@@ -144,6 +144,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('administracion-proyectos-detalle/{id}', [ProyectosController::class, 'indexProgreso']);
     Route::get('usuarios-proyectos', [ProyectosController::class, 'usuariosProyectos']);
     Route::get('ingenieros-proyectos', [ProyectosController::class, 'ingenierosProyectos']);
+    Route::get('usuario-correos', [ProyectosController::class, 'usuariosCorreos']);
 
     //gestion de encargado del proyecto
     Route::apiResource('gestion-proyectos', GestionProyectosController::class);

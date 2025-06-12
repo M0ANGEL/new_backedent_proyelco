@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('image')->default('img/default.jpg');
             $table->string('last_login');
             $table->string('rol');
+            $table->string('correo')->nullable();
             $table->tinyInteger('estado')->length(1)->default(1);
             $table->rememberToken();
             $table->timestamps();
