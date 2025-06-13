@@ -63,8 +63,6 @@ class ProyectosController extends Controller
         ]);
     }
 
-
-
     public function usuariosProyectos()
     {
         //consulta a la bd los proyectos
@@ -85,6 +83,24 @@ class ProyectosController extends Controller
     }
 
     public function ingenierosProyectos()
+    {
+        $proyectosDetalle = DB::connection('mysql')
+            ->table('users')
+            ->where('estado', 1)
+            // ->where('cargo', 'Ingeniero')
+            ->select(
+                'nombre',
+                'id',
+            )
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $proyectosDetalle,
+        ]);
+    }
+
+    public function usuariosCorreos()
     {
         $proyectosDetalle = DB::connection('mysql')
             ->table('users')
@@ -172,7 +188,11 @@ class ProyectosController extends Controller
             $proyecto->pisosCambiarProceso = 2; //se va a borrar despues
             $proyecto->encargado_id = $request->encargado_id;
             $proyecto->ingeniero_id = $request->ingeniero_id;
+
+            // Registrar usuarios de notificación solo si vienen en la solicitud
+            $proyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
             $proyecto->save();
+
 
             // === SIMÉTRICA ===
             if ((int)$request->tipo_obra === 0) {
@@ -336,6 +356,8 @@ class ProyectosController extends Controller
             $updateProyecto->descripcion_proyecto = $request->descripcion_proyecto;
             $updateProyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
             $updateProyecto->codigo_proyecto = $request->codigo_proyecto;
+
+            $updateProyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
             $updateProyecto->save();
 
             return response()->json([
@@ -386,116 +408,6 @@ class ProyectosController extends Controller
 
         ], 200);
     }
-
-
-    // public function PorcentajeDetalles($id){
-
-    //     // formula :    ejecutando:apt con estado 1/(termiando: apt con estado 2 + ejecutando: apt con estado 1)x100
-    //     $data = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->where('proyecto_detalle.proyecto_id', $id)
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.id',
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.piso',
-    //             'proyecto_detalle.apartamento',
-    //             'proyecto_detalle.text_validacion',
-    //             'proyecto_detalle.estado',
-    //         )
-    //         ->get();
-
-    //         la idea cual es que se cumpla la formula para tener los % 
-    //         proyecto: termiando: todo los apartamentos terminado de cada torre y sus procesos con estado = 2
-    //                   ejecutando: todo los apartamentos ejecutando de cada torre y sus procesos con estado = 1
-    //         torre: terminado: seria sumar  los apartamento del proyecto, si tienen dos procesos sumar los que estan con estado = 2 de los procesos que hayan
-    //                ejecutando: seria sumar  los apartamento del proyecto, si tienen dos procesos sumar los que estan con estado = 1 de los procesos que hayan
-    //         proceso: terminado: seria sumar  los apartamento del proceso, estos serian formula por proceso, los apartamentos con estado = 2
-    //                ejecutando: seria sumar  los apartamento del proceso, estos serian formula por proceso, los apartamentos con estado = 1
-
-
-
-
-    //      return response()->json([
-    //         'status' => 'success',
-    //         'data'  => [
-    //             // 'porcentajeXProyecto' => $porcentajeXProyecto,
-    //             // 'porcentajeXTorre' => $porcentajeXTorre,
-    //             // 'porcentajeXProceseo' => $porcentajeXProceseo,
-    //         ],
-
-    //     ], 200);
-    // }
-
-    //     public function PorcentajeDetalles(Request $request)
-    // {
-    //     // Consultar todos los datos del proyecto
-    //     $detalles = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->where('proyecto_id', $request->id)
-    //         ->get();
-
-    //     if ($detalles->isEmpty()) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'No se encontraron registros para este proyecto.',
-    //         ], 404);
-    //     }
-
-    //     // Porcentaje a nivel de Proyecto
-    //     $totalEjecutando = $detalles->where('estado', 1)->count();
-    //     $totalTerminado = $detalles->where('estado', 2)->count();
-    //     $total = $totalEjecutando + $totalTerminado;
-
-    //     $porcentajeXProyecto = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
-
-    //     // Porcentaje por Torre
-    //     $torres = $detalles->groupBy('torre');
-    //     $porcentajeXTorre = [];
-
-    //     foreach ($torres as $torre => $items) {
-    //         $ejecutando = $items->where('estado', 1)->count();
-    //         $terminado = $items->where('estado', 2)->count();
-    //         $totalTorre = $ejecutando + $terminado;
-
-    //         $porcentaje = $totalTorre > 0 ? ($ejecutando / $totalTorre) * 100 : 0;
-
-    //         $porcentajeXTorre[] = [
-    //             'torre' => $torre,
-    //             'ejecutando' => $ejecutando,
-    //             'terminado' => $terminado,
-    //             'porcentaje' => round($porcentaje, 2),
-    //         ];
-    //     }
-
-    //     // Porcentaje por Proceso
-    //     $procesos = $detalles->groupBy('orden_proceso');
-    //     $porcentajeXProceso = [];
-
-    //     foreach ($procesos as $proceso => $items) {
-    //         $ejecutando = $items->where('estado', 1)->count();
-    //         $terminado = $items->where('estado', 2)->count();
-    //         $totalProceso = $ejecutando + $terminado;
-
-    //         $porcentaje = $totalProceso > 0 ? ($ejecutando / $totalProceso) * 100 : 0;
-
-    //         $porcentajeXProceso[] = [
-    //             'proceso' => $proceso,
-    //             'ejecutando' => $ejecutando,
-    //             'terminado' => $terminado,
-    //             'porcentaje' => round($porcentaje, 2),
-    //         ];
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data'  => [
-    //             'porcentajeXProyecto' => round($porcentajeXProyecto, 2),
-    //             'porcentajeXTorre' => $porcentajeXTorre,
-    //             'porcentajeXProceso' => $porcentajeXProceso,
-    //         ],
-    //     ], 200);
-    // }
 
     public function PorcentajeDetalles(Request $request)
     {

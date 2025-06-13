@@ -22,7 +22,6 @@ return new class extends Migration
             $table->string('apartamento',3); // identificador
             $table->string('consecutivo',10); // consecutivo por apartamento
             $table->string('orden_proceso',2); // orden de los procesos
-            $table->string('cambio_proceos',2); // numero para cambio de los procesos
             $table->unsignedBigInteger('procesos_proyectos_id'); //relacion con los procesos
             $table->string('text_validacion')->nullable(); // orden de los procesos
             $table->date('fecha_ini_torre')->nullable(); //fecha en la que inicia la torre
