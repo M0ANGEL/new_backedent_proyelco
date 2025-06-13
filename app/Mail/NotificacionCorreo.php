@@ -19,8 +19,7 @@ class NotificacionCorreo extends Mailable
 
     public function build()
     {
-        return $this->subject('Asunto desde Outlook')
+        return $this->subject($this->detalles['titulo'])
                     ->view('emails.notificacion');
     }
 }
-

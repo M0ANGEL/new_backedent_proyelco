@@ -19,7 +19,7 @@ class EnviarCorreoJob implements ShouldQueue
 
     public function handle()
     {
-        // Obtener todos los proyectos
+        // Paso 1: Consultar todos los proyectos
         $proyectos = DB::connection('mysql')
             ->table('proyecto')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
@@ -33,6 +33,9 @@ class EnviarCorreoJob implements ShouldQueue
             )
             ->get();
 
+        // Paso 2: Agrupar proyectos por usuario
+        $usuariosProyectos = [];
+
         foreach ($proyectos as $proyecto) {
 
             $detalles = DB::connection('mysql')
@@ -40,14 +43,14 @@ class EnviarCorreoJob implements ShouldQueue
                 ->where('proyecto_id', $proyecto->id)
                 ->get();
 
-            // Calcular % atraso
+            // Calcular % de atraso
             $totalEjecutando = $detalles->where('estado', 1)->count();
             $totalTerminado = $detalles->where('estado', 2)->count();
             $total = $totalEjecutando + $totalTerminado;
 
             $porcentajeAtraso = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
 
-            // Calcular % avance
+            // Calcular % de avance
             $totalApartamentos = $detalles->count();
             $apartamentosRealizados = $totalTerminado;
 
@@ -59,24 +62,42 @@ class EnviarCorreoJob implements ShouldQueue
             if ($usuariosIds && count($usuariosIds) > 0) {
                 $usuarios = User::whereIn('id', $usuariosIds)
                     ->whereNotNull('correo')
-                    ->select('id', 'correo','nombre')
+                    ->select('id', 'correo', 'nombre')
                     ->get();
 
                 foreach ($usuarios as $usuario) {
-
-                    $detallesCorreo = [
-                        'titulo' => 'Actualización del Proyecto: ' . $proyecto->descripcion_proyecto,
-                        'mensaje' => "El proyecto tiene un avance del {$porcentajeAvance}% y un atraso del {$porcentajeAtraso}%.",
-                        'proyecto' => $proyecto
-                    ];
-
-                    try {
-                        Mail::to($usuario->correo)->send(new NotificacionCorreo($detallesCorreo));
-                        Log::info('Correo enviado a: ' . $usuario->correo);
-                    } catch (\Exception $e) {
-                        Log::error('Error al enviar correo a ' . $usuario->correo . ': ' . $e->getMessage());
+                    if (!isset($usuariosProyectos[$usuario->correo])) {
+                        $usuariosProyectos[$usuario->correo] = [
+                            'nombre' => $usuario->nombre,
+                            'proyectos' => []
+                        ];
                     }
+
+                    $usuariosProyectos[$usuario->correo]['proyectos'][] = [
+                        'descripcion' => $proyecto->descripcion_proyecto,
+                        'cliente' => $proyecto->emp_nombre,
+                        'encargado' => $proyecto->nombreEncargado,
+                        'ingeniero' => $proyecto->nombreIngeniero,
+                        'porcentajeAvance' => number_format($porcentajeAvance, 2),
+                        'porcentajeAtraso' => number_format($porcentajeAtraso, 2)
+                    ];
                 }
+            }
+        }
+
+        // Paso 3: Enviar un solo correo por usuario consolidado
+        foreach ($usuariosProyectos as $correo => $data) {
+            $detallesCorreo = [
+                'titulo' => 'Resumen de tus proyectos asignados - ' . now()->format('d/m/Y'),
+                'proyectos' => $data['proyectos'],
+                'nombreUsuario' => $data['nombre']
+            ];
+
+            try {
+                Mail::to($correo)->send(new NotificacionCorreo($detallesCorreo));
+                Log::info('Correo enviado a: ' . $correo);
+            } catch (\Exception $e) {
+                Log::error('Error al enviar correo a ' . $correo . ': ' . $e->getMessage());
             }
         }
     }

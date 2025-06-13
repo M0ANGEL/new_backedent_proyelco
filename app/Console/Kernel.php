@@ -18,7 +18,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->job(new \App\Jobs\EnviarCorreoJob)
-            ->dailyAt('16:54'); // Hora deseada para ejecutar el Job
+            ->dailyAt('10:24'); // Hora deseada para ejecutar el Job
         // everyMinute cada minuto para pruebas
 
     }
