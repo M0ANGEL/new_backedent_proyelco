@@ -58,13 +58,27 @@ class ModulosSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now()
             ], //6
-              [
+            [
                 'cod_modulo' => 'PMPT',
                 'nom_modulo' => 'Configuracion Proyectos',
                 'desc_modulo' => 'Configuracion Proyectos',
                 'created_at' => now(),
                 'updated_at' => now()
             ], //7
+            [
+                'cod_modulo' => 'COMPA',
+                'nom_modulo' => 'Compras',
+                'desc_modulo' => 'Modulo de compras',
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //8
+                [
+                'cod_modulo' => 'TH',
+                'nom_modulo' => 'Talento Humano',
+                'desc_modulo' => 'Modulo de Talento Humano',
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //9
         ];
 
         DB::table('modulos')->insert($modulos);

@@ -87,7 +87,7 @@ class MenusSeeder extends Seeder
                 'id_modulo' => 4,
                 'created_at' => now(),
                 'updated_at' => now()
-            ], //12
+            ], //9
             [
                 'nom_menu' => 'Logs',
                 'link_menu' => 'logs',
@@ -95,7 +95,7 @@ class MenusSeeder extends Seeder
                 'id_modulo' => 5,
                 'created_at' => now(),
                 'updated_at' => now()
-            ], //9
+            ], //10
             [
                 'nom_menu' => 'Administrar Clientes',
                 'link_menu' => 'administrar-clientes',
@@ -103,7 +103,7 @@ class MenusSeeder extends Seeder
                 'id_modulo' => 6,
                 'created_at' => now(),
                 'updated_at' => now()
-            ], //10
+            ], //11
             [
                 'nom_menu' => 'Configurar Procesos',
                 'link_menu' => 'administracion-procesos-proyectos',
@@ -111,9 +111,39 @@ class MenusSeeder extends Seeder
                 'id_modulo' => 7,
                 'created_at' => now(),
                 'updated_at' => now()
-            ], //11
-
-
+            ], //12
+            [
+                'nom_menu' => 'Proveedores',
+                'link_menu' => 'admin-proveedores',
+                'desc_menu' => 'Adminsitracion de Proveedores',
+                'id_modulo' => 8,
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //13
+            [
+                'nom_menu' => 'cotizaciones',
+                'link_menu' => 'administrar-cotizaciones',
+                'desc_menu' => 'cotizaciones con proveedores',
+                'id_modulo' => 8,
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //14
+            [
+                'nom_menu' => 'Historial Cotizaciones',
+                'link_menu' => 'historial-cotizaciones',
+                'desc_menu' => 'Historial Cotizaciones',
+                'id_modulo' => 8,
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //15
+              [
+                'nom_menu' => 'Asistencias en Obra',
+                'link_menu' => 'asistencias-obra',
+                'desc_menu' => 'Asistencias en Obra',
+                'id_modulo' => 9,
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //16
         ];
 
         DB::table('menu')->insert($menus);

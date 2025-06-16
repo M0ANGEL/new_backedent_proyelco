@@ -22,6 +22,11 @@ class EmpxUsuSeeder extends Seeder
             'created_at' => now(),
             'updated_at' => now()
         ]);
+        EmpxUsu::create([
+            'id_user' => 2,
+            'id_empresa' => 1,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
     }
-
 }

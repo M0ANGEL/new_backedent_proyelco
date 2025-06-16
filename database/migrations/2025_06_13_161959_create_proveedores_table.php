@@ -20,7 +20,11 @@ return new class extends Migration
             $table->string('estado')->default('1');
             $table->string('ciudad',100);
             $table->string('telefono',20)->nullable();
+            $table->unsignedBigInteger('id_user');
             $table->timestamps();
+
+            $table->foreign('id_user')->references('id')->on('users');
+
         });
     }
 

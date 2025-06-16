@@ -3,18 +3,17 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CargoController;
 use App\Http\Controllers\Api\Clientes\ClientesController;
+use App\Http\Controllers\Api\Compras\CargueComprasController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
-use App\Http\Controllers\Api\ExportExcel\ExcelExportLogsController;
 use App\Http\Controllers\Api\GestionPerfilesController;
+use App\Http\Controllers\Api\Proveedores\ProveedoresController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
 use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
-use App\Http\Controllers\Api\ReportesExcel\ReportesExcelController;
-use App\Http\Controllers\Api\ReportesExcel\UsuariosExcelController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsersPerfilesController;
 use App\Http\Controllers\MenuController;
@@ -25,8 +24,6 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
-use App\Models\Proyectos;
-use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -161,6 +158,14 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('activacionXdia', [GestionProyectosController::class, 'activacionXDia']);
 
 
+    // cargue de archivo plano para papeleria
+    Route::post('papeleria/archivo-plano', [CargueComprasController::class, 'cargarPlanoPapeleria']);
+    Route::post('envio-cotizacion', [CargueComprasController::class, 'EnvioCotizacion']);
+    Route::get('plantilla-papelera-descarga',[CargueComprasController::class, 'plantilla' ]);
+    Route::get('papeleria',[CargueComprasController::class, 'index' ]); //llmado de los datos de cotizacion 
+
+    // proveedores de cotizacion
+    Route::apiResource('proveedores', ProveedoresController::class);
 
 
 });
