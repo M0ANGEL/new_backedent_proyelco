@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsersPerfilesController;
 use App\Http\Controllers\MenuController;
@@ -36,7 +37,7 @@ use App\Http\Controllers\Auth\HorariosController;
 |
  */
 
-Route::post('PorcentajeDetalles',[ProyectosController::class , 'PorcentajeDetalles']);
+Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
 
 Route::post('login', [AuthController::class, 'login']);
 Route::post('clear-sessions', [AuthController::class, 'clearSessions']);
@@ -93,28 +94,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('usuarios/empresas', [EmpxUsuController::class, 'index']);
     Route::delete('/usuarios/empresas/{id}', [EmpxUsuController::class, 'destroy']);
 
-   
-    // Rutas REPORTES
-    // Route::get('reportes/getConvenios', [ReportesExcelController::class, 'getConvenios']);
-
-    // Export Excel Logs
-    // User-Logs
-    // Route::get('users/logs/export/{startDate}/{endDate}', [ExcelExportLogsController::class, 'userLogsExport']);
-
-    // Empresas-Logs
-    // Route::get('empresas/logs/export/{startDate}/{endDate}', [ExcelExportLogsController::class, 'empresasLogsExport']);
-
-
-    // Perfiles-Logs
-    // Route::get('perfiles/logs/export/{startDate}/{endDate}', [ExcelExportLogsController::class, 'perfilesLogsExport']);
-
-
-   
-    // Convenios-Logs
-    // Route::get('convenios/logs/export/{startDate}/{endDate}', [ExcelExportLogsController::class, 'ConveniosLogsExport']);
-
-  
-
     //horarios
     Route::apiResource('crear-horarios', HorariosController::class);
     Route::get('perfiles-horarios', [HorariosController::class, 'getHorarios']);
@@ -161,11 +140,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // cargue de archivo plano para papeleria
     Route::post('papeleria/archivo-plano', [CargueComprasController::class, 'cargarPlanoPapeleria']);
     Route::post('envio-cotizacion', [CargueComprasController::class, 'EnvioCotizacion']);
-    Route::get('plantilla-papelera-descarga',[CargueComprasController::class, 'plantilla' ]);
-    Route::get('papeleria',[CargueComprasController::class, 'index' ]); //llmado de los datos de cotizacion 
+    Route::get('plantilla-papelera-descarga', [CargueComprasController::class, 'plantilla']);
+    Route::get('papeleria', [CargueComprasController::class, 'index']); //llmado de los datos de cotizacion 
 
     // proveedores de cotizacion
     Route::apiResource('proveedores', ProveedoresController::class);
 
-
+    // personal empresa
+    Route::apiResource('personal', PersonalController::class);
 });
