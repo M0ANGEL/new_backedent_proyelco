@@ -1,0 +1,7 @@
+correr servidor para pruebas de correo: php artisan queue:work 
+
+en otra terminal: php artisan tinker
+en terminal 2, este para enviar el correo: dispatch(new \App\Jobs\EnviarCorreoJob);
+
+crear rama: git checkout -b "name"
+borrar rama: git branch -d nombre-de-la-rama
