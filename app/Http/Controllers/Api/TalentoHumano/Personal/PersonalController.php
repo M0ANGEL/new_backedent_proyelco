@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Validator;
 
 class PersonalController extends Controller
 {
-      public function index()
+    public function index()
     {
         $Personales = DB::connection('mysql')
             ->table('personal')

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CargoController;
+use App\Http\Controllers\Api\CargueMasivo\CarguesMasivosCotroller;
 use App\Http\Controllers\Api\Clientes\ClientesController;
 use App\Http\Controllers\Api\Compras\CargueComprasController;
 use App\Http\Controllers\Api\DashboardController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsersPerfilesController;
@@ -148,4 +150,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     // personal empresa
     Route::apiResource('personal', PersonalController::class);
+    Route::apiResource('asistencias', AsistenciasObrasController::class);
+    Route::get('proyectos-activos', [AsistenciasObrasController::class,'proyectosActivos']);
+    Route::get('empleados', [AsistenciasObrasController::class,'empleados']);
+
+    //cargue masivos
+    Route::post('cargueEmpleados', [CarguesMasivosCotroller::class, 'cargueEmpleados']);
+
+
+    //fin cargue masivos
 });

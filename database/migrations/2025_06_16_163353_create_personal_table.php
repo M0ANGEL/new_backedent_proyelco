@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('nombres');
             $table->string('apellidos');
             $table->string('cedula')->unique();
-            $table->string('telefono',12);
+            $table->string('telefono');
             $table->tinyInteger('estado')->default(1);
             $table->unsignedBigInteger('cargo_id');
 

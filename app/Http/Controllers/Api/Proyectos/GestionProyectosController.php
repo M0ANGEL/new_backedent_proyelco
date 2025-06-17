@@ -67,476 +67,136 @@ class GestionProyectosController extends Controller
     }
 
 
-    // public function indexProgreso(Request $request)
-    // {
-    //     $proyectosDetalle = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->where('proyecto_detalle.proyecto_id', $request->id)
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.id',
-    //             'proyecto_detalle.validacion',
-    //             'proyecto_detalle.estado_validacion',
-    //             'proyecto_detalle.consecutivo',
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.piso',
-    //             'proyecto_detalle.apartamento',
-    //             'proyecto_detalle.text_validacion',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso',
-    //             'users.nombre as nombre'
-    //         )
-    //         ->get();
-
-    //     $resultado = [];
-
-    //     foreach ($proyectosDetalle as $item) {
-    //         $torre = $item->torre;
-    //         $orden_proceso = $item->orden_proceso;
-    //         $nombre_proceso = $item->nombre_proceso;
-    //         $text_validacion = $item->text_validacion;
-    //         $validacion = $item->validacion;
-    //         $estado_validacion = $item->estado_validacion;
-    //         $consecutivo = $item->consecutivo;
-    //         $piso = $item->piso;
-
-    //         if (!isset($resultado[$torre])) {
-    //             $resultado[$torre] = [];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso])) {
-    //             $resultado[$torre][$orden_proceso] = [
-    //                 'nombre_proceso' => $nombre_proceso,
-    //                 'text_validacion' => $text_validacion,
-    //                 'estado_validacion' => $estado_validacion,
-    //                 'validacion' => $validacion,
-    //                 'pisos' => [],
-    //             ];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-    //         }
-
-    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-    //             'id' => $item->id,
-    //             'apartamento' => $item->apartamento,
-    //             'consecutivo' => $consecutivo,
-    //             'estado' => $item->estado,
-    //         ];
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $resultado,
-    //     ]);
-    // }
-    // public function indexProgreso(Request $request)
-    // {
-    //     $proyectosDetalle = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->where('proyecto_detalle.proyecto_id', $request->id)
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.id',
-    //             'proyecto_detalle.validacion',
-    //             'proyecto_detalle.estado_validacion',
-    //             'proyecto_detalle.consecutivo',
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.piso',
-    //             'proyecto_detalle.apartamento',
-    //             'proyecto_detalle.text_validacion',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso',
-    //             'users.nombre as nombre'
-    //         )
-    //         ->get();
-
-    //     $resultado = [];
-
-    //     foreach ($proyectosDetalle as $item) {
-    //         $torre = $item->torre;
-    //         $orden_proceso = $item->orden_proceso;
-    //         $nombre_proceso = $item->nombre_proceso;
-    //         $text_validacion = $item->text_validacion;
-    //         $validacion = $item->validacion;
-    //         $estado_validacion = $item->estado_validacion;
-    //         $consecutivo = $item->consecutivo;
-    //         $piso = $item->piso;
-
-    //         if (!isset($resultado[$torre])) {
-    //             $resultado[$torre] = [];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso])) {
-    //             $resultado[$torre][$orden_proceso] = [
-    //                 'nombre_proceso' => $nombre_proceso,
-    //                 'text_validacion' => $text_validacion,
-    //                 'estado_validacion' => $estado_validacion,
-    //                 'validacion' => $validacion,
-    //                 'pisos' => [],
-    //                 'total_apartamentos' => 0,
-    //                 'apartamentos_atraso' => 0,
-    //                 'apartamentos_realizados' => 0,
-    //                 'porcentaje_atraso' => 0,
-    //                 'porcentaje_avance' => 0,
-    //             ];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-    //         }
-
-    //         // Agregar apartamento
-    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-    //             'id' => $item->id,
-    //             'apartamento' => $item->apartamento,
-    //             'consecutivo' => $consecutivo,
-    //             'estado' => $item->estado,
-    //         ];
-
-    //         // Contar total apartamentos
-    //         $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
-
-    //         // Contar apartamentos en atraso (estado = 1)
-    //         if ($item->estado == 1) {
-    //             $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-    //         }
-
-    //         // Contar apartamentos realizados (estado = 2)
-    //         if ($item->estado == 2) {
-    //             $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-    //         }
-    //     }
-
-    //     // Calcular porcentajes finales por proceso
-    //     foreach ($resultado as $torre => $procesos) {
-    //         foreach ($procesos as $orden_proceso => $proceso) {
-    //             $total_atraso = $proceso['apartamentos_atraso'];
-    //             $total_realizados = $proceso['apartamentos_realizados'];
-
-    //             $denominador = $total_atraso + $total_realizados;
-
-    //             // Porcentaje de atraso
-    //             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-
-    //             // Porcentaje de avance
-    //             $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
-
-    //             $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    //             $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
-    //         }
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $resultado,
-    //     ]);
-    // }
     public function indexProgreso(Request $request)
-{
-    $proyectosDetalle = DB::connection('mysql')
-        ->table('proyecto_detalle')
-        ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-        ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-        ->where('proyecto_detalle.proyecto_id', $request->id)
-        ->select(
-            'proyecto_detalle.torre',
-            'proyecto_detalle.id',
-            'proyecto_detalle.validacion',
-            'proyecto_detalle.estado_validacion',
-            'proyecto_detalle.consecutivo',
-            'proyecto_detalle.orden_proceso',
-            'proyecto_detalle.piso',
-            'proyecto_detalle.apartamento',
-            'proyecto_detalle.text_validacion',
-            'proyecto_detalle.estado',
-            'procesos_proyectos.nombre_proceso',
-            'users.nombre as nombre'
-        )
-        ->get();
-
-    $resultado = [];
-    $torreResumen = []; // Nuevo arreglo para guardar totales por torre
-
-    foreach ($proyectosDetalle as $item) {
-        $torre = $item->torre;
-        $orden_proceso = $item->orden_proceso;
-        $nombre_proceso = $item->nombre_proceso;
-        $text_validacion = $item->text_validacion;
-        $validacion = $item->validacion;
-        $estado_validacion = $item->estado_validacion;
-        $consecutivo = $item->consecutivo;
-        $piso = $item->piso;
-
-        // Inicializar torre en resultado
-        if (!isset($resultado[$torre])) {
-            $resultado[$torre] = [];
-        }
-
-        // Inicializar resumen por torre
-        if (!isset($torreResumen[$torre])) {
-            $torreResumen[$torre] = [
-                'total_atraso' => 0,
-                'total_realizados' => 0,
-                'porcentaje_atraso' => 0,
-            ];
-        }
-
-        // Inicializar proceso por torre
-        if (!isset($resultado[$torre][$orden_proceso])) {
-            $resultado[$torre][$orden_proceso] = [
-                'nombre_proceso' => $nombre_proceso,
-                'text_validacion' => $text_validacion,
-                'estado_validacion' => $estado_validacion,
-                'validacion' => $validacion,
-                'pisos' => [],
-                'total_apartamentos' => 0,
-                'apartamentos_atraso' => 0,
-                'apartamentos_realizados' => 0,
-                'porcentaje_atraso' => 0,
-                'porcentaje_avance' => 0,
-            ];
-        }
-
-        if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-            $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-        }
-
-        // Agregar apartamento
-        $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-            'id' => $item->id,
-            'apartamento' => $item->apartamento,
-            'consecutivo' => $consecutivo,
-            'estado' => $item->estado,
-        ];
-
-        // Contar total apartamentos
-        $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
-
-        // Contar apartamentos en atraso (estado = 1)
-        if ($item->estado == 1) {
-            $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-            $torreResumen[$torre]['total_atraso'] += 1; // Sumar al total de la torre
-        }
-
-        // Contar apartamentos realizados (estado = 2)
-        if ($item->estado == 2) {
-            $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-            $torreResumen[$torre]['total_realizados'] += 1; // Sumar al total de la torre
-        }
-    }
-
-    // Calcular porcentajes por proceso
-    foreach ($resultado as $torre => $procesos) {
-        foreach ($procesos as $orden_proceso => $proceso) {
-            $total_atraso = $proceso['apartamentos_atraso'];
-            $total_realizados = $proceso['apartamentos_realizados'];
-            $denominador = $total_atraso + $total_realizados;
-
-            // Porcentaje de atraso por proceso
-            $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-
-            // Porcentaje de avance por proceso
-            $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
-
-            $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-            $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
-        }
-    }
-
-    // Calcular porcentaje de atraso por torre
-    foreach ($torreResumen as $torre => $datos) {
-        $total_atraso = $datos['total_atraso'];
-        $total_realizados = $datos['total_realizados'];
-        $denominador = $total_atraso + $total_realizados;
-
-        $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-
-        $torreResumen[$torre]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    }
-
-    return response()->json([
-        'status' => 'success',
-        'data' => $resultado,
-        'torreResumen' => $torreResumen // Aquí te envío el atraso por torre
-    ]);
-}
-
-
-
-
-    /*    public function usuariosProyectos(Request $request)
     {
-        //consulta a la bd los proyectos
         $proyectosDetalle = DB::connection('mysql')
-            ->table('users')
-            ->where('estado', 1)
+            ->table('proyecto_detalle')
+            ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
+            ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->where('proyecto_detalle.proyecto_id', $request->id)
             ->select(
-                'nombre',
-                'id',
+                'proyecto_detalle.torre',
+                'proyecto_detalle.id',
+                'proyecto_detalle.validacion',
+                'proyecto_detalle.estado_validacion',
+                'proyecto_detalle.consecutivo',
+                'proyecto_detalle.orden_proceso',
+                'proyecto_detalle.piso',
+                'proyecto_detalle.apartamento',
+                'proyecto_detalle.text_validacion',
+                'proyecto_detalle.estado',
+                'procesos_proyectos.nombre_proceso',
+                'users.nombre as nombre'
             )
             ->get();
 
+        $resultado = [];
+        $torreResumen = []; // Nuevo arreglo para guardar totales por torre
+
+        foreach ($proyectosDetalle as $item) {
+            $torre = $item->torre;
+            $orden_proceso = $item->orden_proceso;
+            $nombre_proceso = $item->nombre_proceso;
+            $text_validacion = $item->text_validacion;
+            $validacion = $item->validacion;
+            $estado_validacion = $item->estado_validacion;
+            $consecutivo = $item->consecutivo;
+            $piso = $item->piso;
+
+            // Inicializar torre en resultado
+            if (!isset($resultado[$torre])) {
+                $resultado[$torre] = [];
+            }
+
+            // Inicializar resumen por torre
+            if (!isset($torreResumen[$torre])) {
+                $torreResumen[$torre] = [
+                    'total_atraso' => 0,
+                    'total_realizados' => 0,
+                    'porcentaje_atraso' => 0,
+                ];
+            }
+
+            // Inicializar proceso por torre
+            if (!isset($resultado[$torre][$orden_proceso])) {
+                $resultado[$torre][$orden_proceso] = [
+                    'nombre_proceso' => $nombre_proceso,
+                    'text_validacion' => $text_validacion,
+                    'estado_validacion' => $estado_validacion,
+                    'validacion' => $validacion,
+                    'pisos' => [],
+                    'total_apartamentos' => 0,
+                    'apartamentos_atraso' => 0,
+                    'apartamentos_realizados' => 0,
+                    'porcentaje_atraso' => 0,
+                    'porcentaje_avance' => 0,
+                ];
+            }
+
+            if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+                $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
+            }
+
+            // Agregar apartamento
+            $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
+                'id' => $item->id,
+                'apartamento' => $item->apartamento,
+                'consecutivo' => $consecutivo,
+                'estado' => $item->estado,
+            ];
+
+            // Contar total apartamentos
+            $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
+
+            // Contar apartamentos en atraso (estado = 1)
+            if ($item->estado == 1) {
+                $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
+                $torreResumen[$torre]['total_atraso'] += 1; // Sumar al total de la torre
+            }
+
+            // Contar apartamentos realizados (estado = 2)
+            if ($item->estado == 2) {
+                $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
+                $torreResumen[$torre]['total_realizados'] += 1; // Sumar al total de la torre
+            }
+        }
+
+        // Calcular porcentajes por proceso
+        foreach ($resultado as $torre => $procesos) {
+            foreach ($procesos as $orden_proceso => $proceso) {
+                $total_atraso = $proceso['apartamentos_atraso'];
+                $total_realizados = $proceso['apartamentos_realizados'];
+                $denominador = $total_atraso + $total_realizados;
+
+                // Porcentaje de atraso por proceso
+                $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+
+                // Porcentaje de avance por proceso
+                $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
+
+                $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+                $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
+            }
+        }
+
+        // Calcular porcentaje de atraso por torre
+        foreach ($torreResumen as $torre => $datos) {
+            $total_atraso = $datos['total_atraso'];
+            $total_realizados = $datos['total_realizados'];
+            $denominador = $total_atraso + $total_realizados;
+
+            $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+
+            $torreResumen[$torre]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+        }
+
         return response()->json([
             'status' => 'success',
-            'data' => $proyectosDetalle,
+            'data' => $resultado,
+            'torreResumen' => $torreResumen // Aquí te envío el atraso por torre
         ]);
-    } */
-
-    /*    public function store(Request $request)
-    {
-
-        try {
-            $validator = Validator::make($request->all(), [
-                'estado' => ['required'],
-                'bloques' => ['array'],
-                'codigo_proyecto' => ['required', 'string'],
-                'fecha_inicio' => ['required', 'string'],
-                'tipoProyecto_id' => ['required'],
-                'encargado_id' => ['required'],
-                'torres' => ['required', 'string'],
-                'nit' => ['required', 'string'],
-                'tipo_obra' => ['required'],
-                'cant_pisos' => ['string'],
-                'apt' => ['string'],
-                'pisosCambiarProceso' => ['required', 'string'],
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
-
-            // Buscar cliente
-            $cliente = Clientes::where('nit', $request->nit)->first();
-            if (!$cliente) {
-                return response()->json(['error' => 'Cliente no encontrado'], 404);
-            }
-
-            // Inicializar valores predeterminados
-            $cant_pisos = (int)$request->cant_pisos;
-            $total_apt = (int)$request->apt;
-
-            // Si es obra personalizada (tipo_obra = 1), recalcular cant_pisos y total_apt
-            if ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
-                $cant_pisos = 0;
-                $total_apt = 0;
-
-                foreach ($request->bloques as $bloque) {
-                    if (!empty($bloque['apartamentosPorPiso'])) {
-                        $cant_pisos = max($cant_pisos, count($bloque['apartamentosPorPiso']));
-                        foreach ($bloque['apartamentosPorPiso'] as $aptPorPiso) {
-                            $total_apt += (int)$aptPorPiso;
-                        }
-                    }
-                }
-            }
-
-            // Crear proyecto principal
-            $proyecto = new Proyectos();
-            $proyecto->tipoProyecto_id = $request->tipoProyecto_id;
-            $proyecto->cliente_id = $cliente->id;
-            $proyecto->usuario_crea_id = Auth::id();
-            $proyecto->descripcion_proyecto = $request->descripcion;
-            $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
-            $proyecto->codigo_proyecto = $request->codigo_proyecto;
-            $proyecto->torres = (int)$request->torres ?? count($request->bloques);
-            $proyecto->cant_pisos = $cant_pisos;
-            $proyecto->apt = $total_apt;
-            $proyecto->pisosCambiarProceso = $request->pisosCambiarProceso;
-            $proyecto->encargado_id = $request->encargado_id;
-            $proyecto->save();
-
-            // Lógica para obra simétrica
-            if ((int)$request->tipo_obra === 0) {
-                $torres = (int)$request->torres;
-                $pisos = (int)$request->cant_pisos;
-                $apartamentosPorPiso = (int)$request->apt;
-
-                for ($torre = 1; $torre <= $torres; $torre++) {
-                    $numeroApartamento = 1;
-                    for ($piso = 1; $piso <= $pisos; $piso++) {
-                        for ($i = 1; $i <= $apartamentosPorPiso; $i++) {
-                            $detalle = new ProyectosDetalle();
-                            $detalle->proyecto_id = $proyecto->id;
-                            $detalle->torre = $torre;
-                            $detalle->piso = $piso;
-                            $detalle->apartamento = $numeroApartamento++;
-                            $detalle->save();
-                        }
-                    }
-                }
-
-                // Lógica para obra personalizada
-            } elseif ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
-                foreach ($request->bloques as $indiceTorre => $bloque) {
-                    $piso = 1;
-                    foreach ($bloque['apartamentosPorPiso'] as $aptPorPiso) {
-                        for ($i = 1; $i <= (int)$aptPorPiso; $i++) {
-                            $detalle = new ProyectosDetalle();
-                            $detalle->proyecto_id = $proyecto->id;
-                            $detalle->torre = $indiceTorre + 1;
-                            $detalle->piso = $piso;
-                            $detalle->apartamento = $i;
-                            $detalle->save();
-                        }
-                        $piso++;
-                    }
-                }
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $proyecto
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
-            ], 500);
-        }
-    } */
-
-    public function show($id)
-    {
-        return response()->json(Proyectos::find($id), 200);
     }
 
-    /*   public function update(Request $request, $id)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'tipoPoryecto_id' => ['required', 'string'],
-                'nombre_proceso' => ['required', 'string'],
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
-
-            // Obtener la categoría actual
-            $cliente = Proyectos::findOrFail($id);
-            $cliente->tipoPoryecto_id = $request->tipoPoryecto_id;
-            $cliente->nombre_proceso = $request->nombre_proceso;
-            $cliente->id_user = Auth::id();
-            $cliente->save();
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $cliente
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
-                'code' => $e->getCode()
-            ], 500);
-        }
-    } */
 
     public function destroy($id)
     {

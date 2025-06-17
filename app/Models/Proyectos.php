@@ -12,16 +12,19 @@ class Proyectos extends Model
     protected $table = "proyecto";
 
     protected $fillable = [
-        'estado',
-        'bloques',
-        'codigo_contrato',
-        'fecha_inicio',
         'tipoProyecto_id',
+        'cliente_id',
+        'usuario_crea_id',
+        'encargado_id',
+        'descripcion_proyecto',
+        'fecha_inicio',
+        'codigo_proyecto',
         'torres',
-        'nit',
-        'PsiguentePro',
-        'tipo_obra',
         'cant_pisos',
         'apt',
+        'pisosCambiarProcesos',
+        'usuarios_notificacion',
+        'estado',
+        'fecha_ini_proyecto',
     ];
 }
