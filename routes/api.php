@@ -148,11 +148,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // proveedores de cotizacion
     Route::apiResource('proveedores', ProveedoresController::class);
 
-    // personal empresa
+    // personal empresa y asistencias
     Route::apiResource('personal', PersonalController::class);
     Route::apiResource('asistencias', AsistenciasObrasController::class);
     Route::get('proyectos-activos', [AsistenciasObrasController::class,'proyectosActivos']);
     Route::get('empleados', [AsistenciasObrasController::class,'empleados']);
+    Route::get('asistencias-confirmar', [AsistenciasObrasController::class,'UsuarioConfirmarAsistencia']);
+    Route::post('asistencias-confirmar-empleado', [AsistenciasObrasController::class,'confirmarAsistencias']);
 
     //cargue masivos
     Route::post('cargueEmpleados', [CarguesMasivosCotroller::class, 'cargueEmpleados']);
