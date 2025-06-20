@@ -39,135 +39,60 @@ class AsistenciasObrasController extends Controller
         ]);
     }
 
-    // public function store(Request $request)
-    // {
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'proyecto_id' => ['required'],
-    //             'fecha_programacion' => ['required', 'string'],
-    //         ]);
+    public function store(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'proyecto_id' => ['required'],
+                'fecha_programacion' => ['required', 'array', 'size:2'], // Esperas rango: inicio y fin
+                'personal_id' => ['required', 'array'],
+            ]);
 
-    //         //validación falla
-    //         if ($validator->fails()) {
-    //             return response()->json(['errors' => $validator->errors()], 400);
-    //         }
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
 
-    //         foreach ($request->personal_id as $usuario_id) {
-    //             $asistencia = new AsistenciasObra();
-    //             $asistencia->personal_id = $usuario_id;
-    //             $asistencia->proyecto_id = $request->proyecto_id;
-    //             $asistencia->fecha_programacion = Carbon::parse($request->fecha_programacion);
-    //             $asistencia->usuario_asigna = Auth::id();
-    //             $asistencia->save();
-    //         }
+            // Tomar la fecha de inicio y la fecha fin
+            $fechaInicio = Carbon::parse($request->fecha_programacion[0]);
+            $fechaFin = Carbon::parse($request->fecha_programacion[1]);
 
+            // Validación: la fecha de inicio debe ser menor o igual que la fecha fin
+            if ($fechaInicio->greaterThan($fechaFin)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'La fecha de inicio no puede ser mayor a la fecha fin.',
+                ], 400);
+            }
 
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'data' => $asistencia
-    //         ], 200);
-    //     } catch (Exception $e) {
-    //         // Manejo de errores
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'error ' . $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
+            // Generar todas las fechas del rango
+            $fechas = [];
+            for ($date = $fechaInicio->copy(); $date->lte($fechaFin); $date->addDay()) {
+                $fechas[] = $date->copy();
+            }
 
-    // public function store(Request $request)
-    // {
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'proyecto_id' => ['required'],
-    //             'fecha_programacion' => ['required', 'array'],
-    //             'personal_id' => ['required', 'array'],
-    //         ]);
+            // Crear registros por cada fecha y cada persona
+            foreach ($fechas as $fecha) {
+                foreach ($request->personal_id as $usuario_id) {
+                    $asistencia = new AsistenciasObra();
+                    $asistencia->personal_id = $usuario_id;
+                    $asistencia->proyecto_id = $request->proyecto_id;
+                    $asistencia->fecha_programacion = $fecha;
+                    $asistencia->usuario_asigna = Auth::id();
+                    $asistencia->save();
+                }
+            }
 
-    //         if ($validator->fails()) {
-    //             return response()->json(['errors' => $validator->errors()], 400);
-    //         }
-
-    //         foreach ($request->fecha_programacion as $fecha) {
-    //             foreach ($request->personal_id as $usuario_id) {
-    //                 $asistencia = new AsistenciasObra();
-    //                 $asistencia->personal_id = $usuario_id;
-    //                 $asistencia->proyecto_id = $request->proyecto_id;
-    //                 $asistencia->fecha_programacion = Carbon::parse($fecha);
-    //                 $asistencia->usuario_asigna = Auth::id();
-    //                 $asistencia->save();
-    //             }
-    //         }
-
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'message' => 'Asistencias creadas correctamente.',
-    //         ], 200);
-    //     } catch (Exception $e) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'error ' . $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-public function store(Request $request)
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'proyecto_id' => ['required'],
-            'fecha_programacion' => ['required', 'array', 'size:2'], // Esperas rango: inicio y fin
-            'personal_id' => ['required', 'array'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
-
-        // Tomar la fecha de inicio y la fecha fin
-        $fechaInicio = Carbon::parse($request->fecha_programacion[0]);
-        $fechaFin = Carbon::parse($request->fecha_programacion[1]);
-
-        // Validación: la fecha de inicio debe ser menor o igual que la fecha fin
-        if ($fechaInicio->greaterThan($fechaFin)) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Asistencias creadas correctamente.',
+            ], 200);
+        } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'La fecha de inicio no puede ser mayor a la fecha fin.',
-            ], 400);
+                'message' => 'error ' . $e->getMessage(),
+            ], 500);
         }
-
-        // Generar todas las fechas del rango
-        $fechas = [];
-        for ($date = $fechaInicio->copy(); $date->lte($fechaFin); $date->addDay()) {
-            $fechas[] = $date->copy();
-        }
-
-        // Crear registros por cada fecha y cada persona
-        foreach ($fechas as $fecha) {
-            foreach ($request->personal_id as $usuario_id) {
-                $asistencia = new AsistenciasObra();
-                $asistencia->personal_id = $usuario_id;
-                $asistencia->proyecto_id = $request->proyecto_id;
-                $asistencia->fecha_programacion = $fecha;
-                $asistencia->usuario_asigna = Auth::id();
-                $asistencia->save();
-            }
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Asistencias creadas correctamente.',
-        ], 200);
-    } catch (Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'error ' . $e->getMessage(),
-        ], 500);
     }
-}
-
-
-
 
 
     public function show($id)

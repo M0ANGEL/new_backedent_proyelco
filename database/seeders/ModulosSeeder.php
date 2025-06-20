@@ -74,7 +74,7 @@ class ModulosSeeder extends Seeder
             ], //8
                 [
                 'cod_modulo' => 'TH',
-                'nom_modulo' => 'Talento Humano',
+                'nom_modulo' => 'Modulo de Talento Humano',
                 'desc_modulo' => 'Modulo de Talento Humano',
                 'created_at' => now(),
                 'updated_at' => now()
