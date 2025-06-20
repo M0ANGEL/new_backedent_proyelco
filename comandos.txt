@@ -5,3 +5,7 @@ en terminal 2, este para enviar el correo: dispatch(new \App\Jobs\EnviarCorreoJo
 
 crear rama: git checkout -b "name"
 borrar rama: git branch -d nombre-de-la-rama
+
+
+correro front: npm run build
+

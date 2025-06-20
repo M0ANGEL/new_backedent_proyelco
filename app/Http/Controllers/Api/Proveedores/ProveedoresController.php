@@ -49,7 +49,7 @@ class ProveedoresController extends Controller
             $proveedor->correo = $request->correo;
             $proveedor->ciudad = $request->ciudad;
             $proveedor->telefono = $request->telefono;
-            // $proveedor->id_user = $user->id;
+            $proveedor->id_user = $user->id;
             $proveedor->save();
 
             return response()->json([
@@ -90,7 +90,6 @@ class ProveedoresController extends Controller
             $proveedor->correo = $request->correo;
             $proveedor->ciudad = $request->ciudad;
             $proveedor->telefono = $request->telefono;
-            // $proveedor->id_user = Auth::id();
             $proveedor->save();
 
             return response()->json([

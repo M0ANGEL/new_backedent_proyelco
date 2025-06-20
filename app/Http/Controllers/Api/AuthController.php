@@ -121,25 +121,6 @@ class AuthController extends Controller
         }
     }
 
-    public function empleadoDeVacaciones($cedula)
-    {
-        $empleado = DB::connection('mysql')->table('empleados')
-            ->where('estado', 1)
-            ->where('cedula', $cedula)
-            ->first();
-        if (!$empleado) {
-            return false;
-        }
-
-        $fechaActual = date('Y-m-d');
-
-        return DB::connection('mysql')->table('vacaciones')
-            ->where('empleado_id', $empleado->id)
-            ->whereDate('fecha_inicio', '<=', $fechaActual)
-            ->whereDate('fecha_fin', '>=', $fechaActual)
-            ->exists();
-    }
-
     public function logout(Request $request)
     {
         $user = $request->user();
@@ -169,8 +150,6 @@ class AuthController extends Controller
 
         return response('Logged out successfully', 200);
     }
-
-
 
     public function userProfile()
     {
@@ -365,7 +344,7 @@ class AuthController extends Controller
     }
 
     public function clearSessions(Request $request)
-    {;
+    {
         $credentials = $request->validate([
             'username' => 'required',
             'password' => 'required',
