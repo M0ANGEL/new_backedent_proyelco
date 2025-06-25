@@ -28,13 +28,6 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
 
-            // if ($this->empleadoDeVacaciones($user->cedula)) {
-            //     return response()->json([
-            //         'status' => 'error',
-            //         'message' => 'No puedes ingresar al sistema mientras estás de vacaciones.',
-            //     ], 403);
-            // }
-
             // Validar si el usuario está activo
             if ($user->estado != 1) {
                 return response()->json([
@@ -42,51 +35,6 @@ class AuthController extends Controller
                     'message' => 'Usuario inactivo, por favor contacta con el personal de TI',
                 ], 403);
             }
-
-            // Obtener el perfil de horario del usuario
-            // $perfilHorario = $user->horario;
-
-            // if (!$perfilHorario) {
-            //     return response()->json([
-            //         'status' => 'error',
-            //         'message' => 'No tienes un  horario asignado, comunicate con TI',
-            //     ], 403);
-            // }
-
-            // // Obtener el día y hora actual
-            // $diaActual = ucfirst(Carbon::now()->locale('es')->isoFormat('dddd'));
-            // $horaActual = Carbon::now()->format('H:i:s');
-
-            // // Validar si el usuario está en su horario regular
-            // $horarioValido = false;
-
-            // if ($perfilHorario) {
-            //     $horarioValido = HorarioDetalle::where('horario_id', $perfilHorario->id)
-            //         ->where('dia', $diaActual)
-            //         ->where('estado', 1)
-            //         ->whereTime('hora_inicio', '<=', $horaActual)
-            //         ->whereTime('hora_final', '>=', $horaActual)
-            //         ->exists();
-            // }
-
-            // if (!$horarioValido) {
-            //     // Obtener la fecha y hora actual
-            //     $fechaHoraActual = Carbon::now();
-
-            //     // Validar si el usuario está dentro de un horario adicional
-            //     $horarioAdicional = HorarioAdicional::where('estado', 1)
-            //         ->where('fecha_inicio', '<=', $fechaHoraActual)
-            //         ->where('fecha_final', '>=', $fechaHoraActual)
-            //         ->whereJsonContains('usuarios_autorizados', strval($user->id))
-            //         ->exists();
-
-            //     if (!$horarioValido && !$horarioAdicional) {
-            //         return response()->json([
-            //             'status' => 'error',
-            //             'message' => 'No estás dentro de tu horario laboral, o tu horario adicional no está disponible. Comunícate con TI.',
-            //         ], 403);
-            //     }
-            // }
 
 
             // Verificar si ya tiene una sesión activa (si su rol es "facturación")
@@ -283,62 +231,6 @@ class AuthController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-            ], 500);
-        }
-    }
-
-    public function userDocumentos()
-    {
-        try {
-            $user = auth()->user()->load('tipos_documentos', 'tipos_documentos.privilegios');
-            return response()->json([
-                'status' => 'success',
-                'data' => $user,
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No se pudo cargar los datos de los usuarios.',
-                'error' => $e,
-            ], 500);
-        }
-    }
-
-    public function userBodegas()
-    {
-        try {
-            $user = auth()->user()->load('bodega');
-            return response()->json([
-                'status' => 'success',
-                'data' => $user,
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No se pudo cargar los datos de los usuarios.',
-                'error' => $e,
-            ], 500);
-        }
-    }
-
-    public function validarDocumento(Request $request)
-    {
-        try {
-            $user = auth()->user();
-            $documento = TiposDocumento::where('codigo', $request->codigo_documento)->first();
-            $userDocumento = UsersDocumentos::with('documentoInfo.cabeceras.campo')->where('id_user', $user->id)
-                ->where('id_tipoDocu', $documento->id)
-                ->where('id_empresa', $request->id_empresa)
-                ->first();
-            return response()->json([
-                'status' => 'success',
-                'data' => $userDocumento,
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No se pudo validar el documento.',
-                'error' => $e,
             ], 500);
         }
     }

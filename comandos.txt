@@ -9,3 +9,25 @@ borrar rama: git branch -d nombre-de-la-rama
 
 correro front: npm run build
 
+
+tareas cron de cpanel
+
+cd /home/proyelc1/prueba.proyelco.com && /opt/cpanel/ea-php81/root/usr/bin/php artisan queue:work --stop-when-empty-borraresto-borraresto	    
+Minuto
+
+y
+
+cd /home/proyelc1/prueba.proyelco.com && /opt/cpanel/ea-php81/root/usr/bin/php artisan schedule:run >> /dev/null 2>&1
+
+
+ftp
+
+Pruebas:
+
+front
+usuario: ftp_front_pruebas
+contra. front.prueba
+
+backend
+usuario: ftp_backend_pruebas
+contraseña: Bakend.prueba
