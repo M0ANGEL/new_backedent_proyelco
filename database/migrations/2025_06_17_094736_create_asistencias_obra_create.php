@@ -19,8 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('proyecto_id');
             $table->unsignedBigInteger('usuario_asigna');
             $table->unsignedBigInteger('usuario_confirma')->nullable();
-            $table->tinyInteger('confirmacion')->default(0);
-            $table->string('detalle')->nullable();
+            $table->tinyInteger('confirmacion')->default(0); //1 asistencia cofnirmada, 2 no asistencia
+            $table->string('detalle')->nullable(); //aqui el motivo, se le cponcatena el detalle si tiene
             $table->date('fecha_programacion');
             $table->date('fecha_confirmacion')->nullable();
 

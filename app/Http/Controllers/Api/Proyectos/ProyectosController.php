@@ -146,11 +146,13 @@ class ProyectosController extends Controller
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)->first();
+            $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
+            ->select('descripcion_proyecto')
+            ->first();
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Codigo de proyecto amarrado a otro proyecto',
+                    'message' => 'Error: Codigo de proyecto amarrado al proyecto: ' . $proyectoUnico->descripcion_proyecto,
                 ], 404);
             }
 

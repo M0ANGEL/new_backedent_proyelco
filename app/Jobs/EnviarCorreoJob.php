@@ -87,6 +87,7 @@ class EnviarCorreoJob implements ShouldQueue
 
         // Paso 3: Enviar un solo correo por usuario consolidado
         foreach ($usuariosProyectos as $correo => $data) {
+            Log::info('enviando');
             $detallesCorreo = [
                 'titulo' => 'Resumen de tus proyectos asignados - ' . now()->format('d/m/Y'),
                 'proyectos' => $data['proyectos'],

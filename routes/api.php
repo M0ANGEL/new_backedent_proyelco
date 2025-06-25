@@ -131,6 +131,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('info-proyecto/{id}', [GestionProyectosController::class, 'infoProyecto']);
     Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarApt']);
     Route::post('gestion-confirmar-validar', [GestionProyectosController::class, 'validarProceso']);
+    Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
 
     //cart dashboard
     Route::get('info-dashboard-card', [ProyectosController::class, 'infoCard']);
@@ -155,6 +156,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('empleados', [AsistenciasObrasController::class,'empleados']);
     Route::get('asistencias-confirmar', [AsistenciasObrasController::class,'UsuarioConfirmarAsistencia']);
     Route::post('asistencias-confirmar-empleado', [AsistenciasObrasController::class,'confirmarAsistencias']);
+    Route::post('no-asistencias-empleado', [AsistenciasObrasController::class,'confirmarNoAsistencias']);
+    Route::post('cambio-Proyecto-Asistencia', [AsistenciasObrasController::class,'cambioProyectoAsistencia']);
 
     //cargue masivos
     Route::post('cargueEmpleados', [CarguesMasivosCotroller::class, 'cargueEmpleados']);

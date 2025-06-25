@@ -94,7 +94,6 @@ class AsistenciasObrasController extends Controller
         }
     }
 
-
     public function show($id)
     {
         return response()->json(AsistenciasObra::find($id), 200);
@@ -137,7 +136,6 @@ class AsistenciasObrasController extends Controller
 
     public function confirmarAsistencias(Request $request)
     {
-        info($request->all());
         $Personal = AsistenciasObra::find($request->id);
 
         $Personal->detalle = $request->detalle ? $request->detalle : "Sin detalle";
@@ -199,6 +197,7 @@ class AsistenciasObrasController extends Controller
             ->join('cargos', 'cargos.id', '=', 'personal.cargo_id')
             ->join('proyecto', 'proyecto.id', '=', 'asistencias_obra_create.proyecto_id')
             ->whereIn('proyecto_id', $obras) // Aquí debe ir solo IDs
+            ->where('fecha_programacion', $hoy) // para que solo muestre los usuarios de el dia actual
             ->select(
                 'asistencias_obra_create.*',
                 'personal.nombres',
@@ -206,6 +205,7 @@ class AsistenciasObrasController extends Controller
                 'personal.cedula',
                 'cargos.nombre as cargo',
                 'proyecto.descripcion_proyecto',
+                'proyecto.id as proyecto_id',
                 'users.nombre as usurioConfirma'
             )
             ->get();
@@ -220,5 +220,23 @@ class AsistenciasObrasController extends Controller
             'status' => 'success',
             'data' => $asistencias,
         ]);
+    }
+
+    public function confirmarNoAsistencias(Request $request)
+    {
+        $Personal = AsistenciasObra::find($request->id);
+
+        $Personal->detalle = $request->motivo . ($request->detalle ?? "Sin detalle");
+        $Personal->usuario_confirma = Auth::id();
+        $Personal->fecha_confirmacion = now();
+        $Personal->confirmacion = "2";
+        $Personal->update();
+    }
+
+    public function cambioProyectoAsistencia(Request $request)
+    {
+        $Personal = AsistenciasObra::find($request->id);
+        $Personal->proyecto_id = $request->proyecto_id;
+        $Personal->update();
     }
 }
