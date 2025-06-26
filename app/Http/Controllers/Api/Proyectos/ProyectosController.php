@@ -152,7 +152,7 @@ class ProyectosController extends Controller
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Codigo de proyecto amarrado al proyecto: ' . $proyectoUnico->descripcion_proyecto,
+                    'message' => 'Error: Codigo no disponible, esta amarrado al proyecto: ' . $proyectoUnico->descripcion_proyecto,
                 ], 404);
             }
 
