@@ -132,12 +132,14 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarApt']);
     Route::post('gestion-confirmar-validar', [GestionProyectosController::class, 'validarProceso']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
+    Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
+
 
     //cart dashboard
     Route::get('info-dashboard-card', [ProyectosController::class, 'infoCard']);
 
     // activacion de pisos por dias en procesos  
-    Route::post('activacionXdia', [GestionProyectosController::class, 'activacionXDia']);
+    // Route::post('activacionXdia', [GestionProyectosController::class, 'activacionXDia']);
 
 
     // cargue de archivo plano para papeleria

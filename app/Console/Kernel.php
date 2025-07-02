@@ -17,10 +17,16 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule)
     {
+        // job de enviar correos de info de los proyectos
         $schedule->job(new \App\Jobs\EnviarCorreoJob)
-            ->dailyAt('10:24'); // Hora deseada para ejecutar el Job
+            ->dailyAt('10:24')
+            ->timezone('America/Bogota');
         // everyMinute cada minuto para pruebas
 
+        // job de activar pisos diarios si el procesos esta completo, solo dias habilis 
+        $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
+            ->dailyAt('00:00')
+            ->timezone('America/Bogota');
     }
 
 
