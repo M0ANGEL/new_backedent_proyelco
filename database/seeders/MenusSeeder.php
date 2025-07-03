@@ -81,7 +81,7 @@ class MenusSeeder extends Seeder
                 'updated_at' => now()
             ], //8
             [
-                'nom_menu' => 'Gestion',
+                'nom_menu' => 'Gestion Ingenieros Obras',
                 'link_menu' => 'gestion-proyectos',
                 'desc_menu' => 'Gestion Poryectos',
                 'id_modulo' => 4,
@@ -160,7 +160,7 @@ class MenusSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now()
             ], //18 
-              [
+            [
                 'nom_menu' => 'Administrar Personal',
                 'link_menu' => 'administrar-personal',
                 'desc_menu' => 'Administrar Personal',
@@ -168,6 +168,14 @@ class MenusSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now()
             ], //19
+            [
+                'nom_menu' => 'Gestion Encargado Obra',
+                'link_menu' => 'gestion-encargado-obra',
+                'desc_menu' => 'Gestion Encargado Obra',
+                'id_modulo' => 4,
+                'created_at' => now(),
+                'updated_at' => now()
+            ], //20
         ];
 
         DB::table('menu')->insert($menus);

@@ -39,10 +39,7 @@ use App\Http\Controllers\Auth\HorariosController;
 |
  */
 
-Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
-Route::get('/entorno', function () {
-    return response()->json(['entorno' => 'production']);
-});
+// Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
 
 
 Route::post('login', [AuthController::class, 'login']);

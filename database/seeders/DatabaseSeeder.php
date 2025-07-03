@@ -24,5 +24,6 @@ class DatabaseSeeder extends Seeder
         $this->call(PerfilesModulosSeeder::class);
         $this->call(PerfilesUsuarioSeeder::class);
         $this->call(CargosUsuarioSeeder::class);
+        $this->call(TipoProyectosSeeder::class);
     }
 }
