@@ -41,6 +41,7 @@ use App\Http\Controllers\Auth\HorariosController;
 
 // Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
 
+
 Route::post('login', [AuthController::class, 'login']);
 Route::post('clear-sessions', [AuthController::class, 'clearSessions']);
 Route::middleware([CompanyDatabase::class])->group(function () {
