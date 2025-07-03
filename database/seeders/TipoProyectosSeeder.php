@@ -24,6 +24,6 @@ class TipoProyectosSeeder extends Seeder
             ], //1
         ];
 
-        DB::table('submenu')->insert($tipoProyectos);
+        DB::table('tipos_de_proyectos')->insert($tipoProyectos);
     }
 }
