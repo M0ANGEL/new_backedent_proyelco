@@ -18,7 +18,7 @@ class TipoProyectosSeeder extends Seeder
         $tipoProyectos = [
             [
                 'nombre_tipo' => 'Apartamentos',
-                'user_id ' => 1,
+                'user_id' => 1,
                 'created_at' => now(),
                 'updated_at' => now()
             ], //1
