@@ -19,7 +19,6 @@ class TipoProyectosSeeder extends Seeder
             [
                 'nombre_tipo' => 'Apartamentos',
                 'user_id ' => 1,
-                'estado' => 'Cargue Empleados',
                 'created_at' => now(),
                 'updated_at' => now()
             ], //1
