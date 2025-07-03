@@ -40,6 +40,10 @@ use App\Http\Controllers\Auth\HorariosController;
  */
 
 Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
+Route::get('/entorno', function () {
+    return response()->json(['entorno' => '🧪 Pruebas']);
+});
+
 
 Route::post('login', [AuthController::class, 'login']);
 Route::post('clear-sessions', [AuthController::class, 'clearSessions']);
