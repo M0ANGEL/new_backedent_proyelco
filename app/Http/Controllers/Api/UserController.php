@@ -72,12 +72,14 @@ class UserController extends Controller
                 'correo' => ['nullable', 'email', 'max:255'],
             ]);
 
+            $cargoName = Cargo::where('id',$request->cargos)->first();
+
             $data = $request->all();
             $user = new User();
             $user->cedula = $data['cedula'];
             $user->nombre = $data['nombre'];
             $user->telefono = $data['telefono'];
-            $user->cargo = $data['cargo'];
+            $user->cargo = $cargoName->nombre;
             $user->username =  $data['username'];
             $user->password = bcrypt($data['password']);
             $user->rol = $data['rol'];
