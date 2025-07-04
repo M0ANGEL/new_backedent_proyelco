@@ -74,8 +74,8 @@ class ModulosSeeder extends Seeder
             ], //8
                 [
                 'cod_modulo' => 'CA',
-                'nom_modulo' => 'Cronogra Asistencias',
-                'desc_modulo' => 'Cronogra Asistencias',
+                'nom_modulo' => 'Cronograma Asistencias',
+                'desc_modulo' => 'Cronograna Asistencias',
                 'created_at' => now(),
                 'updated_at' => now()
             ], //9
