@@ -65,7 +65,7 @@ class UserController extends Controller
         try {
 
             $validatedData = $request->validate([
-                'username' => ['required', 'string', 'max:100', new UniqueUserName],
+                'username' => ['required', 'string', 'max:100', 'unique:users,username'],
                 'password' => ['required', 'string', 'regex:/^[a-zA-Z0-9]{6,8}$/'],
                 'cargos'   => ['required'],
                 'perfiles' => ['required'],
@@ -417,62 +417,62 @@ class UserController extends Controller
         return response()->json(['message' => 'Contraseña actualizada correctamente'], 200);
     }
 
-    public function removerItem(Request $request)
-    {
-        DB::beginTransaction();
-        try {
-            switch ($request->ctrl) {
-                case 'empresa':
-                    $empresaUsu = EmpxUsu::with('empresa')->findOrFail($request->id);
-                    $empresaUsu->delete();
-                    // Registrar acción en empresas_usu_Logs
-                    $log = new EmpxUsuLog();
-                    $log->id_user = Auth::user()->id;
-                    $log->id_emp_x_usu = $empresaUsu->id;
-                    $log->accion = 'Se elimina empresa-usu con id ' . $empresaUsu->id . ' correspondiente a la EMPRESA: ' . $empresaUsu->empresa->emp_nombre;
-                    $log->data = 'Registro eliminado';
-                    $log->old = $empresaUsu;
-                    $log->save();
-                    foreach ($request->bodegas as $bodegaUsu_id) {
-                        $bodegaUsu = BodegaxUsu::with('bodega')->findOrFail($bodegaUsu_id);
-                        $bodegaUsu->delete();
-                        // Registrar acción en bodegas_usu_Logs
-                        $log = new BodegaxUsuLogs();
-                        $log->id_user = Auth::user()->id;
-                        $log->id_bodega_x_usu = $bodegaUsu->id;
-                        $log->accion = 'Se eliminó bodega-usu con id ' . $bodegaUsu->id . ' correspondiente a la BODEGA: ' . $bodegaUsu->bodega->bod_nombre;
-                        $log->data = 'Registro eliminado';
-                        $log->old = $bodegaUsu;
-                        $log->save();
-                    }
-                    break;
-                case 'bodega':
-                    $bodegaUsu = BodegaxUsu::with('bodega')->findOrFail($request->id);
-                    $bodegaUsu->delete();
-                    // Registrar acción en bodegas_usu_Logs
-                    $log = new BodegaxUsuLogs();
-                    $log->id_user = Auth::user()->id;
-                    $log->id_bodega_x_usu = $bodegaUsu->id;
-                    $log->accion = 'Se eliminó bodega-usu con id ' . $bodegaUsu->id . ' correspondiente a la BODEGA: ' . $bodegaUsu->bodega->bod_nombre;
-                    $log->data = 'Registro eliminado';
-                    $log->old = $bodegaUsu;
-                    $log->save();
-                    break;
-            }
+    // public function removerItem(Request $request)
+    // {
+    //     DB::beginTransaction();
+    //     try {
+    //         switch ($request->ctrl) {
+    //             case 'empresa':
+    //                 $empresaUsu = EmpxUsu::with('empresa')->findOrFail($request->id);
+    //                 $empresaUsu->delete();
+    //                 // Registrar acción en empresas_usu_Logs
+    //                 $log = new EmpxUsuLog();
+    //                 $log->id_user = Auth::user()->id;
+    //                 $log->id_emp_x_usu = $empresaUsu->id;
+    //                 $log->accion = 'Se elimina empresa-usu con id ' . $empresaUsu->id . ' correspondiente a la EMPRESA: ' . $empresaUsu->empresa->emp_nombre;
+    //                 $log->data = 'Registro eliminado';
+    //                 $log->old = $empresaUsu;
+    //                 $log->save();
+    //                 foreach ($request->bodegas as $bodegaUsu_id) {
+    //                     $bodegaUsu = BodegaxUsu::with('bodega')->findOrFail($bodegaUsu_id);
+    //                     $bodegaUsu->delete();
+    //                     // Registrar acción en bodegas_usu_Logs
+    //                     $log = new BodegaxUsuLogs();
+    //                     $log->id_user = Auth::user()->id;
+    //                     $log->id_bodega_x_usu = $bodegaUsu->id;
+    //                     $log->accion = 'Se eliminó bodega-usu con id ' . $bodegaUsu->id . ' correspondiente a la BODEGA: ' . $bodegaUsu->bodega->bod_nombre;
+    //                     $log->data = 'Registro eliminado';
+    //                     $log->old = $bodegaUsu;
+    //                     $log->save();
+    //                 }
+    //                 break;
+    //             case 'bodega':
+    //                 $bodegaUsu = BodegaxUsu::with('bodega')->findOrFail($request->id);
+    //                 $bodegaUsu->delete();
+    //                 // Registrar acción en bodegas_usu_Logs
+    //                 $log = new BodegaxUsuLogs();
+    //                 $log->id_user = Auth::user()->id;
+    //                 $log->id_bodega_x_usu = $bodegaUsu->id;
+    //                 $log->accion = 'Se eliminó bodega-usu con id ' . $bodegaUsu->id . ' correspondiente a la BODEGA: ' . $bodegaUsu->bodega->bod_nombre;
+    //                 $log->data = 'Registro eliminado';
+    //                 $log->old = $bodegaUsu;
+    //                 $log->save();
+    //                 break;
+    //         }
 
-            DB::commit();
-            return response()->json([
-                'message' => ucfirst($request->ctrl) . " eliminada con éxito!",
-            ], Response::HTTP_ACCEPTED);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-            ], 500);
-        }
-    }
+    //         DB::commit();
+    //         return response()->json([
+    //             'message' => ucfirst($request->ctrl) . " eliminada con éxito!",
+    //         ], Response::HTTP_ACCEPTED);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => $e->getMessage(),
+    //             'line' => $e->getLine(),
+    //         ], 500);
+    //     }
+    // }
 
     public function getListUsersByRoles(Request $request)
     {
