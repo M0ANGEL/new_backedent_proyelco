@@ -88,7 +88,7 @@ class ProyectosController extends Controller
         $proyectosDetalle = DB::connection('mysql')
             ->table('users')
             ->where('estado', 1)
-            ->where('cargo', 'Ingeniero Obra')
+            ->where('rol', 'Ingeniero Obra')
             ->select(
                 'nombre',
                 'id',
