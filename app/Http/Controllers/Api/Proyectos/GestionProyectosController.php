@@ -315,10 +315,10 @@ class GestionProyectosController extends Controller
 
 
             // si esta valdado no hacer nada
-            if ($pisosPrevios->validacion == 1 && $pisosPrevios->estado_validacion == 1) {
+            if ($pisosPrevios->validacion === 1 && $pisosPrevios->estado_validacion === 1) {
                 DB::commit();
                 return response()->json([
-                    'success' => true,
+                    'success' => "Ya validado co: FP-6325.22",
                 ]);
             }
 
@@ -368,7 +368,14 @@ class GestionProyectosController extends Controller
                         ->get();
 
                     // si los pisos requeridos para activar el proceso actual, estan confirmados en el proceso anetrioro, esto sera true
-                    $puedeValidarse = $pisosPrevios->isNotEmpty() && $pisosPrevios->every(fn($apt) => $apt->estado == 2);
+                    $puedeValidarse = $pisosPrevios->isNotEmpty() && $pisosPrevios->every(fn($apt) => $apt->estado == "2");
+                    if (!$puedeValidarse) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'No se puede validar este piso porque el proceso anterior aun no cumple con el minimo de pisos requeridos. ' .  $pisosRequeridos,
+                        ], 400);
+                    }
+                    return;
                 } else {
                     // valdiar que el proceso anterior este confirmado todo (estado: 2)
                     $totalPisos = $existeProcesoAnterior->pluck('piso')->unique()->count();
@@ -489,6 +496,8 @@ class GestionProyectosController extends Controller
             //buscamos el proyecto padre
             $proyecto = Proyectos::findOrFail($info->proyecto_id);
             $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
+            $aptMinimos = (int) $proyecto->minimoApt; //pisos minimos para tomarlo como completo
+
 
 
 
@@ -532,14 +541,18 @@ class GestionProyectosController extends Controller
                 ->get();
 
             //validar que todo los apt de ese piso esten confirmados
-            $todosConfirmados = $aptosDelPiso->every(fn($apt) => $apt->estado == 2);
+
+            // $todosConfirmados = $aptosDelPiso->every(fn($apt) => $apt->estado == 2);
+            $numAptos = $aptosDelPiso->count(); // Total de aptos
+            $confirmados = $aptosDelPiso->where('estado', 2)->count(); // Confirmados
+            $esValido = $confirmados >= $aptMinimos;
+
 
             //si estan confirmado todo los apartamentos de ese piso sigue la logica, del resto termina aqui.
-            if ($todosConfirmados) {
+            if ($esValido) {
 
                 if ($orden_proceso === 1) {
                     // Si es el primer proceso (no depende de ningún proceso anterior)
-                    // Habilita el piso siguiente para el primer proceso (orden_proceso = 1)
                     ProyectosDetalle::where('torre', $torre)
                         ->where('orden_proceso', $orden_proceso)
                         ->where('piso', $piso + 1)
@@ -554,7 +567,20 @@ class GestionProyectosController extends Controller
                         ->where('piso', 1)
                         ->get();
 
+                    //       // si necesita validacion pero no esta validadio no hacer nada
+                    // if ($InicioProceso->validacion == 1 && $InicioProceso->estado_validacion == 0) {
+                    //     DB::commit();
+                    //     return response()->json([
+                    //         'success' => true,
+                    //     ]);
+                    // }
+
+                    //     info($InicioProceso);
+
                     $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != 0);
+
+
+                  
 
                     //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
                     if ($confirmarInicioProceso == true) {
@@ -668,14 +694,30 @@ class GestionProyectosController extends Controller
                         } else {
 
                             // Se valida que el proceso actual tenga confirmado los pisos de pisosPorProceso, si lo esta, iniciar proceso siguiente
+                            // $InicioProceso = ProyectosDetalle::where('torre', $torre)
+                            //     ->where('orden_proceso', $orden_proceso)
+                            //     ->where('proyecto_id', $proyecto->id)
+                            //     ->whereIn('piso', range(1, $pisosPorProceso))
+                            //     ->get();
+
+                            // $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado == "2");
+
+
+                            //logica nuerva de acuerdo a minimo de apt
                             $InicioProceso = ProyectosDetalle::where('torre', $torre)
                                 ->where('orden_proceso', $orden_proceso)
                                 ->where('proyecto_id', $proyecto->id)
                                 ->whereIn('piso', range(1, $pisosPorProceso))
                                 ->get();
 
-                            $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado == "2");
+                            // Agrupar por piso
+                            $pisos = $InicioProceso->groupBy('piso');
 
+                            // Verificar si se cumplen todos los pisos
+                            $confirmarInicioProceso = $pisos->count() == $pisosPorProceso &&
+                                $pisos->every(function ($aptosDelPiso) use ($aptMinimos) {
+                                    return $aptosDelPiso->where('estado', 2)->count() >= $aptMinimos;
+                                });
 
                             //si el proceso actual cumple con los pisos re pisosPorPrceos en estado 2, activar
                             if ($confirmarInicioProceso == true) {
@@ -952,6 +994,16 @@ class GestionProyectosController extends Controller
             //buscamos el detalle del proyeto para ese piso
             $info = ProyectosDetalle::findOrFail($request->aptId);
 
+            $numeroCambio = $info->orden_proceso + "1";
+            //buscamos los cambio de piso para proceso, el numero minimo de pisos que debe cumplir el proecso anterior
+            $CambioProcesoProyectos = CambioProcesoProyectos::where('proyecto_id', $info->proyecto_id)
+                ->where('proceso', $numeroCambio)->first();
+
+            $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
+
+
+
+
             // se registra historial de cambio de estado del apt
             $LogCambioEstadoApt = new AnulacionApt();
             $LogCambioEstadoApt->motivo = $request->detalle;
@@ -985,5 +1037,147 @@ class GestionProyectosController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    // cambio estado de apartamentos confirado por erro-mentira informativo
+    public function CambioEstadosAptInformativo(Request $request)
+    {
+        try {
+            $info = ProyectosDetalle::findOrFail($request->aptId);
+            $proyectoId = $info->proyecto_id;
+            $pisoActual = (int) $info->piso;
+            $ordenProcesoActual = (int) $info->orden_proceso;
+
+            $numeroCambio = $ordenProcesoActual + 1;
+
+            $CambioProcesoProyectos = CambioProcesoProyectos::where('proyecto_id', $proyectoId)
+                ->where('proceso', $numeroCambio)
+                ->first();
+
+            $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
+
+            // Simulación del impacto
+            $pisosAfectados = [];
+            $procesosAfectados = [];
+
+            // Buscamos los pisos siguientes del mismo proceso
+            $pisosPosteriores = ProyectosDetalle::where('proyecto_id', $proyectoId)
+                ->where('orden_proceso', $ordenProcesoActual)
+                ->where('piso', '>', $pisoActual)
+                ->where('estado', 0)
+                ->get();
+
+            foreach ($pisosPosteriores as $piso) {
+                $pisosAfectados[] = [
+                    'id' => $piso->id,
+                    'piso' => $piso->piso,
+                    'nuevo_estado' => 0
+                ];
+            }
+
+            // Si el proceso siguiente ya tiene activaciones, también afectarlo
+            $procesosSiguientes = ProyectosDetalle::where('proyecto_id', $proyectoId)
+                ->where('orden_proceso', $numeroCambio)
+                ->where('estado', 0)
+                ->get();
+
+            foreach ($procesosSiguientes as $proc) {
+                $procesosAfectados[] = [
+                    'id' => $proc->id,
+                    'piso' => $proc->piso,
+                    'orden_proceso' => $proc->orden_proceso,
+                    'nuevo_estado' => 0
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'mensaje' => 'Esta es una vista previa. No se han aplicado cambios.',
+                'afecta_pisos' => $pisosAfectados,
+                'afecta_procesos' => $procesosAfectados,
+                'apartamento_original' => $info
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en consulta informativa',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    // app/Http/Controllers/ProyectoController.php
+
+    public function simularAnulacion(Request $request)
+    {
+        $aptId = $request->aptId;
+
+        $apt = ProyectosDetalle::findOrFail($aptId);
+
+        $anulado = [
+            'id' => $apt->id,
+            'proceso' => $apt->orden_proceso,
+            'piso' => $apt->piso,
+        ];
+
+        $proyecto_id = $apt->proyecto_id;
+
+        $afectados = [];
+
+        // Obtener el proceso actual
+        $procesoActual = $apt->orden_proceso;
+        $pisoActual = $apt->piso;
+
+        // Buscar si afecta pisos posteriores del mismo proceso
+        $pisosPosteriores = ProyectosDetalle::where('proyecto_id', $proyecto_id)
+            ->where('orden_proceso', $procesoActual)
+            ->where('piso', '>', $pisoActual)
+            ->where('estado', '!=', 0)
+            ->get();
+
+        foreach ($pisosPosteriores as $piso) {
+            $afectados[] = [
+                'id' => $piso->id,
+                'proceso' => $piso->orden_proceso,
+                'piso' => $piso->piso,
+                'razon' => 'Piso posterior del mismo proceso',
+            ];
+        }
+
+        // Buscar si afecta al siguiente proceso
+        $procesoSiguiente = $procesoActual + 1;
+        $configProceso = CambioProcesoProyectos::where('proyecto_id', $proyecto_id)
+            ->where('proceso', $procesoSiguiente)
+            ->first();
+
+        if ($configProceso) {
+            $pisosRequeridos = (int) $configProceso->numero;
+
+            // Verifica si el pisoActual es uno de los necesarios
+            if ($pisoActual <= $pisosRequeridos) {
+                $pisosSiguienteProceso = ProyectosDetalle::where('proyecto_id', $proyecto_id)
+                    ->where('orden_proceso', $procesoSiguiente)
+                    ->where('estado', '!=', 0)
+                    ->get();
+
+                foreach ($pisosSiguienteProceso as $piso) {
+                    $afectados[] = [
+                        'id' => $piso->id,
+                        'proceso' => $piso->orden_proceso,
+                        'piso' => $piso->piso,
+                        'razon' => 'No se cumplen los pisos requeridos del proceso anterior',
+                    ];
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'resultado' => [
+                'anulado' => $anulado,
+                'afectados' => $afectados,
+            ],
+        ]);
     }
 }
