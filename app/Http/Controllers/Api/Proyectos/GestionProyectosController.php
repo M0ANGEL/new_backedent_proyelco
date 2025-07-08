@@ -460,6 +460,8 @@ class GestionProyectosController extends Controller
 
     public function validarProceso(Request $request)
     {
+
+        info("entor");
         // iniciode trasnacion
         DB::beginTransaction();
 
@@ -485,6 +487,12 @@ class GestionProyectosController extends Controller
                 ->where('proyecto_id', $proyecto)
                 ->where('piso', $pisoActual)
                 ->first();
+
+
+                // proyecto padre
+            $proyectoPadre = Proyectos::where('id',$proyecto)->first();
+
+            $aptMinimos = $proyectoPadre->minimoApt;
 
 
             // si esta valdado no hacer nada
@@ -538,17 +546,26 @@ class GestionProyectosController extends Controller
                         ->where('orden_proceso', $procesoAnterior)
                         ->where('proyecto_id', $proyecto)
                         ->whereIn('piso', range(1, $pisosRequeridos))
-                        ->get();
+                        ->where('estado', '2')
+                        ->get()
+                        ->groupBy('piso');
 
-                    // si los pisos requeridos para activar el proceso actual, estan confirmados en el proceso anetrioro, esto sera true
-                    $puedeValidarse = $pisosPrevios->isNotEmpty() && $pisosPrevios->every(fn($apt) => $apt->estado == "2");
-                    if (!$puedeValidarse) {
+                    $pisosCumplenMinimo = 0;
+
+                    foreach ($pisosPrevios as $piso => $aptos) {
+                        if ($aptos->count() >= $proyectoPadre->aptMinimos) {
+                            $pisosCumplenMinimo++;
+                        }
+                    }
+
+                    if ($pisosCumplenMinimo < $pisosRequeridos) {
                         return response()->json([
                             'success' => false,
-                            'message' => 'No se puede validar este piso porque el proceso anterior aun no cumple con el minimo de pisos requeridos. ' .  $pisosRequeridos,
+                            'message' => "No se puede validar este piso porque no se han confirmado al menos $aptMinimos apartamentos en cada uno de los $pisosRequeridos pisos requeridos.",
                         ], 400);
                     }
-                    return;
+
+                    // return;
                 } else {
                     // valdiar que el proceso anterior este confirmado todo (estado: 2)
                     $totalPisos = $existeProcesoAnterior->pluck('piso')->unique()->count();
@@ -844,7 +861,7 @@ class GestionProyectosController extends Controller
                                 ->where('orden_proceso', $orden_proceso + 1)
                                 ->where('proyecto_id', $proyecto->id)
                                 ->where('piso', $nuevoPisoParaActivar)
-                                ->where('estado', 1)
+                                // ->where('estado', 1)
                                 ->first();
 
                             // se compara, si la validaion esta confirmada sigue su flujo, si no no hacer nada
