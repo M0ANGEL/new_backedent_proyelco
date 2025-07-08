@@ -19,8 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('userConfirmo_id');
             $table->unsignedBigInteger('proyecto_id');
             $table->string('motivo');
-            $table->string('piso',2);
-            $table->string('apt',2);
+            $table->string('piso');
+            $table->string('apt');
             $table->dateTime('fecha_confirmo');
 
             $table->timestamps();

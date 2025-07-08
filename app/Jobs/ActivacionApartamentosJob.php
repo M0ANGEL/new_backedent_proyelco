@@ -34,6 +34,7 @@ class ActivacionApartamentosJob implements ShouldQueue
         $proyectos = Proyectos::all();
 
         foreach ($proyectos as $proyecto) {
+            $aptMinimos = $proyecto->aptMinimos;
             $cantidadActivar = $proyecto->activador_pordia_apt;
 
             $procesos = ProyectosDetalle::where('proyecto_id', $proyecto->id)
@@ -58,18 +59,17 @@ class ActivacionApartamentosJob implements ShouldQueue
                         ->where('torre', $torre)
                         ->get();
 
-                    $completado = $registrosActual->every(fn($r) => $r->estado == 2);
-
-                    if (!$completado) {
-                        continue;
-                    }
-
-                    $pendientesSiguiente = ProyectosDetalle::where('proyecto_id', $proyecto->id)
+                    $registrosSiguiente = ProyectosDetalle::where('proyecto_id', $proyecto->id)
                         ->where('orden_proceso', $procesoSiguiente)
                         ->where('estado', 0)
                         ->where('torre', $torre)
+                        ->orderBy('piso')
                         ->orderBy('consecutivo')
                         ->get();
+
+                    if ($registrosSiguiente->isEmpty()) {
+                        continue;
+                    }
 
                     $registroValidar = ProyectosDetalle::where('proyecto_id', $proyecto->id)
                         ->where('orden_proceso', $procesoSiguiente)
@@ -87,14 +87,35 @@ class ActivacionApartamentosJob implements ShouldQueue
                         ->whereDate('fecha_habilitado', $hoy->toDateString())
                         ->exists();
 
-                    if ($ya_habilitado_hoy || $pendientesSiguiente->isEmpty()) {
+                    if ($ya_habilitado_hoy) {
                         continue;
                     }
 
-                    // Activar los N apartamentos
-                    $apartamentosPorActivar = $pendientesSiguiente->take($cantidadActivar);
+                    // Agrupar por piso el proceso actual
+                    $agrupadosPorPiso = $registrosActual->groupBy('piso');
 
-                    foreach ($apartamentosPorActivar as $apt) {
+                    // Determinar los pisos que ya están completos
+                    $pisosCompletos = [];
+                    foreach ($agrupadosPorPiso as $piso => $items) {
+                        $confirmados = $items->where('estado', 2)->count();
+                        if ($confirmados >= $aptMinimos) {
+                            $pisosCompletos[] = $piso;
+                        }
+                    }
+
+                    // Solo activar los apartamentos del proceso siguiente que estén en pisos ya completos
+                    $activables = $registrosSiguiente->filter(function ($item) use ($pisosCompletos) {
+                        return in_array($item->piso, $pisosCompletos);
+                    });
+
+                    if ($activables->isEmpty()) {
+                        continue;
+                    }
+
+                    // Activar solo la cantidad diaria permitida
+                    $activadosHoy = $activables->take($cantidadActivar);
+
+                    foreach ($activadosHoy as $apt) {
                         $apt->update([
                             'fecha_habilitado' => $hoy->toDateString(),
                             'estado' => 1,

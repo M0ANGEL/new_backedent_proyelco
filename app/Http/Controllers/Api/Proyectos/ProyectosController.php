@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Proyectos;
 use App\Http\Controllers\Controller;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
+use App\Models\NombreTorres;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 use Carbon\Carbon;
@@ -39,7 +40,7 @@ class ProyectosController extends Controller
             $detalles = DB::connection('mysql')
                 ->table('proyecto_detalle')
                 ->where('proyecto_id', $proyecto->id)
-                ->where('orden_proceso','!=', 1)
+                ->where('orden_proceso', '!=', 1)
                 ->get();
 
             // Cálculo de atraso
@@ -135,6 +136,7 @@ class ProyectosController extends Controller
                 'ingeniero_id' => ['required'],
                 'torres' => ['required', 'string'],
                 'nit' => ['required', 'string'],
+                'minimoApt' => ['required', 'string'],
                 'tipo_obra' => ['required'],
                 'cant_pisos' /* => ['string','null'] */,
                 'apt' /* => ['string','null'] */,
@@ -147,8 +149,8 @@ class ProyectosController extends Controller
             }
 
             $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
-            ->select('descripcion_proyecto')
-            ->first();
+                ->select('descripcion_proyecto')
+                ->first();
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
@@ -188,6 +190,7 @@ class ProyectosController extends Controller
             $proyecto->torres = (int)$request->torres ?? count($request->bloques);
             $proyecto->cant_pisos = $cant_pisos;
             $proyecto->apt = $total_apt;
+            $proyecto->minimoApt = $request->minimoApt;
             $proyecto->pisosCambiarProceso = 2; //se va a borrar despues
             $proyecto->encargado_id = $request->encargado_id;
             $proyecto->ingeniero_id = $request->ingeniero_id;
@@ -237,6 +240,20 @@ class ProyectosController extends Controller
                     }
                 }
 
+                // nombre de torres
+                if (isset($request->torreNombres) && is_array($request->torreNombres)) {
+                    foreach ($request->torreNombres as $index => $nombreTorre) {
+                        if (!empty($nombreTorre)) {
+                            $cambioPisosNuevo = new NombreTorres();
+                            $cambioPisosNuevo->proyecto_id = $proyecto->id;
+                            $cambioPisosNuevo->nombre_torre = $nombreTorre;
+                            $cambioPisosNuevo->torre = $index + 1; // Mantener el orden
+                            $cambioPisosNuevo->save();
+                        }
+                    }
+                }
+
+
 
                 // === PERSONALIZADA ===
             } elseif ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
@@ -273,6 +290,19 @@ class ProyectosController extends Controller
                             $cambioPisosNuevo->proceso = $index + 1; // Esto mantiene el orden
                             $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
                             $cambioPisosNuevo->save();
+                        }
+                    }
+                }
+
+                // nombre de torres personalizado
+                if (isset($request->bloques) && is_array($request->bloques)) {
+                    foreach ($request->bloques as $index => $bloque) {
+                        if (!empty($bloque['nombre'])) {
+                            $nombreTorre = new NombreTorres();
+                            $nombreTorre->proyecto_id = $proyecto->id;
+                            $nombreTorre->nombre_torre = $bloque['nombre'];
+                            $nombreTorre->torre = $index + 1; // posición/orden
+                            $nombreTorre->save();
                         }
                     }
                 }
@@ -326,6 +356,8 @@ class ProyectosController extends Controller
                 'descripcion_proyecto' => ['required', 'string'],
                 'fecha_inicio' => ['required', 'string'],
                 'codigo_proyecto' => ['required', 'string'],
+                'activador_pordia_apt' => ['required', 'string'],
+                'minimoApt' => ['required', 'string'],
             ]);
 
             if ($validator->fails()) {
@@ -360,6 +392,8 @@ class ProyectosController extends Controller
             $updateProyecto->descripcion_proyecto = $request->descripcion_proyecto;
             $updateProyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
             $updateProyecto->codigo_proyecto = $request->codigo_proyecto;
+            $updateProyecto->activador_pordia_apt = $request->activador_pordia_apt;
+            $updateProyecto->minimoApt = $request->minimoApt;
 
             $updateProyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
             $updateProyecto->save();
@@ -413,154 +447,80 @@ class ProyectosController extends Controller
         ], 200);
     }
 
-    // public function PorcentajeDetalles(Request $request)
-    // {
-    //     // Consultar todos los datos del proyecto
-    //     $detalles = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->where('proyecto_id', $request->id)
-    //         ->get();
-
-    //     if ($detalles->isEmpty()) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'No se encontraron registros para este proyecto.',
-    //         ], 404);
-    //     }
-
-    //     // Porcentaje a nivel de Proyecto
-    //     $totalEjecutando = $detalles->where('estado', 1)->count();
-    //     $totalTerminado = $detalles->where('estado', 2)->count();
-    //     $total = $totalEjecutando + $totalTerminado;
-
-    //     $porcentajeXProyecto = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
-
-    //     // Porcentaje por Torre
-    //     $torres = $detalles->groupBy('torre');
-    //     $porcentajeXTorre = [];
-
-    //     foreach ($torres as $torre => $items) {
-    //         $ejecutando = $items->where('estado', 1)->count();
-    //         $terminado = $items->where('estado', 2)->count();
-    //         $totalTorre = $ejecutando + $terminado;
-
-    //         $porcentaje = $totalTorre > 0 ? ($ejecutando / $totalTorre) * 100 : 0;
-
-    //         $porcentajeXTorre[] = [
-    //             'torre' => $torre,
-    //             'ejecutando' => $ejecutando,
-    //             'terminado' => $terminado,
-    //             'porcentaje' => round($porcentaje, 2),
-    //         ];
-    //     }
-
-    //     // Porcentaje por Proceso agrupado por Torre
-    //     $porcentajeXProceso = [];
-
-    //     foreach ($torres as $torre => $items) {
-    //         $procesos = $items->groupBy('orden_proceso');
-
-    //         foreach ($procesos as $proceso => $apartamentos) {
-    //             $ejecutando = $apartamentos->where('estado', 1)->count();
-    //             $terminado = $apartamentos->where('estado', 2)->count();
-    //             $totalProceso = $ejecutando + $terminado;
-
-    //             $porcentaje = $totalProceso > 0 ? ($ejecutando / $totalProceso) * 100 : 0;
-
-    //             $porcentajeXProceso[] = [
-    //                 'torre' => $torre,
-    //                 'proceso' => $proceso,
-    //                 'ejecutando' => $ejecutando,
-    //                 'terminado' => $terminado,
-    //                 'porcentaje' => round($porcentaje, 2),
-    //             ];
-    //         }
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data'  => [
-    //             'porcentajeXProyecto' => round($porcentajeXProyecto, 2),
-    //             'porcentajeXTorre' => $porcentajeXTorre,
-    //             'porcentajeXProceso' => $porcentajeXProceso,
-    //         ],
-    //     ], 200);
-    // }
 
     public function PorcentajeDetalles(Request $request)
-{
-    // Consultar todos los datos del proyecto, excluyendo el proceso 1
-    $detalles = DB::connection('mysql')
-        ->table('proyecto_detalle')
-        ->where('proyecto_id', $request->id)
-        ->where('orden_proceso', '!=', 1) // Excluir proceso 1
-        ->get();
+    {
+        // Consultar todos los datos del proyecto, excluyendo el proceso 1
+        $detalles = DB::connection('mysql')
+            ->table('proyecto_detalle')
+            ->where('proyecto_id', $request->id)
+            ->where('orden_proceso', '!=', 1) // Excluir proceso 1
+            ->get();
 
-    if ($detalles->isEmpty()) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'No se encontraron registros para este proyecto.',
-        ], 404);
-    }
+        if ($detalles->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No se encontraron registros para este proyecto.',
+            ], 404);
+        }
 
-    // Porcentaje a nivel de Proyecto
-    $totalEjecutando = $detalles->where('estado', 1)->count();
-    $totalTerminado = $detalles->where('estado', 2)->count();
-    $total = $totalEjecutando + $totalTerminado;
+        // Porcentaje a nivel de Proyecto
+        $totalEjecutando = $detalles->where('estado', 1)->count();
+        $totalTerminado = $detalles->where('estado', 2)->count();
+        $total = $totalEjecutando + $totalTerminado;
 
-    $porcentajeXProyecto = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
+        $porcentajeXProyecto = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
 
-    // Porcentaje por Torre
-    $torres = $detalles->groupBy('torre');
-    $porcentajeXTorre = [];
+        // Porcentaje por Torre
+        $torres = $detalles->groupBy('torre');
+        $porcentajeXTorre = [];
 
-    foreach ($torres as $torre => $items) {
-        $ejecutando = $items->where('estado', 1)->count();
-        $terminado = $items->where('estado', 2)->count();
-        $totalTorre = $ejecutando + $terminado;
+        foreach ($torres as $torre => $items) {
+            $ejecutando = $items->where('estado', 1)->count();
+            $terminado = $items->where('estado', 2)->count();
+            $totalTorre = $ejecutando + $terminado;
 
-        $porcentaje = $totalTorre > 0 ? ($ejecutando / $totalTorre) * 100 : 0;
+            $porcentaje = $totalTorre > 0 ? ($ejecutando / $totalTorre) * 100 : 0;
 
-        $porcentajeXTorre[] = [
-            'torre' => $torre,
-            'ejecutando' => $ejecutando,
-            'terminado' => $terminado,
-            'porcentaje' => round($porcentaje, 2),
-        ];
-    }
-
-    // Porcentaje por Proceso agrupado por Torre
-    $porcentajeXProceso = [];
-
-    foreach ($torres as $torre => $items) {
-        $procesos = $items->groupBy('orden_proceso');
-
-        foreach ($procesos as $proceso => $apartamentos) {
-            // Aquí ya no necesitas excluir porque ya lo filtraste desde la consulta
-            $ejecutando = $apartamentos->where('estado', 1)->count();
-            $terminado = $apartamentos->where('estado', 2)->count();
-            $totalProceso = $ejecutando + $terminado;
-
-            $porcentaje = $totalProceso > 0 ? ($ejecutando / $totalProceso) * 100 : 0;
-
-            $porcentajeXProceso[] = [
+            $porcentajeXTorre[] = [
                 'torre' => $torre,
-                'proceso' => $proceso,
                 'ejecutando' => $ejecutando,
                 'terminado' => $terminado,
                 'porcentaje' => round($porcentaje, 2),
             ];
         }
+
+        // Porcentaje por Proceso agrupado por Torre
+        $porcentajeXProceso = [];
+
+        foreach ($torres as $torre => $items) {
+            $procesos = $items->groupBy('orden_proceso');
+
+            foreach ($procesos as $proceso => $apartamentos) {
+                // Aquí ya no necesitas excluir porque ya lo filtraste desde la consulta
+                $ejecutando = $apartamentos->where('estado', 1)->count();
+                $terminado = $apartamentos->where('estado', 2)->count();
+                $totalProceso = $ejecutando + $terminado;
+
+                $porcentaje = $totalProceso > 0 ? ($ejecutando / $totalProceso) * 100 : 0;
+
+                $porcentajeXProceso[] = [
+                    'torre' => $torre,
+                    'proceso' => $proceso,
+                    'ejecutando' => $ejecutando,
+                    'terminado' => $terminado,
+                    'porcentaje' => round($porcentaje, 2),
+                ];
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'  => [
+                'porcentajeXProyecto' => round($porcentajeXProyecto, 2),
+                'porcentajeXTorre' => $porcentajeXTorre,
+                'porcentajeXProceso' => $porcentajeXProceso,
+            ],
+        ], 200);
     }
-
-    return response()->json([
-        'status' => 'success',
-        'data'  => [
-            'porcentajeXProyecto' => round($porcentajeXProyecto, 2),
-            'porcentajeXTorre' => $porcentajeXTorre,
-            'porcentajeXProceso' => $porcentajeXProceso,
-        ],
-    ], 200);
-}
-
 }
