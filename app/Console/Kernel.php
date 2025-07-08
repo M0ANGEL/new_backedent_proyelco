@@ -18,15 +18,15 @@ class Kernel extends ConsoleKernel
     {
         // job de enviar correos de info de los proyectos
         $schedule->job(new \App\Jobs\EnviarCorreoJob)
-            // ->dailyAt('10:24')
-            ->everyMinute()
+            ->dailyAt('00:00')
+            // ->everyMinute('10:24')
             ->timezone('America/Bogota');
         // everyMinute cada minuto para pruebas
 
-        // // job de activar pisos diarios si el procesos esta completo, solo dias habilis 
-        // $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
-        //     ->dailyAt('10:21')
-        //     ->timezone('America/Bogota');
+        // job de activar pisos diarios si el procesos esta completo, solo dias habilis 
+        $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
+            ->dailyAt('00:00')
+            ->timezone('America/Bogota');
     }
 
 
