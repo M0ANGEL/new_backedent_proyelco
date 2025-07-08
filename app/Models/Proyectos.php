@@ -27,4 +27,9 @@ class Proyectos extends Model
         'estado',
         'fecha_ini_proyecto',
     ];
+
+    public function detalles()
+    {
+        return $this->hasMany(ProyectosDetalle::class, 'proyecto_id');
+    }
 }
