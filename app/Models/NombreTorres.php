@@ -14,6 +14,6 @@ class NombreTorres extends Model
     protected $fillable = [
         'nombre_torre',
         'torre',
-        'protecto_id',
+        'proyecto_id',
     ];
 }

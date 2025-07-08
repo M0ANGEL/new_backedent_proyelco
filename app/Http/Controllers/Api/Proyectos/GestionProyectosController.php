@@ -67,8 +67,176 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+    // public function indexProgreso(Request $request)
+    // {
+
+    //     $torresConNombre = DB::table('nombre_xtore')
+    //         ->where('protecto_id', $request->id)
+    //         ->pluck('nombre_torre', 'torre') // esto devuelve: ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
+    //         ->toArray();
+
+
+    //     $proyectosDetalle = DB::connection('mysql')
+    //         ->table('proyecto_detalle')
+    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
+    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->where('proyecto_detalle.proyecto_id', $request->id)
+    //         ->select(
+    //             'proyecto_detalle.torre',
+    //             'proyecto_detalle.id',
+    //             'proyecto_detalle.validacion',
+    //             'proyecto_detalle.estado_validacion',
+    //             'proyecto_detalle.consecutivo',
+    //             'proyecto_detalle.orden_proceso',
+    //             'proyecto_detalle.piso',
+    //             'proyecto_detalle.apartamento',
+    //             'proyecto_detalle.text_validacion',
+    //             'proyecto_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso',
+    //             'users.nombre as nombre'
+    //         )
+    //         ->get();
+
+    //     $resultado = [];
+    //     $torreResumen = [];
+
+    //     foreach ($proyectosDetalle as $item) {
+    //         $torre = $item->torre;
+    //         $orden_proceso = $item->orden_proceso;
+    //         $nombre_proceso = $item->nombre_proceso;
+    //         $text_validacion = $item->text_validacion;
+    //         $validacion = $item->validacion;
+    //         $estado_validacion = $item->estado_validacion;
+    //         $consecutivo = $item->consecutivo;
+    //         $piso = $item->piso;
+
+    //         // Inicializar torre en resultado
+    //         if (!isset($resultado[$torre])) {
+    //             $resultado[$torre] = [];
+    //         }
+
+    //         // Inicializar resumen por torre
+    //         if (!isset($torreResumen[$torre])) {
+    //             $torreResumen[$torre] = [
+    //                 'total_atraso' => 0,
+    //                 'total_realizados' => 0,
+    //                 'porcentaje_atraso' => 0,
+    //                 'porcentaje_avance' => 0,
+    //                 'serial_avance' => '0/0',
+    //                 'pisos_unicos' => []
+    //             ];
+    //         }
+
+    //         // Registrar piso único por torre
+    //         if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
+    //             $torreResumen[$torre]['pisos_unicos'][] = $piso;
+    //         }
+
+    //         // Inicializar proceso por torre
+    //         if (!isset($resultado[$torre][$orden_proceso])) {
+    //             $resultado[$torre][$orden_proceso] = [
+    //                 'nombre_proceso' => $nombre_proceso,
+    //                 'text_validacion' => $text_validacion,
+    //                 'estado_validacion' => $estado_validacion,
+    //                 'validacion' => $validacion,
+    //                 'pisos' => [],
+    //                 'total_apartamentos' => 0,
+    //                 'apartamentos_atraso' => 0,
+    //                 'apartamentos_realizados' => 0,
+    //                 'porcentaje_atraso' => 0,
+    //                 'porcentaje_avance' => 0,
+    //             ];
+    //         }
+
+    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
+    //         }
+
+    //         // Agregar apartamento
+    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
+    //             'id' => $item->id,
+    //             'apartamento' => $item->apartamento,
+    //             'consecutivo' => $consecutivo,
+    //             'estado' => $item->estado,
+    //         ];
+
+    //         // Contar total apartamentos
+    //         $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
+
+    //         // 👉 Solo sumar al resumen de torre si el proceso NO es 1
+    //         if ($orden_proceso != 1) {
+    //             if ($item->estado == 1) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
+    //                 $torreResumen[$torre]['total_atraso'] += 1;
+    //             }
+    //             if ($item->estado == 2) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
+    //                 $torreResumen[$torre]['total_realizados'] += 1;
+    //             }
+    //         } else {
+    //             if ($item->estado == 1) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
+    //             }
+    //             if ($item->estado == 2) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
+    //             }
+    //         }
+    //     }
+
+    //     // Calcular porcentajes por proceso
+    //     foreach ($resultado as $torre => $procesos) {
+    //         foreach ($procesos as $orden_proceso => $proceso) {
+
+    //             if ($orden_proceso == 1) {
+    //                 $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = 0;
+    //                 $resultado[$torre][$orden_proceso]['porcentaje_avance'] = 0;
+    //                 continue;
+    //             }
+
+    //             $total_atraso = $proceso['apartamentos_atraso'];
+    //             $total_realizados = $proceso['apartamentos_realizados'];
+    //             $denominador = $total_atraso + $total_realizados;
+
+    //             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+    //             $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
+
+    //             $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+    //             $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
+    //         }
+    //     }
+
+    //     // Calcular porcentaje y avance textual por torre
+    //     foreach ($torreResumen as $torre => $datos) {
+    //         $total_atraso = $datos['total_atraso'];
+    //         $total_realizados = $datos['total_realizados'];
+    //         $denominador = $total_atraso + $total_realizados;
+
+    //         $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+    //         $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
+
+    //         $torreResumen[$torre]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+    //         $torreResumen[$torre]['porcentaje_avance'] = round($porcentaje_avance, 2);
+    //         $torreResumen[$torre]['serial_avance'] = $total_realizados . '/' . $denominador;
+    //         $torreResumen[$torre]['total_pisos'] = count($datos['pisos_unicos']);
+
+    //         unset($torreResumen[$torre]['pisos_unicos']); // eliminar si no deseas mostrar el array
+    //     }
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $resultado,
+    //         'torreResumen' => $torreResumen
+    //     ]);
+    // }
+
     public function indexProgreso(Request $request)
     {
+        // Obtener el listado de nombres de torre por código
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $request->id)
+            ->pluck('nombre_torre', 'torre') // ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
+            ->toArray();
+
         $proyectosDetalle = DB::connection('mysql')
             ->table('proyecto_detalle')
             ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
@@ -103,14 +271,16 @@ class GestionProyectosController extends Controller
             $consecutivo = $item->consecutivo;
             $piso = $item->piso;
 
-            // Inicializar torre en resultado
+
             if (!isset($resultado[$torre])) {
                 $resultado[$torre] = [];
             }
 
+
             // Inicializar resumen por torre
             if (!isset($torreResumen[$torre])) {
                 $torreResumen[$torre] = [
+                    'nombre_torre' => $torresConNombre[$torre] ?? $torre,
                     'total_atraso' => 0,
                     'total_realizados' => 0,
                     'porcentaje_atraso' => 0,
@@ -177,12 +347,14 @@ class GestionProyectosController extends Controller
         }
 
         // Calcular porcentajes por proceso
-        foreach ($resultado as $torre => $procesos) {
-            foreach ($procesos as $orden_proceso => $proceso) {
+        foreach ($resultado as $torre => &$procesos) {
+            foreach ($procesos as $orden_proceso => &$proceso) {
+                // Ignorar campo extra "nombre_torre"
+                if ($orden_proceso === 'nombre_torre') continue;
 
                 if ($orden_proceso == 1) {
-                    $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = 0;
-                    $resultado[$torre][$orden_proceso]['porcentaje_avance'] = 0;
+                    $proceso['porcentaje_atraso'] = 0;
+                    $proceso['porcentaje_avance'] = 0;
                     continue;
                 }
 
@@ -193,13 +365,13 @@ class GestionProyectosController extends Controller
                 $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
                 $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
 
-                $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-                $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
+                $proceso['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+                $proceso['porcentaje_avance'] = round($porcentaje_avance, 2);
             }
         }
 
         // Calcular porcentaje y avance textual por torre
-        foreach ($torreResumen as $torre => $datos) {
+        foreach ($torreResumen as $torre => &$datos) {
             $total_atraso = $datos['total_atraso'];
             $total_realizados = $datos['total_realizados'];
             $denominador = $total_atraso + $total_realizados;
@@ -207,12 +379,12 @@ class GestionProyectosController extends Controller
             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
             $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
 
-            $torreResumen[$torre]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-            $torreResumen[$torre]['porcentaje_avance'] = round($porcentaje_avance, 2);
-            $torreResumen[$torre]['serial_avance'] = $total_realizados . '/' . $denominador;
-            $torreResumen[$torre]['total_pisos'] = count($datos['pisos_unicos']);
+            $datos['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+            $datos['porcentaje_avance'] = round($porcentaje_avance, 2);
+            $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+            $datos['total_pisos'] = count($datos['pisos_unicos']);
 
-            unset($torreResumen[$torre]['pisos_unicos']); // eliminar si no deseas mostrar el array
+            unset($datos['pisos_unicos']); // eliminar si no deseas mostrar el array
         }
 
         return response()->json([
@@ -221,6 +393,7 @@ class GestionProyectosController extends Controller
             'torreResumen' => $torreResumen
         ]);
     }
+
 
     public function destroy($id)
     {
@@ -248,7 +421,7 @@ class GestionProyectosController extends Controller
                 ->where('proyecto_id', $proyectoId)
                 ->where('torre', $torre)
                 ->where('piso', '1')
-                ->where('procesos_proyectos_id', 1)
+                ->where('orden_proceso', 1)
                 ->update([
                     'estado' => '1',
                     'fecha_habilitado' => now(),
@@ -580,7 +753,7 @@ class GestionProyectosController extends Controller
                     $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != 0);
 
 
-                  
+
 
                     //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
                     if ($confirmarInicioProceso == true) {
