@@ -2,7 +2,6 @@
 
 namespace App\Console;
 
-use App\Jobs\EnviarCorreoJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -25,7 +24,7 @@ class Kernel extends ConsoleKernel
 
         // job de activar pisos diarios si el procesos esta completo, solo dias habilis 
         $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
-            ->dailyAt('00:00')
+            ->dailyAt('10:21')
             ->timezone('America/Bogota');
     }
 

@@ -167,4 +167,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
 
     //fin cargue masivos
+
+    //anulacion de apt informativo
+Route::post('proyectos-simular-anulacion', [GestionProyectosController::class, 'simularAnulacion']);
+
 });
