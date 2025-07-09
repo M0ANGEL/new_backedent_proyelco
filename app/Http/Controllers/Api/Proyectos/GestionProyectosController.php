@@ -458,15 +458,209 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+    // public function validarProceso(Request $request)
+    // {
+
+    //     // iniciode trasnacion
+    //     DB::beginTransaction();
+
+    //     try {
+    //         // datos que llegan
+    //         $request->validate([
+    //             'torre' => 'required|string',
+    //             'proyecto' => 'required',
+    //             'orden_proceso' => 'required|integer|min:1',
+    //             'piso' => 'required|integer',
+    //         ]);
+
+
+    //         // asignamos datos
+    //         $torre = $request->torre;
+    //         $proyecto = (int) $request->proyecto;
+    //         $ordenProceso = (int) $request->orden_proceso;
+    //         $pisoActual = (int) $request->piso;
+
+    //         // ver si ya esta confirmada la validacion(estado1 )
+    //         $pisosPrevios = ProyectosDetalle::where('torre', $torre)
+    //             ->where('orden_proceso', $ordenProceso)
+    //             ->where('proyecto_id', $proyecto)
+    //             ->where('piso', $pisoActual)
+    //             ->first();
+
+
+    //         // proyecto padre
+    //         $proyectoPadre = Proyectos::where('id',$proyecto)->first();
+    //         $aptMinimos = $proyectoPadre->minimoApt;
+
+
+    //         // si esta valdado no hacer nada
+    //         if ($pisosPrevios->validacion === 1 && $pisosPrevios->estado_validacion === 1) {
+    //             DB::commit();
+    //             return response()->json([
+    //                 'success' => "Ya validado co: FP-6325.22",
+    //             ]);
+    //         }
+
+
+
+    //         // Buscar configuración del proceso, para saber el numero de piso que se deben cumplir del proceso anterior para poder activar el piso
+    //         // del proceso actual
+    //         $configProceso = CambioProcesoProyectos::where('proyecto_id', $proyecto)
+    //             ->where('proceso', $ordenProceso)
+    //             ->first();
+
+    //         // si no existe da error
+    //         if (!$configProceso) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Configuración de proceso no encontrada.',
+    //             ], 400);
+    //         }
+
+    //         // asignamos el numero de pisos minimo que se requieren
+    //         $pisosRequeridos = (int) $configProceso->numero;
+
+    //         // Si no es el primer proceso, validar requisitos del anterior
+    //         if ($ordenProceso > 1) {
+    //             $procesoAnterior = $ordenProceso - 1;
+
+    //             // no puede que pase, pero por si las mocasas, valdia que si llega que es proceso 2, pero no existe proceso anterior hubo un problema en la creacion, ya que no se organizo del 1 en adelante
+    //             $existeProcesoAnterior = ProyectosDetalle::where('torre', $torre)
+    //                 ->where('orden_proceso', $procesoAnterior)
+    //                 ->where('proyecto_id', $proyecto)
+    //                 ->get();
+
+    //             if (!$existeProcesoAnterior) {
+    //                 return response()->json([
+    //                     'success' => false,
+    //                     'message' => 'No se puede validar porque el proceso anterior no existe.',
+    //                     'details' => ['proceso_faltante' => $procesoAnterior]
+    //                 ], 400);
+    //             }
+
+    //             $puedeValidarse = false;
+
+    //             if ($pisoActual === 1) {
+    //                 // Validación para piso 1: verificar los primeros N pisos del proceso anterior
+    //                 $pisosPrevios = ProyectosDetalle::where('torre', $torre)
+    //                     ->where('orden_proceso', $procesoAnterior)
+    //                     ->where('proyecto_id', $proyecto)
+    //                     ->whereIn('piso', range(1, $pisosRequeridos))
+    //                     ->where('estado', '2')
+    //                     ->get()
+    //                     ->groupBy('piso');
+
+    //                 $pisosCumplenMinimo = 0;
+
+    //                 foreach ($pisosPrevios as $piso => $aptos) {
+    //                     if ($aptos->count() >= $proyectoPadre->aptMinimos) {
+    //                         $pisosCumplenMinimo++;
+    //                     }
+    //                 }
+
+    //                 if ($pisosCumplenMinimo < $pisosRequeridos) {
+    //                     DB::commit();
+    //                     return response()->json([
+    //                         'success' => false,
+    //                         'message' => "No se puede validar este piso porque no se han confirmado al menos $aptMinimos apartamentos en cada uno de los $pisosRequeridos pisos requeridos.",
+    //                     ], 400);
+    //                 }
+
+    //                 // return;
+    //             } else {
+    //                 // si no es el piso 1
+    //                 // valdiar que el proceso anterior este confirmado todo (estado: 2)
+    //                 $totalPisos = $existeProcesoAnterior->pluck('piso')->unique()->count();
+
+    //                 $procesoAntCompletado = ProyectosDetalle::where('torre', $torre)
+    //                     ->where('orden_proceso', $procesoAnterior)
+    //                     ->where('proyecto_id', $proyecto)
+    //                     ->whereIn('piso', range(1, $totalPisos))
+    //                     ->get();
+
+
+    //                 // si esta completo si seguir con la logica no quedar en el if
+    //                 $ProcesoPasadoCompleto = $procesoAntCompletado->isNotEmpty() && $procesoAntCompletado->every(fn($apt) => $apt->estado === 2);
+
+    //                 // Validación para piso > 1: verificar piso activador del proceso anterior
+    //                 $pisoActivador = $pisoActual + ($pisosRequeridos - 1);
+
+    //                 if ($pisoActual !== $totalPisos) {
+    //                     $activador = ProyectosDetalle::where('torre', $torre)
+    //                         ->where('orden_proceso', $procesoAnterior)
+    //                         ->where('proyecto_id', $proyecto)
+    //                         ->where('piso', $pisoActivador)
+    //                         ->first();
+
+    //                     $puedeValidarse = $activador && $activador->estado == 2;
+
+    //                     if (!$puedeValidarse) {
+    //                         DB::commit();
+    //                         return response()->json([
+    //                             'success' => false,
+    //                             'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.',
+    //                         ], 400);
+    //                     }
+    //                 } else {
+    //                     $activador = ProyectosDetalle::where('torre', $torre)
+    //                         ->where('orden_proceso', $procesoAnterior)
+    //                         ->where('proyecto_id', $proyecto)
+    //                         ->where('piso', $pisoActivador)
+    //                         ->first();
+
+    //                     $puedeValidarse = $activador && $activador->estado == 2;
+
+    //                     if ($ProcesoPasadoCompleto == null) {
+    //                         return response()->json([
+    //                             'success' => false,
+    //                             'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior--.',
+    //                         ], 400);
+    //                     }
+    //                 }
+    //             }
+
+    //             // if (!$puedeValidarse && !$ProcesoPasadoCompleto) {
+    //             //     return response()->json([
+    //             //         'success' => false,
+    //             //         'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.',
+    //             //     ], 400);
+    //             // }
+    //         }
+
+    //         // Activar el piso actual y marcar validación
+    //         ProyectosDetalle::where('torre', $torre)
+    //             ->where('orden_proceso', $ordenProceso)
+    //             ->where('proyecto_id', $proyecto)
+    //             ->where('piso', $pisoActual)
+    //             ->update([
+    //                 'estado_validacion' => 1,
+    //                 'fecha_validacion' => now(),
+    //                 'user_id' => Auth::id(),
+    //                 'estado' => 1,
+    //                 'fecha_habilitado' => now(),
+    //             ]);
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Proceso validado exitosamente.'
+    //         ], 200);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error al validar proceso.',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
     public function validarProceso(Request $request)
     {
-
-        info("entor");
-        // iniciode trasnacion
         DB::beginTransaction();
 
         try {
-            // datos que llegan
+            // Validar datos de entrada
             $request->validate([
                 'torre' => 'required|string',
                 'proyecto' => 'required',
@@ -474,28 +668,23 @@ class GestionProyectosController extends Controller
                 'piso' => 'required|integer',
             ]);
 
-
-            // asignamos datos
             $torre = $request->torre;
             $proyecto = (int) $request->proyecto;
             $ordenProceso = (int) $request->orden_proceso;
             $pisoActual = (int) $request->piso;
 
-            // ver si ya esta confirmada la validacion(estado1 )
+            // Buscar información del piso actual
             $pisosPrevios = ProyectosDetalle::where('torre', $torre)
                 ->where('orden_proceso', $ordenProceso)
                 ->where('proyecto_id', $proyecto)
                 ->where('piso', $pisoActual)
                 ->first();
 
-
-                // proyecto padre
-            $proyectoPadre = Proyectos::where('id',$proyecto)->first();
-
+            // Proyecto padre
+            $proyectoPadre = Proyectos::find($proyecto);
             $aptMinimos = $proyectoPadre->minimoApt;
 
-
-            // si esta valdado no hacer nada
+            // Si ya está validado, no hacer nada
             if ($pisosPrevios->validacion === 1 && $pisosPrevios->estado_validacion === 1) {
                 DB::commit();
                 return response()->json([
@@ -503,9 +692,7 @@ class GestionProyectosController extends Controller
                 ]);
             }
 
-
-
-            // Buscar configuración del proceso, para saber el numero de piso que se deben cumplir del proceso anterior para poder activar 
+            // Obtener configuración del proceso
             $configProceso = CambioProcesoProyectos::where('proyecto_id', $proyecto)
                 ->where('proceso', $ordenProceso)
                 ->first();
@@ -517,20 +704,17 @@ class GestionProyectosController extends Controller
                 ], 400);
             }
 
-            // asignamos el numero de pisos minimo que se requieren
             $pisosRequeridos = (int) $configProceso->numero;
 
-            // Si no es el primer proceso, validar requisitos del anterior
             if ($ordenProceso > 1) {
                 $procesoAnterior = $ordenProceso - 1;
 
-                // no puede que pase, pero por si las mocasas, valdia que si llega que es proceso 2, pero no existe proceso anterior hubo un problema en la creacion, ya que no se organizo del 1 en adelante
                 $existeProcesoAnterior = ProyectosDetalle::where('torre', $torre)
                     ->where('orden_proceso', $procesoAnterior)
                     ->where('proyecto_id', $proyecto)
                     ->get();
 
-                if (!$existeProcesoAnterior) {
+                if ($existeProcesoAnterior->isEmpty()) {
                     return response()->json([
                         'success' => false,
                         'message' => 'No se puede validar porque el proceso anterior no existe.',
@@ -538,36 +722,33 @@ class GestionProyectosController extends Controller
                     ], 400);
                 }
 
-                $puedeValidarse = false;
-
                 if ($pisoActual === 1) {
-                    // Validación para piso 1: verificar los primeros N pisos del proceso anterior
+                    // Validación para piso 1
                     $pisosPrevios = ProyectosDetalle::where('torre', $torre)
                         ->where('orden_proceso', $procesoAnterior)
                         ->where('proyecto_id', $proyecto)
                         ->whereIn('piso', range(1, $pisosRequeridos))
-                        ->where('estado', '2')
+                        ->where('estado', 2)
                         ->get()
                         ->groupBy('piso');
 
                     $pisosCumplenMinimo = 0;
 
                     foreach ($pisosPrevios as $piso => $aptos) {
-                        if ($aptos->count() >= $proyectoPadre->aptMinimos) {
+                        if ($aptos->count() >= $aptMinimos) {
                             $pisosCumplenMinimo++;
                         }
                     }
 
                     if ($pisosCumplenMinimo < $pisosRequeridos) {
+                        DB::commit();
                         return response()->json([
                             'success' => false,
                             'message' => "No se puede validar este piso porque no se han confirmado al menos $aptMinimos apartamentos en cada uno de los $pisosRequeridos pisos requeridos.",
                         ], 400);
                     }
-
-                    // return;
                 } else {
-                    // valdiar que el proceso anterior este confirmado todo (estado: 2)
+                    // Validación para piso > 1
                     $totalPisos = $existeProcesoAnterior->pluck('piso')->unique()->count();
 
                     $procesoAntCompletado = ProyectosDetalle::where('torre', $torre)
@@ -576,55 +757,33 @@ class GestionProyectosController extends Controller
                         ->whereIn('piso', range(1, $totalPisos))
                         ->get();
 
+                    $ProcesoPasadoCompleto = $procesoAntCompletado->isNotEmpty() &&
+                        $procesoAntCompletado->every(fn($apt) => $apt->estado === 2);
 
-                    // si esta completo si seguir con la logica no quedar en el if
-                    $ProcesoPasadoCompleto = $procesoAntCompletado->isNotEmpty() && $procesoAntCompletado->every(fn($apt) => $apt->estado === 2);
-
-                    // Validación para piso > 1: verificar piso activador del proceso anterior
                     $pisoActivador = $pisoActual + ($pisosRequeridos - 1);
 
-                    if ($pisoActual !== $totalPisos) {
-                        $activador = ProyectosDetalle::where('torre', $torre)
-                            ->where('orden_proceso', $procesoAnterior)
-                            ->where('proyecto_id', $proyecto)
-                            ->where('piso', $pisoActivador)
-                            ->first();
+                    $activador = ProyectosDetalle::where('torre', $torre)
+                        ->where('orden_proceso', $procesoAnterior)
+                        ->where('proyecto_id', $proyecto)
+                        ->where('piso', $pisoActivador)
+                        ->where('estado', 2)
+                        ->get();
 
-                        $puedeValidarse = $activador && $activador->estado == 2;
+                    $puedeValidarse = $activador->count() >= $aptMinimos;
 
-                        if (!$puedeValidarse) {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.',
-                            ], 400);
-                        }
-                    } else {
-                        $activador = ProyectosDetalle::where('torre', $torre)
-                            ->where('orden_proceso', $procesoAnterior)
-                            ->where('proyecto_id', $proyecto)
-                            ->where('piso', $pisoActivador)
-                            ->first();
-
-                        $puedeValidarse = $activador && $activador->estado == 2;
-
-                        if ($ProcesoPasadoCompleto == null) {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior--.',
-                            ], 400);
-                        }
+                    if (
+                        ($pisoActual !== $totalPisos && !$puedeValidarse) ||
+                        ($pisoActual === $totalPisos && (!$puedeValidarse || !$ProcesoPasadoCompleto))
+                    ) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.",
+                        ], 400);
                     }
                 }
-
-                // if (!$puedeValidarse && !$ProcesoPasadoCompleto) {
-                //     return response()->json([
-                //         'success' => false,
-                //         'message' => 'No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.',
-                //     ], 400);
-                // }
             }
 
-            // Activar el piso actual y marcar validación
+            // Validación exitosa: habilitar piso actual
             ProyectosDetalle::where('torre', $torre)
                 ->where('orden_proceso', $ordenProceso)
                 ->where('proyecto_id', $proyecto)
@@ -652,6 +811,7 @@ class GestionProyectosController extends Controller
             ], 500);
         }
     }
+
 
     // confirmar con secuencia de desfase
     public function confirmarApt($id)
@@ -757,24 +917,35 @@ class GestionProyectosController extends Controller
                         ->where('piso', 1)
                         ->get();
 
-                    //       // si necesita validacion pero no esta validadio no hacer nada
-                    // if ($InicioProceso->validacion == 1 && $InicioProceso->estado_validacion == 0) {
-                    //     DB::commit();
-                    //     return response()->json([
-                    //         'success' => true,
-                    //     ]);
-                    // }
-
-                    //     info($InicioProceso);
 
                     $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != 0);
 
 
-
-
                     //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
                     if ($confirmarInicioProceso == true) {
+                        // calculo del piso que se debe validar
                         $nuevoPisoParaActivar = $piso - ($pisosPorProceso - 1);
+
+                        // solo para procesos con validacion
+                        $vervalidacionPiso = ProyectosDetalle::where('torre', $torre)
+                            ->where('orden_proceso', $orden_proceso + 1)
+                            ->where('proyecto_id', $proyecto->id)
+                            ->where('piso', $nuevoPisoParaActivar)
+                            // ->where('consecutivo', $info->consecutivo)
+                            ->get();
+
+                        // Verificar que TODOS estén en estado validación = 1 y estado_validacion = 0
+                        $todosPendientes = $vervalidacionPiso->every(function ($apt) {
+                            return $apt->validacion == 1 && $apt->estado_validacion == 0;
+                        });
+
+                        if ($todosPendientes) {
+                            DB::commit();
+                            return response()->json([
+                                'success' => true,
+                                'message' => 'Todos los apartamentos del piso están validados y pendientes por habilitación.',
+                            ]);
+                        }
                         ProyectosDetalle::where('torre', $torre)
                             ->where('orden_proceso', $orden_proceso + 1)
                             ->where('proyecto_id', $proyecto->id)
