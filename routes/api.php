@@ -27,6 +27,7 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
+use App\Models\Proyectos;
 
 /*
 |--------------------------------------------------------------------------
@@ -59,7 +60,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('perfiles-modulos', PerfilesModulosController::class);
     Route::apiResource('submenu', SubmenuController::class);
 
-    Route::get('statistics', [DashboardController::class, 'getStatistics']);
 
     // Rutas Usuarios
     Route::post('register', [UserController::class, 'register']);
@@ -155,12 +155,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // personal empresa y asistencias
     Route::apiResource('personal', PersonalController::class);
     Route::apiResource('asistencias', AsistenciasObrasController::class);
-    Route::get('proyectos-activos', [AsistenciasObrasController::class,'proyectosActivos']);
-    Route::get('empleados', [AsistenciasObrasController::class,'empleados']);
-    Route::get('asistencias-confirmar', [AsistenciasObrasController::class,'UsuarioConfirmarAsistencia']);
-    Route::post('asistencias-confirmar-empleado', [AsistenciasObrasController::class,'confirmarAsistencias']);
-    Route::post('no-asistencias-empleado', [AsistenciasObrasController::class,'confirmarNoAsistencias']);
-    Route::post('cambio-Proyecto-Asistencia', [AsistenciasObrasController::class,'cambioProyectoAsistencia']);
+    Route::get('proyectos-activos', [AsistenciasObrasController::class, 'proyectosActivos']);
+    Route::get('empleados', [AsistenciasObrasController::class, 'empleados']);
+    Route::get('asistencias-confirmar', [AsistenciasObrasController::class, 'UsuarioConfirmarAsistencia']);
+    Route::post('asistencias-confirmar-empleado', [AsistenciasObrasController::class, 'confirmarAsistencias']);
+    Route::post('no-asistencias-empleado', [AsistenciasObrasController::class, 'confirmarNoAsistencias']);
+    Route::post('cambio-Proyecto-Asistencia', [AsistenciasObrasController::class, 'cambioProyectoAsistencia']);
 
     //cargue masivos
     Route::post('cargueEmpleados', [CarguesMasivosCotroller::class, 'cargueEmpleados']);
@@ -169,6 +169,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //fin cargue masivos
 
     //anulacion de apt informativo
-Route::post('proyectos-simular-anulacion', [GestionProyectosController::class, 'simularAnulacion']);
+    Route::post('proyectos-simular-anulacion', [GestionProyectosController::class, 'simularAnulacion']);
+
+    // dashboar
+
+    Route::get('dashboards/proyectos', [DashboardController::class, 'dashboardsProyectos']);
+    
 
 });

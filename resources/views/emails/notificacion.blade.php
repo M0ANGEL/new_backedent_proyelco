@@ -100,7 +100,7 @@
         @endforeach
 
         <div class="btn-container">
-            <a class="btn" href="https://front.prueba.proyelco.com/#/auth/login" target="_blank">VER MÁS DETALLE</a>
+            <a class="btn" href="https://front.proyelco.com/#/auth/login" target="_blank">VER MÁS DETALLE</a>
         </div>
 
         <div class="footer">
