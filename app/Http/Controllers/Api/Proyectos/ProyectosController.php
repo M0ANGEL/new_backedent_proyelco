@@ -123,6 +123,7 @@ class ProyectosController extends Controller
 
     public function store(Request $request)
     {
+        info($request->all());
         DB::beginTransaction();
 
         try {
@@ -162,6 +163,18 @@ class ProyectosController extends Controller
             if (!$cliente) {
                 return response()->json(['error' => 'Cliente no encontrado'], 404);
             }
+
+
+            // se valida que los cambios de piso no sea mayor a la cantidad de piso
+            foreach ($request->procesos as $proceso) {
+                if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
+                    ], 404);
+                }
+            }
+
 
             // Datos base
             $cant_pisos = (int)$request->cant_pisos;
