@@ -130,7 +130,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-proyectos-detalle/{id}', [GestionProyectosController::class, 'indexProgreso']);
     Route::post('gestion-iniciar-torre', [GestionProyectosController::class, 'IniciarTorre']);
     Route::get('info-proyecto/{id}', [GestionProyectosController::class, 'infoProyecto']);
-    Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarApt']);
+    Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarAptNuevaLogica']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
     Route::post('gestion-confirmar-validar', [GestionProyectosController::class, 'validarProceso']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
     Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
