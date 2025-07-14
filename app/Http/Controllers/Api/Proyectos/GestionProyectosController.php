@@ -1983,10 +1983,12 @@ class GestionProyectosController extends Controller
         $pisosMinimos = $minimos ? (int)$minimos : 0;
         if ($piso < $pisosMinimos) return;
 
+        $PisoCambioProceso = $piso -($minimos -1);
+
         // 3. Validar si requiere validación
         $detalleDestino = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
-            ->where('piso', $piso)
+            ->where('piso', $PisoCambioProceso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
 
@@ -1997,7 +1999,7 @@ class GestionProyectosController extends Controller
         // 4. Activar el proceso destino en ese piso
         ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
-            ->where('piso', $piso)
+            ->where('piso', $PisoCambioProceso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->where('estado', 0)
             ->update([
