@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Proyectos;
 use App\Http\Controllers\Controller;
 use App\Models\AnulacionApt;
 use App\Models\CambioProcesoProyectos;
+use App\Models\ProcesosProyectos;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 use Carbon\Carbon;
@@ -66,168 +67,6 @@ class GestionProyectosController extends Controller
             'data' => $proyectosGestion
         ]);
     }
-
-    // public function indexProgreso(Request $request)
-    // {
-
-    //     $torresConNombre = DB::table('nombre_xtore')
-    //         ->where('protecto_id', $request->id)
-    //         ->pluck('nombre_torre', 'torre') // esto devuelve: ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
-    //         ->toArray();
-
-
-    //     $proyectosDetalle = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->where('proyecto_detalle.proyecto_id', $request->id)
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.id',
-    //             'proyecto_detalle.validacion',
-    //             'proyecto_detalle.estado_validacion',
-    //             'proyecto_detalle.consecutivo',
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.piso',
-    //             'proyecto_detalle.apartamento',
-    //             'proyecto_detalle.text_validacion',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso',
-    //             'users.nombre as nombre'
-    //         )
-    //         ->get();
-
-    //     $resultado = [];
-    //     $torreResumen = [];
-
-    //     foreach ($proyectosDetalle as $item) {
-    //         $torre = $item->torre;
-    //         $orden_proceso = $item->orden_proceso;
-    //         $nombre_proceso = $item->nombre_proceso;
-    //         $text_validacion = $item->text_validacion;
-    //         $validacion = $item->validacion;
-    //         $estado_validacion = $item->estado_validacion;
-    //         $consecutivo = $item->consecutivo;
-    //         $piso = $item->piso;
-
-    //         // Inicializar torre en resultado
-    //         if (!isset($resultado[$torre])) {
-    //             $resultado[$torre] = [];
-    //         }
-
-    //         // Inicializar resumen por torre
-    //         if (!isset($torreResumen[$torre])) {
-    //             $torreResumen[$torre] = [
-    //                 'total_atraso' => 0,
-    //                 'total_realizados' => 0,
-    //                 'porcentaje_atraso' => 0,
-    //                 'porcentaje_avance' => 0,
-    //                 'serial_avance' => '0/0',
-    //                 'pisos_unicos' => []
-    //             ];
-    //         }
-
-    //         // Registrar piso único por torre
-    //         if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
-    //             $torreResumen[$torre]['pisos_unicos'][] = $piso;
-    //         }
-
-    //         // Inicializar proceso por torre
-    //         if (!isset($resultado[$torre][$orden_proceso])) {
-    //             $resultado[$torre][$orden_proceso] = [
-    //                 'nombre_proceso' => $nombre_proceso,
-    //                 'text_validacion' => $text_validacion,
-    //                 'estado_validacion' => $estado_validacion,
-    //                 'validacion' => $validacion,
-    //                 'pisos' => [],
-    //                 'total_apartamentos' => 0,
-    //                 'apartamentos_atraso' => 0,
-    //                 'apartamentos_realizados' => 0,
-    //                 'porcentaje_atraso' => 0,
-    //                 'porcentaje_avance' => 0,
-    //             ];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-    //         }
-
-    //         // Agregar apartamento
-    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-    //             'id' => $item->id,
-    //             'apartamento' => $item->apartamento,
-    //             'consecutivo' => $consecutivo,
-    //             'estado' => $item->estado,
-    //         ];
-
-    //         // Contar total apartamentos
-    //         $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
-
-    //         // 👉 Solo sumar al resumen de torre si el proceso NO es 1
-    //         if ($orden_proceso != 1) {
-    //             if ($item->estado == 1) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-    //                 $torreResumen[$torre]['total_atraso'] += 1;
-    //             }
-    //             if ($item->estado == 2) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-    //                 $torreResumen[$torre]['total_realizados'] += 1;
-    //             }
-    //         } else {
-    //             if ($item->estado == 1) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-    //             }
-    //             if ($item->estado == 2) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-    //             }
-    //         }
-    //     }
-
-    //     // Calcular porcentajes por proceso
-    //     foreach ($resultado as $torre => $procesos) {
-    //         foreach ($procesos as $orden_proceso => $proceso) {
-
-    //             if ($orden_proceso == 1) {
-    //                 $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = 0;
-    //                 $resultado[$torre][$orden_proceso]['porcentaje_avance'] = 0;
-    //                 continue;
-    //             }
-
-    //             $total_atraso = $proceso['apartamentos_atraso'];
-    //             $total_realizados = $proceso['apartamentos_realizados'];
-    //             $denominador = $total_atraso + $total_realizados;
-
-    //             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-    //             $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
-
-    //             $resultado[$torre][$orden_proceso]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    //             $resultado[$torre][$orden_proceso]['porcentaje_avance'] = round($porcentaje_avance, 2);
-    //         }
-    //     }
-
-    //     // Calcular porcentaje y avance textual por torre
-    //     foreach ($torreResumen as $torre => $datos) {
-    //         $total_atraso = $datos['total_atraso'];
-    //         $total_realizados = $datos['total_realizados'];
-    //         $denominador = $total_atraso + $total_realizados;
-
-    //         $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-    //         $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
-
-    //         $torreResumen[$torre]['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    //         $torreResumen[$torre]['porcentaje_avance'] = round($porcentaje_avance, 2);
-    //         $torreResumen[$torre]['serial_avance'] = $total_realizados . '/' . $denominador;
-    //         $torreResumen[$torre]['total_pisos'] = count($datos['pisos_unicos']);
-
-    //         unset($torreResumen[$torre]['pisos_unicos']); // eliminar si no deseas mostrar el array
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $resultado,
-    //         'torreResumen' => $torreResumen
-    //     ]);
-    // }
 
     public function indexProgreso(Request $request)
     {
@@ -393,7 +232,6 @@ class GestionProyectosController extends Controller
             'torreResumen' => $torreResumen
         ]);
     }
-
 
     public function destroy($id)
     {
@@ -811,7 +649,6 @@ class GestionProyectosController extends Controller
             ], 500);
         }
     }
-
 
     // confirmar con secuencia de desfase
     public function confirmarApt($id)
@@ -1467,9 +1304,6 @@ class GestionProyectosController extends Controller
         }
     }
 
-
-    // app/Http/Controllers/ProyectoController.php
-
     public function simularAnulacion(Request $request)
     {
         $aptId = $request->aptId;
@@ -1540,5 +1374,670 @@ class GestionProyectosController extends Controller
                 'afectados' => $afectados,
             ],
         ]);
+    }
+
+    // se va a trabajar en una nueva logica para el tema de activavion de apt
+    // confirmar con secuencia de desfase
+    // public function confirmarAptNuevaLogica($id)
+    // {
+
+    //     DB::beginTransaction();
+    //     //inicio de flujo
+
+    //     try {
+    //         //buscamos el detalle del proyeto para ese piso
+    //         $info = ProyectosDetalle::findOrFail($id);
+
+    //         //definimos datos numericos
+    //         $torre = $info->torre;
+    //         $orden_proceso = (int) $info->orden_proceso;
+    //         $piso = (int) $info->piso;
+    //         $procesoSiguiente = $info->orden_proceso + "1";
+
+    //         //buscamos el proyecto padre
+    //         $proyecto = Proyectos::findOrFail($info->proyecto_id);
+
+    //         //buscamos el nombre del proceso para la validacion
+    //         $TipoProceso = strtolower(ProcesosProyectos::where('id', $info->procesos_proyectos_id)->value('nombre_proceso'));
+
+    //         $info->estado = 2;
+    //         $info->fecha_fin = now();
+    //         $info->user_id = Auth::id();
+    //         $info->save();
+
+
+    //         // if ($esValido) {
+    //         // aqui va a ir el swich de comparaciones
+    //         switch ($TipoProceso) {
+    //             case 'fundida':
+
+    //                 //buscamos los cambio de piso para el proceso, el numero minimo de pisos que debe cumplir el proecso fundiada para habiliar destapada
+    //                 $CambioProcesoDestapada = DB::connection('mysql')
+    //                     ->table('cambio_procesos_x_proyecto')
+    //                     ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.orden_proceso', '=', 'procesos_proyectos.id')
+    //                     ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                     ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
+    //                     ->select('cambio_procesos_x_proyecto.*')
+    //                     ->first();
+    //                 $pisosPorProcesoDestapada = $CambioProcesoDestapada ? (int) $CambioProcesoDestapada->numero : 0;
+
+
+    //                 // Verificar si todos los aptos de este piso ya están confirmados
+    //                 $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
+    //                     ->where('orden_proceso', $orden_proceso)
+    //                     ->where('proyecto_id', $proyecto->id)
+    //                     ->where('piso', $piso)
+    //                     ->get();
+
+    //                 // si el proceso es fundida este debe tener todo el piso completo para habliar el siguiente piso del mismo
+    //                 $confirmarInicioProceso = $aptosDelPiso->isNotEmpty() && $aptosDelPiso->every(fn($apt) => $apt->estado == "2");
+
+    //                 if ($confirmarInicioProceso) {
+
+    //                     // AL entrar en fundida, este no depende de nadie, el solo confirma y se auto habilita a si mismo
+    //                     ProyectosDetalle::where('torre', $torre)
+    //                         ->where('orden_proceso', $orden_proceso)
+    //                         ->where('piso', $piso + 1)
+    //                         ->where('proyecto_id', $proyecto->id)
+    //                         ->where('estado', 0)
+    //                         ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+
+    //                     // se debe hacer dos validaciones en dos procesos, destapada y prolongacion
+    //                     // destapada
+    //                     // Validación si el procesotiene el piso 1 activo
+    //                     $InicioProcesoDestapada = DB::connection('mysql')
+    //                         ->table('proyecto_detalle')
+    //                         ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                         ->where('proyecto_detalle.torre', $torre)
+    //                         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                         ->where('proyecto_detalle.piso', 1)
+    //                         ->select('proyecto_detalle.*')
+    //                         ->get();
+
+    //                     $confirmarInicioProcesoDestapada = $InicioProcesoDestapada->isNotEmpty() && $InicioProcesoDestapada->every(fn($apt) => $apt->estado != 0);
+
+
+    //                     //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
+    //                     if ($confirmarInicioProcesoDestapada == true) {
+    //                         // calculo del piso que se debe validar
+    //                         $nuevoPisoParaActivarDestapada = $piso - ($pisosPorProcesoDestapada - 1);
+
+    //                         // solo para procesos con validacion
+    //                         $vervalidacionPiso = DB::connection('mysql')
+    //                             ->table('proyecto_detalle')
+    //                             ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                             ->where('proyecto_detalle.torre', $torre)
+    //                             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                             ->where('proyecto_detalle.piso', $nuevoPisoParaActivarDestapada)
+    //                             ->select('proyecto_detalle.*')
+    //                             ->get();
+
+    //                         // Verificar que TODOS estén en estado validación = 1 y estado_validacion = 0
+    //                         $todosPendientes = $vervalidacionPiso->every(function ($apt) {
+    //                             return $apt->validacion == 1 && $apt->estado_validacion == 0;
+    //                         });
+
+    //                         if ($todosPendientes) {
+    //                             DB::commit();
+    //                             return response()->json([
+    //                                 'success' => true,
+    //                                 'message' => 'Todos los apartamentos del piso están validados y pendientes por habilitación.',
+    //                             ]);
+    //                         }
+
+    //                         DB::connection('mysql')
+    //                             ->table('proyecto_detalle')
+    //                             ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                             ->where('proyecto_detalle.torre', $torre)
+    //                             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                             ->where('proyecto_detalle.piso', $nuevoPisoParaActivarDestapada)
+    //                             ->where('estado', 0)
+    //                             ->update([
+    //                                 'estado' => 1,
+    //                                 'fecha_habilitado' => now(),
+    //                             ]);
+    //                     } else {
+    //                         // si no esta inicializado, se debe revisar si el proceso actual cumple con los requisitos del minimo de pisos para que el proceso pueda ser incializado
+    //                         if ($piso >= $pisosPorProcesoDestapada) {
+    //                             // Se revisa si el prcceso siguiente que se piensa habilitar necesita validacion
+    //                             $procesoActualDestapada = DB::connection('mysql')
+    //                                 ->table('proyecto_detalle')
+    //                                 ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                                 ->where('proyecto_detalle.torre', $torre)
+    //                                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                                 ->select('proyecto_detalle.*')
+    //                                 ->first();
+
+    //                             // si necesita validacion pero no esta validadio no hacer nada
+    //                             if ($procesoActualDestapada->validacion == 1 && $procesoActualDestapada->estado_validacion == 0) {
+    //                                 DB::commit();
+    //                                 return response()->json([
+    //                                     'success' => true,
+    //                                 ]);
+    //                             }
+
+
+    //                             DB::connection('mysql')
+    //                                 ->table('proyecto_detalle')
+    //                                 ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                                 ->where('proyecto_detalle.torre', $torre)
+    //                                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                                 ->select('proyecto_detalle.*')
+    //                                 ->where('piso', 1)
+    //                                 ->where('estado', 0)
+    //                                 ->update([
+    //                                     'estado' => 1,
+    //                                     'fecha_habilitado' => now(),
+    //                                 ]);
+    //                         }
+    //                     }
+
+
+
+    //                     //------------------------------------------------------------------------------------------------------
+    //                     // prolongacion
+    //                     //buscamos los cambio de piso para el proceso, el numero minimo de pisos que debe cumplir el proecso fundiada para habiliar destapada
+    //                     $CambioProcesoProlongacion = DB::connection('mysql')
+    //                         ->table('cambio_procesos_x_proyecto')
+    //                         ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.orden_proceso', '=', 'procesos_proyectos.id')
+    //                         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['prolongacion']) // nombre en minúsculas
+    //                         ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
+    //                         ->select('cambio_procesos_x_proyecto.*')
+    //                         ->first();
+
+    //                     $pisosPorProcesoProlongacion = $CambioProcesoProlongacion ? (int) $CambioProcesoProlongacion->numero : 0;
+
+
+    //                     // Validación si el proceso prolongacion tiene el piso 1 activo
+    //                     $InicioProcesoProlongacion = DB::connection('mysql')
+    //                         ->table('proyecto_detalle')
+    //                         ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['prolongacion']) // nombre en minúsculas
+    //                         ->where('proyecto_detalle.torre', $torre)
+    //                         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                         ->where('proyecto_detalle.piso', 1)
+    //                         ->select('proyecto_detalle.*')
+    //                         ->get();
+
+    //                     $confirmarInicioProcesoProlongacion = $InicioProcesoProlongacion->isNotEmpty() && $InicioProcesoProlongacion->every(fn($apt) => $apt->estado != 0);
+
+
+    //                     //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
+    //                     if ($confirmarInicioProcesoProlongacion == true) {
+    //                         // calculo del piso que se debe validar
+    //                         $nuevoPisoParaActivarProlongacion = $piso - ($pisosPorProcesoProlongacion - 1);
+
+
+    //                         // solo para procesos con validacion
+    //                         $vervalidacionPisoProlongacion = DB::connection('mysql')
+    //                             ->table('proyecto_detalle')
+    //                             ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['destapada']) // nombre en minúsculas
+    //                             ->where('proyecto_detalle.torre', $torre)
+    //                             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                             ->where('proyecto_detalle.piso', $nuevoPisoParaActivarProlongacion)
+    //                             ->select('proyecto_detalle.*')
+    //                             ->get();
+
+    //                         // Verificar que TODOS estén en estado validación = 1 y estado_validacion = 0
+    //                         $todosPendientes = $vervalidacionPiso->every(function ($apt) {
+    //                             return $apt->validacion == 1 && $apt->estado_validacion == 0;
+    //                         });
+
+    //                         if ($todosPendientes) {
+    //                             DB::commit();
+    //                             return response()->json([
+    //                                 'success' => true,
+    //                                 'message' => 'Todos los apartamentos del piso están validados y pendientes por habilitación.',
+    //                             ]);
+    //                         }
+    //                         ProyectosDetalle::where('torre', $torre)
+    //                             ->where('orden_proceso', $orden_proceso + 1)
+    //                             ->where('proyecto_id', $proyecto->id)
+    //                             ->where('piso', $nuevoPisoParaActivarProlongacion)
+    //                             ->where('estado', 0)
+    //                             ->update([
+    //                                 'estado' => 1,
+    //                                 'fecha_habilitado' => now(),
+    //                             ]);
+    //                     } else {
+    //                         // si no esta inicializado, se debe revisar si el proceso actual cumple con lso requisitos del minimo de pisos para que el proceso pueda ser incializado
+    //                         if ($piso >= $pisosPorProcesoProlongacion) {
+
+    //                             // Se revisa si el prcceso siguiente que se piensa habilitar necesita validacion
+    //                             $procesoActualProlongacion = DB::connection('mysql')
+    //                                 ->table('proyecto_detalle')
+    //                                 ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['prolongacion']) // nombre en minúsculas
+    //                                 ->where('proyecto_detalle.torre', $torre)
+    //                                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                                 ->select('proyecto_detalle.*')
+    //                                 ->first();
+
+    //                             // si necesita validacion pero no esta validadio no hacer nada
+    //                             if ($procesoActualProlongacion->validacion == 1 && $procesoActualProlongacion->estado_validacion == 0) {
+    //                                 DB::commit();
+    //                                 return response()->json([
+    //                                     'success' => true,
+    //                                 ]);
+    //                             }
+
+
+
+    //                             // Activar los apt del piso del  proceso prolongacion
+    //                             DB::connection('mysql')
+    //                                 ->table('proyecto_detalle')
+    //                                 ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+    //                                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['prolongacion']) // nombre en minúsculas
+    //                                 ->where('proyecto_detalle.torre', $torre)
+    //                                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //                                 ->where('piso', 1)
+    //                                 ->where('estado', 0)
+    //                                 ->update([
+    //                                     'estado' => 1,
+    //                                     'fecha_habilitado' => now(),
+    //                                 ]);
+    //                         }
+    //                     }
+    //                 }
+
+
+
+
+
+    //                 break;
+
+    //             case 'destapada':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en destapada'
+    //                 ]);
+
+    //                 break;
+    //             case 'prolongacion':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en prolongacion'
+    //                 ]);
+
+    //                 break;
+    //             case 'alambrada':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en alambrada'
+    //                 ]);
+
+    //                 break;
+    //             case 'aparateada':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en aparateada'
+    //                 ]);
+
+    //                 break;
+    //             case 'pruebas':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en pruebas'
+    //                 ]);
+
+    //                 break;
+    //             case 'retie':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en retie'
+    //                 ]);
+
+    //                 break;
+    //             case 'ritel':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en ritel'
+    //                 ]);
+
+    //                 break;
+    //             case 'entrega':
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'en entrega'
+    //                 ]);
+
+    //                 break;
+
+
+
+
+
+    //             default:
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => 'ERROR, PROCESO NO EXISTENTE, COMUNICATE CON TI'
+    //                 ]);
+    //                 break;
+    //         }
+    //         // }
+
+
+    //         DB::commit();
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $info
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error al confirmar apartamento',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+
+    public function confirmarAptNuevaLogica($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $info = ProyectosDetalle::findOrFail($id);
+
+            $torre = $info->torre;
+            $orden_proceso = (int) $info->orden_proceso;
+            $piso = (int) $info->piso;
+
+            $proyecto = Proyectos::findOrFail($info->proyecto_id);
+            $TipoProceso = strtolower(ProcesosProyectos::where('id', $info->procesos_proyectos_id)->value('nombre_proceso'));
+
+            $info->estado = 2;
+            $info->fecha_fin = now();
+            $info->user_id = Auth::id();
+            $info->save();
+
+            switch ($TipoProceso) {
+                case 'fundida':
+                    $this->confirmarFundida($proyecto, $torre, $orden_proceso, $piso);
+                    break;
+
+                case 'destapada':
+                case 'prolongacion':
+                    $this->intentarHabilitarAlambrada($info);
+                    break;
+
+                case 'alambrada':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'alambrada', 'aparateada');
+                    break;
+
+                case 'aparateada':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', 'pruebas');
+                    break;
+                case 'pruebas':
+                    // Verificar si todo el piso del proceso "pruebas" está confirmado
+                    $aptosPruebas = ProyectosDetalle::where('torre', $info->torre)
+                        ->where('proyecto_id', $proyecto->id)
+                        ->where('piso', $info->piso)
+                        ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['pruebas']))
+                        ->get();
+
+                    $pisoCompleto = $aptosPruebas->isNotEmpty() && $aptosPruebas->every(fn($apt) => $apt->estado == 2);
+
+                    if ($pisoCompleto) {
+                        $this->validarYHabilitarPorPiso($proyecto, $info->torre, $info->piso, 'pruebas', 'retie');
+                        $this->validarYHabilitarPorPiso($proyecto, $info->torre, $info->piso, 'pruebas', 'ritel');
+                    }
+
+                    break;
+
+                case 'retie':
+                case 'ritel':
+                    $this->intentarHabilitarEntrega($info);
+                    break;
+                case 'entrega':
+                default:
+                    return response()->json([
+                        'success' => false,
+                        'data' => 'ERROR, PROCESO NO EXISTENTE, COMUNICATE CON TI'
+                    ]);
+            }
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'data' => $info
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al confirmar apartamento',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function confirmarFundida($proyecto, $torre, $orden_proceso, $piso)
+    {
+        // Confirmar todo el piso fundida
+        $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
+            ->where('orden_proceso', $orden_proceso)
+            ->where('proyecto_id', $proyecto->id)
+            ->where('piso', $piso)
+            ->get();
+
+        $confirmarInicioProceso = $aptosDelPiso->isNotEmpty() && $aptosDelPiso->every(fn($apt) => $apt->estado == 2);
+
+        if ($confirmarInicioProceso) {
+            // Habilitar siguiente piso fundida
+            ProyectosDetalle::where('torre', $torre)
+                ->where('orden_proceso', $orden_proceso)
+                ->where('piso', $piso + 1)
+                ->where('proyecto_id', $proyecto->id)
+                ->where('estado', 0)
+                ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+
+            // Validar y habilitar procesos dependientes
+            $this->validarYHabilitarProceso($proyecto, $torre, $piso, 'destapada');
+            $this->validarYHabilitarProceso($proyecto, $torre, $piso, 'prolongacion');
+        }
+    }
+
+    private function validarYHabilitarProceso($proyecto, $torre, $piso, $procesoNombre)
+    {
+        $CambioProceso = DB::table('cambio_procesos_x_proyecto')
+            ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+            ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
+            ->select('cambio_procesos_x_proyecto.*')
+            ->first();
+
+        $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
+
+        $inicioProceso = DB::table('proyecto_detalle')
+            ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+            ->where('proyecto_detalle.torre', $torre)
+            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+            ->where('proyecto_detalle.piso', 1)
+            ->get();
+
+        $yaIniciado = $inicioProceso->isNotEmpty() && $inicioProceso->every(fn($apt) => $apt->estado != 0);
+
+        if ($yaIniciado) {
+
+            $nuevoPiso = $piso - ($pisosRequeridos - 1);
+
+            $verValidacion = DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->where('proyecto_detalle.piso', $nuevoPiso)
+                ->select('proyecto_detalle.*')
+                ->get();
+
+            $todosPendientes = $verValidacion->every(fn($apt) => $apt->validacion == 1 && $apt->estado_validacion == 0);
+
+            if ($todosPendientes) {
+                return; // espera validación externa
+            }
+
+            ProyectosDetalle::where('torre', $torre)
+                ->where('proyecto_id', $proyecto->id)
+                ->where('piso', $nuevoPiso)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
+                ->where('estado', 0)
+                ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+        } elseif ($piso >= $pisosRequeridos) {
+
+            // Aún no iniciado, inicia en piso 1
+            $detalle = DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->select('proyecto_detalle.*')
+                ->first();
+
+            if ($detalle && $detalle->validacion == 1 && $detalle->estado_validacion == 0) {
+                return; // espera validación externa
+            }
+
+
+            DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->where('proyecto_detalle.piso', 1)
+                ->where('estado', 0)
+                ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+        }
+    }
+
+    private function intentarHabilitarAlambrada($info)
+    {
+        $torre = $info->torre;
+        $proyectoId = $info->proyecto_id;
+        $piso = $info->piso;
+
+        $procesos = ['destapada', 'prolongacion'];
+
+        // Validar que ambos procesos tengan todo el piso confirmado (estado == 2)
+        foreach ($procesos as $proceso) {
+            $aptos = ProyectosDetalle::where('torre', $torre)
+                ->where('proyecto_id', $proyectoId)
+                ->where('piso', $piso)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
+                ->get();
+
+            // Si hay apartamentos y alguno NO está en estado 2, aún no se puede habilitar
+            if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
+                return; // No se cumple la condición, no hacemos nada
+            }
+        }
+
+        // Si ambos procesos están completos, habilitar alambrada en ese piso
+        ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['alambrada']))
+            ->where('estado', 0)
+            ->update([
+                'estado' => 1,
+                'fecha_habilitado' => now()
+            ]);
+    }
+
+    private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoOrigen, $procesoDestino)
+    {
+        // 1. Revisar que todo el piso del proceso origen esté confirmado (estado 2)
+        $aptos = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyecto->id)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoOrigen]))
+            ->get();
+
+        if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
+            return; // Piso no está completo aún
+        }
+
+        // 2. Obtener la cantidad mínima de pisos requeridos
+        $minimos = DB::table('cambio_procesos_x_proyecto')
+            ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.proceso', '=', 'procesos_proyectos.id')
+            ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoDestino])
+            ->value('numero');
+
+        $pisosMinimos = $minimos ? (int)$minimos : 0;
+        if ($piso < $pisosMinimos) return;
+
+        $PisoCambioProceso = $piso -($minimos -1);
+
+        // 3. Validar si requiere validación
+        $detalleDestino = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyecto->id)
+            ->where('piso', $PisoCambioProceso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
+            ->first();
+
+        if ($detalleDestino && $detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
+            return; // espera validación externa
+        }
+
+        // 4. Activar el proceso destino en ese piso
+        ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyecto->id)
+            ->where('piso', $PisoCambioProceso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
+            ->where('estado', 0)
+            ->update([
+                'estado' => 1,
+                'fecha_habilitado' => now()
+            ]);
+    }
+
+    private function intentarHabilitarEntrega($info)
+    {
+        $torre = $info->torre;
+        $proyectoId = $info->proyecto_id;
+        $piso = $info->piso;
+
+        $procesos = ['retie', 'ritel'];
+
+        foreach ($procesos as $proceso) {
+            $aptos = ProyectosDetalle::where('torre', $torre)
+                ->where('proyecto_id', $proyectoId)
+                ->where('piso', $piso)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
+                ->get();
+
+            // Si falta alguno o alguno no está en estado 2, salir
+            if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
+                return; // No se habilita entrega
+            }
+        }
+
+        // Si ambos procesos están completos, habilitar entrega
+        ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega']))
+            ->where('estado', 0)
+            ->update([
+                'estado' => 1,
+                'fecha_habilitado' => now()
+            ]);
     }
 }

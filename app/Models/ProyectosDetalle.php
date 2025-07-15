@@ -29,5 +29,9 @@ class ProyectosDetalle extends Model
         'text_validacion',
         'consecutivo',
     ];
-    
+
+    public function proceso()
+    {
+        return $this->belongsTo(ProcesosProyectos::class, 'orden_proceso', 'id');
+    }
 }
