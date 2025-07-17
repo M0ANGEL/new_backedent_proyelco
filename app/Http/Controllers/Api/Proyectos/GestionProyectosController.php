@@ -1783,28 +1783,19 @@ class GestionProyectosController extends Controller
                 case 'aparateada':
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', 'pruebas');
                     break;
+
                 case 'pruebas':
-                    // Verificar si todo el piso del proceso "pruebas" está confirmado
-                    $aptosPruebas = ProyectosDetalle::where('torre', $info->torre)
-                        ->where('proyecto_id', $proyecto->id)
-                        ->where('piso', $info->piso)
-                        ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['pruebas']))
-                        ->get();
-
-                    $pisoCompleto = $aptosPruebas->isNotEmpty() && $aptosPruebas->every(fn($apt) => $apt->estado == 2);
-
-                    if ($pisoCompleto) {
-                        $this->validarYHabilitarPorPiso($proyecto, $info->torre, $info->piso, 'pruebas', 'retie');
-                        $this->validarYHabilitarPorPiso($proyecto, $info->torre, $info->piso, 'pruebas', 'ritel');
-                    }
-
+                    $this->confirmarPruebas($proyecto, $torre, $orden_proceso, $piso);
                     break;
 
                 case 'retie':
                 case 'ritel':
-                    $this->intentarHabilitarEntrega($info);
+                    $this->intentarHabilitarEntrega($info); // esta función no habilita entrega directamente, solo revisa
                     break;
+
                 case 'entrega':
+                    break;
+
                 default:
                     return response()->json([
                         'success' => false,
@@ -1983,7 +1974,7 @@ class GestionProyectosController extends Controller
         $pisosMinimos = $minimos ? (int)$minimos : 0;
         if ($piso < $pisosMinimos) return;
 
-        $PisoCambioProceso = $piso -($minimos -1);
+        $PisoCambioProceso = $piso - ($minimos - 1);
 
         // 3. Validar si requiere validación
         $detalleDestino = ProyectosDetalle::where('torre', $torre)
@@ -1992,9 +1983,9 @@ class GestionProyectosController extends Controller
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
 
-        if ($detalleDestino && $detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
-            return; // espera validación externa
-        }
+        // if ($detalleDestino && $detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
+        //     return; // espera validación externa
+        // }
 
         // 4. Activar el proceso destino en ese piso
         ProyectosDetalle::where('torre', $torre)
@@ -2039,5 +2030,99 @@ class GestionProyectosController extends Controller
                 'estado' => 1,
                 'fecha_habilitado' => now()
             ]);
+    }
+
+    private function confirmarPruebas($proyecto, $torre, $orden_proceso, $piso)
+    {
+        
+        // Confirmar todo el piso pruebas
+        $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
+            ->where('orden_proceso', $orden_proceso)
+            ->where('proyecto_id', $proyecto->id)
+            ->where('piso', $piso)
+            ->get();
+
+        $confirmarInicioProceso = $aptosDelPiso->isNotEmpty() && $aptosDelPiso->every(fn($apt) => $apt->estado == 2);
+
+        if ($confirmarInicioProceso) {
+            // Validar y habilitar procesos dependientes
+            $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'retie');
+            $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'ritel');
+        }
+    }
+
+    private function validarYHabilitarRetieYRitel($proyecto, $torre, $piso, $procesoNombre)
+    {
+        $CambioProceso = DB::table('cambio_procesos_x_proyecto')
+            ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+            ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
+            ->select('cambio_procesos_x_proyecto.*')
+            ->first();
+
+        $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
+
+        $inicioProceso = DB::table('proyecto_detalle')
+            ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+            ->where('proyecto_detalle.torre', $torre)
+            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+            ->where('proyecto_detalle.piso', 1)
+            ->get();
+
+
+        $yaIniciado = $inicioProceso->isNotEmpty() && $inicioProceso->every(fn($apt) => $apt->estado != 0);
+
+        if ($yaIniciado) {
+
+            $nuevoPiso = $piso - ($pisosRequeridos - 1);
+
+            $verValidacion = DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->where('proyecto_detalle.piso', $nuevoPiso)
+                ->select('proyecto_detalle.*')
+                ->get();
+
+
+            $todosPendientes = $verValidacion->every(fn($apt) => $apt->validacion == 1 && $apt->estado_validacion == 0);
+
+            if ($todosPendientes) {
+                return; // espera validación externa
+            }
+
+            ProyectosDetalle::where('torre', $torre)
+                ->where('proyecto_id', $proyecto->id)
+                ->where('piso', $nuevoPiso)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
+                ->where('estado', 0)
+                ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+        } elseif ($piso >= $pisosRequeridos) {
+
+            // Aún no iniciado, inicia en piso 1
+            $detalle = DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->select('proyecto_detalle.*')
+                ->first();
+
+            if ($detalle && $detalle->validacion == 1 && $detalle->estado_validacion == 0) {
+                return; // espera validación externa
+            }
+
+
+            DB::table('proyecto_detalle')
+                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                ->where('proyecto_detalle.piso', 1)
+                ->where('estado', 0)
+                ->update(['estado' => 1, 'fecha_habilitado' => now()]);
+        }
     }
 }
