@@ -123,7 +123,6 @@ class ProyectosController extends Controller
 
     public function store(Request $request)
     {
-        info($request->all());
         DB::beginTransaction();
 
         try {
@@ -246,7 +245,7 @@ class ProyectosController extends Controller
                         if (isset($proceso['numCambioProceso'])) {
                             $cambioPisosNuevo = new CambioProcesoProyectos();
                             $cambioPisosNuevo->proyecto_id = $proyecto->id;
-                            $cambioPisosNuevo->proceso = $index + 1; // Esto mantiene el orden
+                            $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
                             $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
                             $cambioPisosNuevo->save();
                         }
@@ -300,7 +299,7 @@ class ProyectosController extends Controller
                         if (isset($proceso['numCambioProceso'])) {
                             $cambioPisosNuevo = new CambioProcesoProyectos();
                             $cambioPisosNuevo->proyecto_id = $proyecto->id;
-                            $cambioPisosNuevo->proceso = $index + 1; // Esto mantiene el orden
+                            $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
                             $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
                             $cambioPisosNuevo->save();
                         }

@@ -32,6 +32,6 @@ class ProyectosDetalle extends Model
 
     public function proceso()
     {
-        return $this->belongsTo(ProcesosProyectos::class, 'orden_proceso', 'id');
+        return $this->belongsTo(ProcesosProyectos::class, 'procesos_proyectos_id', 'id');
     }
 }
