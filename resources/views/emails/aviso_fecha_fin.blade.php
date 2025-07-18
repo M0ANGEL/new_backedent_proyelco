@@ -101,12 +101,13 @@
 <body>
     <div class="container">
 
-        <h2>🚨 Alerta de Inactivida en Proyecto <span> <b> {{ $proyecto->descripcion_proyecto }}</b></span></h2>
+        <h2>🚨 Alerta de Inactividad en el Proyecto <span><b>{{ $proyecto->descripcion_proyecto }}</b></span></h2>
+
         <div class="proyecto-card">
-            <p>Se informa que hace 3 dias habiles no se realizan registros en el proyecto
-                <span> <b> {{ $proyecto->descripcion_proyecto }}</b></span>
-            </p>
+            <p>Se informa que el proyecto <span><b>{{ $proyecto->descripcion_proyecto }}</b></span> no ha registrado
+                actividad en los últimos 3 días hábiles.</p>
         </div>
+
 
 
         <div class="btn-container">
