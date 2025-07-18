@@ -2053,6 +2053,7 @@ class GestionProyectosController extends Controller
 
     private function validarYHabilitarRetieYRitel($proyecto, $torre, $piso, $procesoNombre)
     {
+        //se buscan los pisos minimos para activar este proceso
         $CambioProceso = DB::table('cambio_procesos_x_proyecto')
             ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
@@ -2063,7 +2064,7 @@ class GestionProyectosController extends Controller
         $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
 
         $inicioProceso = DB::table('proyecto_detalle')
-            ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
             ->where('proyecto_detalle.torre', $torre)
             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
@@ -2103,7 +2104,7 @@ class GestionProyectosController extends Controller
 
             // Aún no iniciado, inicia en piso 1
             $detalle = DB::table('proyecto_detalle')
-                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
                 ->where('proyecto_detalle.torre', $torre)
                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
@@ -2116,7 +2117,7 @@ class GestionProyectosController extends Controller
 
 
             DB::table('proyecto_detalle')
-                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
                 ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
                 ->where('proyecto_detalle.torre', $torre)
                 ->where('proyecto_detalle.proyecto_id', $proyecto->id)
