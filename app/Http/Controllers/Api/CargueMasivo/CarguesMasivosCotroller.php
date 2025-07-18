@@ -12,7 +12,6 @@ class CarguesMasivosCotroller extends Controller
 {
     public function cargueEmpleados(Request $request)
     {
-        info($request);
         DB::beginTransaction();
 
         try {
