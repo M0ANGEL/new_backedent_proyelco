@@ -221,7 +221,6 @@ class UserController extends Controller
             }
 
             $cargoName = Cargo::where('id',$request->cargos)->first();
-            info($cargoName);
 
             $data = User::findOrFail($id);
             $user = clone $data;

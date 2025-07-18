@@ -173,7 +173,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     // dashboar
 
-    Route::get('dashboards/proyectos', [DashboardController::class, 'dashboardsProyectos']);
+    Route::get('dashboards/indexMisProyectos', [DashboardController::class, 'indexMisProyectos']);
+    Route::get('dashboards/proyectosDetalles/{id}', [DashboardController::class, 'dashboardsProyectos']);
     
 
 });
