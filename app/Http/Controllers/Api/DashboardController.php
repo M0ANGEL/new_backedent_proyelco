@@ -231,4 +231,23 @@ class DashboardController extends Controller
             'torreResumen' => $torreResumen
         ]);
     }
+
+    public function infoApt(Request $request){
+        // buscamos la info del apt
+        $info = DB::connection('mysql')
+            ->table('proyecto_detalle')
+            ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
+            ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->where('proyecto_detalle.id', $request->id)
+            ->select(
+                'proyecto_detalle.*',
+                'users.nombre as nombre'
+            )
+            ->first();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $info,
+        ]);
+    }
 }
