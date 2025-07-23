@@ -176,6 +176,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('dashboards/indexMisProyectos', [DashboardController::class, 'indexMisProyectos']);
     Route::get('dashboards/proyectosDetalles/{id}', [DashboardController::class, 'dashboardsProyectos']);
     Route::post('dashboards/infoApt', [DashboardController::class, 'infoApt']);
+
+    //descargas en excel
+    Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class,'ExportInformeExcelProyecto']);
     
 
 });
