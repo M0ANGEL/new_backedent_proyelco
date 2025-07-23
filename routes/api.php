@@ -172,9 +172,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('proyectos-simular-anulacion', [GestionProyectosController::class, 'simularAnulacion']);
 
     // dashboar
-
+    // esta ruta me envia todo mis proyectos en los que yo estoy
     Route::get('dashboards/indexMisProyectos', [DashboardController::class, 'indexMisProyectos']);
     Route::get('dashboards/proyectosDetalles/{id}', [DashboardController::class, 'dashboardsProyectos']);
+    Route::post('dashboards/infoApt', [DashboardController::class, 'infoApt']);
     
 
 });

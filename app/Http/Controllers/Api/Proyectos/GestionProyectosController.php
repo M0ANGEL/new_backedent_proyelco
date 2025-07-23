@@ -54,12 +54,19 @@ class GestionProyectosController extends Controller
             $porcentaje = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
             $proyecto->porcentaje = round($porcentaje, 2);
 
-            // Cálculo del avance (nuevo)
-            $totalApartamentos = $detalles->count();
-            $apartamentosRealizados = $totalTerminado;
+            foreach ($proyectosGestion as $proyecto) {
+                $AVANCE = DB::connection('mysql')
+                    ->table('proyecto_detalle')
+                    ->where('proyecto_id', $proyecto->id)
+                    ->get();
 
-            $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-            $proyecto->avance = round($avance, 2);
+                // Cálculo del avance (nuevo)
+                $totalApartamentos = $AVANCE->count();
+                $apartamentosRealizados = $totalTerminado;
+
+                $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
+                $proyecto->avance = round($avance, 2);
+            }
         }
 
         return response()->json([
@@ -1467,7 +1474,7 @@ class GestionProyectosController extends Controller
 
     private function confirmarPruebas($proyecto, $torre, $orden_proceso, $piso)
     {
-        
+
         // Confirmar todo el piso pruebas
         $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
             ->where('orden_proceso', $orden_proceso)
