@@ -52,11 +52,29 @@ class ProyectosController extends Controller
             $proyecto->porcentaje = round($porcentaje, 2);
 
             // Cálculo de avance
-            $totalApartamentos = $detalles->count();
-            $apartamentosRealizados = $totalTerminado;
+            // $totalApartamentos = $detalles->count();
+            // $apartamentosRealizados = $totalTerminado;
 
-            $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-            $proyecto->avance = round($avance, 2);
+            // $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
+            // $proyecto->avance = round($avance, 2);
+
+            foreach ($proyectos as $proyecto) {
+                $AVANCE = DB::connection('mysql')
+                    ->table('proyecto_detalle')
+                    ->where('proyecto_id', $proyecto->id)
+                    ->get();
+
+                $totalEjecutando = $AVANCE->where('estado', 1)->count();
+                $totalTerminado = $AVANCE->where('estado', 2)->count();
+                $total = $totalEjecutando + $totalTerminado;
+
+                // Cálculo del avance (nuevo)
+                $totalApartamentos = $AVANCE->count();
+                $apartamentosRealizados = $totalTerminado;
+
+                $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
+                $proyecto->avance = round($avance, 2);
+            }
         }
 
         return response()->json([
