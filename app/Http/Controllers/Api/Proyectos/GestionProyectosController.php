@@ -60,6 +60,10 @@ class GestionProyectosController extends Controller
                     ->where('proyecto_id', $proyecto->id)
                     ->get();
 
+                $totalEjecutando = $AVANCE->where('estado', 1)->count();
+                $totalTerminado = $AVANCE->where('estado', 2)->count();
+                $total = $totalEjecutando + $totalTerminado;
+
                 // Cálculo del avance (nuevo)
                 $totalApartamentos = $AVANCE->count();
                 $apartamentosRealizados = $totalTerminado;
