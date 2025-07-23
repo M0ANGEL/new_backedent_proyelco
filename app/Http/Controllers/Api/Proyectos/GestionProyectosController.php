@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Proyectos;
 
+use App\Exports\InformeProyectoExport;
 use App\Http\Controllers\Controller;
 use App\Models\AnulacionApt;
 use App\Models\CambioProcesoProyectos;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class GestionProyectosController extends Controller
 {
@@ -926,6 +928,80 @@ class GestionProyectosController extends Controller
     //     ]);
     // }
 
+    // public function InformeDetalladoProyectos($id)
+    // {
+    //     $proyectoId = $id;
+
+    //     if (!$proyectoId) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'ID de proyecto no proporcionado.',
+    //         ], 400);
+    //     }
+
+    //     // Obtener el listado de nombres de torre por código
+    //     $torresConNombre = DB::table('nombre_xtore')
+    //         ->where('proyecto_id', $proyectoId)
+    //         ->pluck('nombre_torre', 'torre') 
+    //         ->toArray();
+
+    //     // Obtener todos los detalles del proyecto incluyendo torre y proceso
+    //     $detalles = DB::table('proyecto_detalle')
+    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->select(
+    //             'proyecto_detalle.torre',
+    //             'proyecto_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso as proceso'
+    //         )
+    //         ->where('proyecto_detalle.proyecto_id', $proyectoId)
+    //         ->get();
+
+    //     if ($detalles->isEmpty()) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'No se encontraron detalles para el proyecto.',
+    //         ], 404);
+    //     }
+
+    //     // Agrupar por proceso
+    //     $procesos = $detalles->groupBy('proceso');
+    //     $torres = $detalles->pluck('torre')->unique()->sort()->values(); // torre1, torre2, etc.
+
+    //     $resultado = [];
+
+    //     foreach ($procesos as $proceso => $itemsProceso) {
+    //         $fila = ['proceso' => $proceso];
+    //         $totalGlobal = 0;
+    //         $terminadosGlobal = 0;
+
+    //         foreach ($torres as $torre) {
+    //             $filtrados = $itemsProceso->where('torre', $torre);
+    //             $total = $filtrados->count();
+    //             $terminados = $filtrados->where('estado', 2)->count();
+
+    //             $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+    //             $fila["torre_{$torre}"] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+    //             $totalGlobal += $total;
+    //             $terminadosGlobal += $terminados;
+    //         }
+
+    //         // Agregar total general por proceso
+    //         $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+    //         $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+    //         $resultado[] = $fila;
+    //     }
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => [
+    //             'torres' => $torres,
+    //             'reporte' => $resultado
+    //         ]
+    //     ]);
+    // }
+
     public function InformeDetalladoProyectos($id)
     {
         $proyectoId = $id;
@@ -936,6 +1012,12 @@ class GestionProyectosController extends Controller
                 'message' => 'ID de proyecto no proporcionado.',
             ], 400);
         }
+
+        // Obtener el listado de nombres de torre por código
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $proyectoId)
+            ->pluck('nombre_torre', 'torre') // [codigo => nombre]
+            ->toArray();
 
         // Obtener todos los detalles del proyecto incluyendo torre y proceso
         $detalles = DB::table('proyecto_detalle')
@@ -957,7 +1039,14 @@ class GestionProyectosController extends Controller
 
         // Agrupar por proceso
         $procesos = $detalles->groupBy('proceso');
-        $torres = $detalles->pluck('torre')->unique()->sort()->values(); // torre1, torre2, etc.
+
+        // Obtener lista de torres con código y nombre
+        $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoTorre,
+                'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+            ];
+        });
 
         $resultado = [];
 
@@ -967,12 +1056,15 @@ class GestionProyectosController extends Controller
             $terminadosGlobal = 0;
 
             foreach ($torres as $torre) {
-                $filtrados = $itemsProceso->where('torre', $torre);
+                $codigo = $torre['codigo'];
+                $nombre = $torre['nombre'];
+
+                $filtrados = $itemsProceso->where('torre', $codigo);
                 $total = $filtrados->count();
                 $terminados = $filtrados->where('estado', 2)->count();
 
                 $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
-                $fila["torre_{$torre}"] = "{$terminados}/{$total} ({$porcentaje}%)";
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
 
                 $totalGlobal += $total;
                 $terminadosGlobal += $terminados;
@@ -988,8 +1080,9 @@ class GestionProyectosController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'torres' => $torres,
-                'reporte' => $resultado
+                'torres' => $torres->pluck('nombre'),
+                'reporte' => $resultado,
+                'proyecto_id' => $proyectoId
             ]
         ]);
     }
@@ -1569,5 +1662,157 @@ class GestionProyectosController extends Controller
                 ->where('estado', 0)
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
+    }
+
+    // public function ExportInformeExcelProyecto($id){
+    //     //aqui descargar en excel esta info
+    //      $proyectoId = $id;
+
+    //     if (!$proyectoId) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'ID de proyecto no proporcionado.',
+    //         ], 400);
+    //     }
+
+    //     // Obtener el listado de nombres de torre por código
+    //     $torresConNombre = DB::table('nombre_xtore')
+    //         ->where('proyecto_id', $proyectoId)
+    //         ->pluck('nombre_torre', 'torre') // [codigo => nombre]
+    //         ->toArray();
+
+    //     // Obtener todos los detalles del proyecto incluyendo torre y proceso
+    //     $detalles = DB::table('proyecto_detalle')
+    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->select(
+    //             'proyecto_detalle.torre',
+    //             'proyecto_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso as proceso'
+    //         )
+    //         ->where('proyecto_detalle.proyecto_id', $proyectoId)
+    //         ->get();
+
+    //     if ($detalles->isEmpty()) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'No se encontraron detalles para el proyecto.',
+    //         ], 404);
+    //     }
+
+    //     // Agrupar por proceso
+    //     $procesos = $detalles->groupBy('proceso');
+
+    //     // Obtener lista de torres con código y nombre
+    //     $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+    //         return [
+    //             'codigo' => $codigoTorre,
+    //             'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+    //         ];
+    //     });
+
+    //     $resultado = [];
+
+    //     foreach ($procesos as $proceso => $itemsProceso) {
+    //         $fila = ['proceso' => $proceso];
+    //         $totalGlobal = 0;
+    //         $terminadosGlobal = 0;
+
+    //         foreach ($torres as $torre) {
+    //             $codigo = $torre['codigo'];
+    //             $nombre = $torre['nombre'];
+
+    //             $filtrados = $itemsProceso->where('torre', $codigo);
+    //             $total = $filtrados->count();
+    //             $terminados = $filtrados->where('estado', 2)->count();
+
+    //             $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+    //             $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+    //             $totalGlobal += $total;
+    //             $terminadosGlobal += $terminados;
+    //         }
+
+    //         // Agregar total general por proceso
+    //         $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+    //         $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+    //         $resultado[] = $fila;
+    //     }
+
+
+    // }
+
+
+
+    public function ExportInformeExcelProyecto($id)
+    {
+        $proyectoId = $id;
+
+        if (!$proyectoId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID de proyecto no proporcionado.',
+            ], 400);
+        }
+
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $proyectoId)
+            ->pluck('nombre_torre', 'torre')
+            ->toArray();
+
+        $detalles = DB::table('proyecto_detalle')
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->select(
+                'proyecto_detalle.torre',
+                'proyecto_detalle.estado',
+                'procesos_proyectos.nombre_proceso as proceso'
+            )
+            ->where('proyecto_detalle.proyecto_id', $proyectoId)
+            ->get();
+
+        if ($detalles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron detalles para el proyecto.',
+            ], 404);
+        }
+
+        $procesos = $detalles->groupBy('proceso');
+        $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoTorre,
+                'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+            ];
+        });
+
+        $resultado = [];
+
+        foreach ($procesos as $proceso => $itemsProceso) {
+            $fila = ['Proceso' => $proceso];
+            $totalGlobal = 0;
+            $terminadosGlobal = 0;
+
+            foreach ($torres as $torre) {
+                $codigo = $torre['codigo'];
+                $nombre = $torre['nombre'];
+
+                $filtrados = $itemsProceso->where('torre', $codigo);
+                $total = $filtrados->count();
+                $terminados = $filtrados->where('estado', 2)->count();
+
+                $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+                $totalGlobal += $total;
+                $terminadosGlobal += $terminados;
+            }
+
+            $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+            $fila["Total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+            $resultado[] = $fila;
+        }
+
+        return Excel::download(new InformeProyectoExport($resultado), 'informe-proyecto.xlsx');
     }
 }
