@@ -1027,6 +1027,7 @@ class GestionProyectosController extends Controller
                 ->where('torre', $info->torre)
                 ->where('consecutivo', $info->consecutivo)
                 ->where('estado', 2)
+                ->where('orden_proceso','>=',$info->orden_proceso)
                 ->get();
 
             // Cambiar estado a 1 y limpiar campos
