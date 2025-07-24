@@ -19,5 +19,6 @@ class AnulacionApt extends Model
         'piso',
         'apt',
         'fecha_confirmo',
+        'apt_afectados',
     ];
 }

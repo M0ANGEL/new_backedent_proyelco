@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Proyectos;
 
+use App\Exports\InformeProyectoExport;
 use App\Http\Controllers\Controller;
 use App\Models\AnulacionApt;
 use App\Models\CambioProcesoProyectos;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class GestionProyectosController extends Controller
 {
@@ -926,6 +928,7 @@ class GestionProyectosController extends Controller
     //     ]);
     // }
 
+
     public function InformeDetalladoProyectos($id)
     {
         $proyectoId = $id;
@@ -936,6 +939,12 @@ class GestionProyectosController extends Controller
                 'message' => 'ID de proyecto no proporcionado.',
             ], 400);
         }
+
+        // Obtener el listado de nombres de torre por código
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $proyectoId)
+            ->pluck('nombre_torre', 'torre') // [codigo => nombre]
+            ->toArray();
 
         // Obtener todos los detalles del proyecto incluyendo torre y proceso
         $detalles = DB::table('proyecto_detalle')
@@ -957,7 +966,14 @@ class GestionProyectosController extends Controller
 
         // Agrupar por proceso
         $procesos = $detalles->groupBy('proceso');
-        $torres = $detalles->pluck('torre')->unique()->sort()->values(); // torre1, torre2, etc.
+
+        // Obtener lista de torres con código y nombre
+        $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoTorre,
+                'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+            ];
+        });
 
         $resultado = [];
 
@@ -967,12 +983,15 @@ class GestionProyectosController extends Controller
             $terminadosGlobal = 0;
 
             foreach ($torres as $torre) {
-                $filtrados = $itemsProceso->where('torre', $torre);
+                $codigo = $torre['codigo'];
+                $nombre = $torre['nombre'];
+
+                $filtrados = $itemsProceso->where('torre', $codigo);
                 $total = $filtrados->count();
                 $terminados = $filtrados->where('estado', 2)->count();
 
                 $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
-                $fila["torre_{$torre}"] = "{$terminados}/{$total} ({$porcentaje}%)";
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
 
                 $totalGlobal += $total;
                 $terminadosGlobal += $terminados;
@@ -988,8 +1007,9 @@ class GestionProyectosController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'torres' => $torres,
-                'reporte' => $resultado
+                'torres' => $torres->pluck('nombre'),
+                'reporte' => $resultado,
+                'proyecto_id' => $proyectoId
             ]
         ]);
     }
@@ -997,49 +1017,48 @@ class GestionProyectosController extends Controller
     // cambio estado de apartamentos confirado por erro-mentira
     public function CambioEstadosApt(Request $request)
     {
-
         DB::beginTransaction();
-        //inicio de flujo
 
         try {
-
-            //buscamos el detalle del proyeto para ese piso
             $info = ProyectosDetalle::findOrFail($request->aptId);
 
-            $numeroCambio = $info->orden_proceso + "1";
-            //buscamos los cambio de piso para proceso, el numero minimo de pisos que debe cumplir el proecso anterior
-            $CambioProcesoProyectos = CambioProcesoProyectos::where('proyecto_id', $info->proyecto_id)
-                ->where('proceso', $numeroCambio)->first();
+            // Obtener todos los APT con estado 2 que coincidan en proyecto, torre y consecutivo
+            $aptosRelacionados = ProyectosDetalle::where('proyecto_id', $info->proyecto_id)
+                ->where('torre', $info->torre)
+                ->where('consecutivo', $info->consecutivo)
+                ->where('estado', 2)
+                ->where('orden_proceso','>=',$info->orden_proceso)
+                ->get();
 
-            $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
+            // Cambiar estado a 1 y limpiar campos
+            $idsAfectados = [];
+            foreach ($aptosRelacionados as $apt) {
+                $apt->estado = 1;
+                $apt->fecha_habilitado = now();
+                $apt->fecha_fin = null;
+                $apt->user_id = null;
+                $apt->update();
 
+                $idsAfectados[] = $apt->id;
+            }
 
-
-
-            // se registra historial de cambio de estado del apt
+            // Guardar log de anulación
             $LogCambioEstadoApt = new AnulacionApt();
             $LogCambioEstadoApt->motivo = $request->detalle;
             $LogCambioEstadoApt->piso = (int) $info->piso;
-            $LogCambioEstadoApt->apt =  $request->aptId;
+            $LogCambioEstadoApt->apt = $request->aptId;
             $LogCambioEstadoApt->fecha_confirmo = $info->fecha_fin;
             $LogCambioEstadoApt->userConfirmo_id = $info->user_id;
             $LogCambioEstadoApt->user_id = Auth::id();
             $LogCambioEstadoApt->proyecto_id = $info->proyecto_id;
+            $LogCambioEstadoApt->apt_afectados = json_encode($idsAfectados); // <<< aquí guardamos los IDs afectados
             $LogCambioEstadoApt->save();
 
-
-
-            // se actualiza el estado del apt
-            $info->estado = 1;
-            $info->fecha_habilitado =  now();
-            $info->fecha_fin = null;
-            $info->user_id = null;
-            $info->update();
-
             DB::commit();
+
             return response()->json([
                 'success' => true,
-                'data' => $info
+                'data' => $aptosRelacionados // devolvemos todos los afectados, no solo uno
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1050,146 +1069,6 @@ class GestionProyectosController extends Controller
             ], 500);
         }
     }
-
-    // cambio estado de apartamentos confirado por erro-mentira informativo
-    public function CambioEstadosAptInformativo(Request $request)
-    {
-        try {
-            $info = ProyectosDetalle::findOrFail($request->aptId);
-            $proyectoId = $info->proyecto_id;
-            $pisoActual = (int) $info->piso;
-            $ordenProcesoActual = (int) $info->orden_proceso;
-
-            $numeroCambio = $ordenProcesoActual + 1;
-
-            $CambioProcesoProyectos = CambioProcesoProyectos::where('proyecto_id', $proyectoId)
-                ->where('proceso', $numeroCambio)
-                ->first();
-
-            $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
-
-            // Simulación del impacto
-            $pisosAfectados = [];
-            $procesosAfectados = [];
-
-            // Buscamos los pisos siguientes del mismo proceso
-            $pisosPosteriores = ProyectosDetalle::where('proyecto_id', $proyectoId)
-                ->where('orden_proceso', $ordenProcesoActual)
-                ->where('piso', '>', $pisoActual)
-                ->where('estado', 0)
-                ->get();
-
-            foreach ($pisosPosteriores as $piso) {
-                $pisosAfectados[] = [
-                    'id' => $piso->id,
-                    'piso' => $piso->piso,
-                    'nuevo_estado' => 0
-                ];
-            }
-
-            // Si el proceso siguiente ya tiene activaciones, también afectarlo
-            $procesosSiguientes = ProyectosDetalle::where('proyecto_id', $proyectoId)
-                ->where('orden_proceso', $numeroCambio)
-                ->where('estado', 0)
-                ->get();
-
-            foreach ($procesosSiguientes as $proc) {
-                $procesosAfectados[] = [
-                    'id' => $proc->id,
-                    'piso' => $proc->piso,
-                    'orden_proceso' => $proc->orden_proceso,
-                    'nuevo_estado' => 0
-                ];
-            }
-
-            return response()->json([
-                'success' => true,
-                'mensaje' => 'Esta es una vista previa. No se han aplicado cambios.',
-                'afecta_pisos' => $pisosAfectados,
-                'afecta_procesos' => $procesosAfectados,
-                'apartamento_original' => $info
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error en consulta informativa',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function simularAnulacion(Request $request)
-    {
-        $aptId = $request->aptId;
-
-        $apt = ProyectosDetalle::findOrFail($aptId);
-
-        $anulado = [
-            'id' => $apt->id,
-            'proceso' => $apt->orden_proceso,
-            'piso' => $apt->piso,
-        ];
-
-        $proyecto_id = $apt->proyecto_id;
-
-        $afectados = [];
-
-        // Obtener el proceso actual
-        $procesoActual = $apt->orden_proceso;
-        $pisoActual = $apt->piso;
-
-        // Buscar si afecta pisos posteriores del mismo proceso
-        $pisosPosteriores = ProyectosDetalle::where('proyecto_id', $proyecto_id)
-            ->where('orden_proceso', $procesoActual)
-            ->where('piso', '>', $pisoActual)
-            ->where('estado', '!=', 0)
-            ->get();
-
-        foreach ($pisosPosteriores as $piso) {
-            $afectados[] = [
-                'id' => $piso->id,
-                'proceso' => $piso->orden_proceso,
-                'piso' => $piso->piso,
-                'razon' => 'Piso posterior del mismo proceso',
-            ];
-        }
-
-        // Buscar si afecta al siguiente proceso
-        $procesoSiguiente = $procesoActual + 1;
-        $configProceso = CambioProcesoProyectos::where('proyecto_id', $proyecto_id)
-            ->where('proceso', $procesoSiguiente)
-            ->first();
-
-        if ($configProceso) {
-            $pisosRequeridos = (int) $configProceso->numero;
-
-            // Verifica si el pisoActual es uno de los necesarios
-            if ($pisoActual <= $pisosRequeridos) {
-                $pisosSiguienteProceso = ProyectosDetalle::where('proyecto_id', $proyecto_id)
-                    ->where('orden_proceso', $procesoSiguiente)
-                    ->where('estado', '!=', 0)
-                    ->get();
-
-                foreach ($pisosSiguienteProceso as $piso) {
-                    $afectados[] = [
-                        'id' => $piso->id,
-                        'proceso' => $piso->orden_proceso,
-                        'piso' => $piso->piso,
-                        'razon' => 'No se cumplen los pisos requeridos del proceso anterior',
-                    ];
-                }
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'resultado' => [
-                'anulado' => $anulado,
-                'afectados' => $afectados,
-            ],
-        ]);
-    }
-
 
     public function confirmarAptNuevaLogica($id)
     {
@@ -1569,5 +1448,157 @@ class GestionProyectosController extends Controller
                 ->where('estado', 0)
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
+    }
+
+    // public function ExportInformeExcelProyecto($id){
+    //     //aqui descargar en excel esta info
+    //      $proyectoId = $id;
+
+    //     if (!$proyectoId) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'ID de proyecto no proporcionado.',
+    //         ], 400);
+    //     }
+
+    //     // Obtener el listado de nombres de torre por código
+    //     $torresConNombre = DB::table('nombre_xtore')
+    //         ->where('proyecto_id', $proyectoId)
+    //         ->pluck('nombre_torre', 'torre') // [codigo => nombre]
+    //         ->toArray();
+
+    //     // Obtener todos los detalles del proyecto incluyendo torre y proceso
+    //     $detalles = DB::table('proyecto_detalle')
+    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->select(
+    //             'proyecto_detalle.torre',
+    //             'proyecto_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso as proceso'
+    //         )
+    //         ->where('proyecto_detalle.proyecto_id', $proyectoId)
+    //         ->get();
+
+    //     if ($detalles->isEmpty()) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'No se encontraron detalles para el proyecto.',
+    //         ], 404);
+    //     }
+
+    //     // Agrupar por proceso
+    //     $procesos = $detalles->groupBy('proceso');
+
+    //     // Obtener lista de torres con código y nombre
+    //     $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+    //         return [
+    //             'codigo' => $codigoTorre,
+    //             'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+    //         ];
+    //     });
+
+    //     $resultado = [];
+
+    //     foreach ($procesos as $proceso => $itemsProceso) {
+    //         $fila = ['proceso' => $proceso];
+    //         $totalGlobal = 0;
+    //         $terminadosGlobal = 0;
+
+    //         foreach ($torres as $torre) {
+    //             $codigo = $torre['codigo'];
+    //             $nombre = $torre['nombre'];
+
+    //             $filtrados = $itemsProceso->where('torre', $codigo);
+    //             $total = $filtrados->count();
+    //             $terminados = $filtrados->where('estado', 2)->count();
+
+    //             $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+    //             $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+    //             $totalGlobal += $total;
+    //             $terminadosGlobal += $terminados;
+    //         }
+
+    //         // Agregar total general por proceso
+    //         $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+    //         $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+    //         $resultado[] = $fila;
+    //     }
+
+
+    // }
+
+
+
+    public function ExportInformeExcelProyecto($id)
+    {
+        $proyectoId = $id;
+
+        if (!$proyectoId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID de proyecto no proporcionado.',
+            ], 400);
+        }
+
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $proyectoId)
+            ->pluck('nombre_torre', 'torre')
+            ->toArray();
+
+        $detalles = DB::table('proyecto_detalle')
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->select(
+                'proyecto_detalle.torre',
+                'proyecto_detalle.estado',
+                'procesos_proyectos.nombre_proceso as proceso'
+            )
+            ->where('proyecto_detalle.proyecto_id', $proyectoId)
+            ->get();
+
+        if ($detalles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron detalles para el proyecto.',
+            ], 404);
+        }
+
+        $procesos = $detalles->groupBy('proceso');
+        $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoTorre,
+                'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+            ];
+        });
+
+        $resultado = [];
+
+        foreach ($procesos as $proceso => $itemsProceso) {
+            $fila = ['Proceso' => $proceso];
+            $totalGlobal = 0;
+            $terminadosGlobal = 0;
+
+            foreach ($torres as $torre) {
+                $codigo = $torre['codigo'];
+                $nombre = $torre['nombre'];
+
+                $filtrados = $itemsProceso->where('torre', $codigo);
+                $total = $filtrados->count();
+                $terminados = $filtrados->where('estado', 2)->count();
+
+                $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+                $totalGlobal += $total;
+                $terminadosGlobal += $terminados;
+            }
+
+            $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+            $fila["Total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+            $resultado[] = $fila;
+        }
+
+        return Excel::download(new InformeProyectoExport($resultado), 'informe-proyecto.xlsx');
     }
 }
