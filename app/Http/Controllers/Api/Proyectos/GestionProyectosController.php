@@ -1324,8 +1324,6 @@ class GestionProyectosController extends Controller
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
 
-            info("sd".$detalleDestino);
-
         if ($detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
             return; // espera validación externa
         }
