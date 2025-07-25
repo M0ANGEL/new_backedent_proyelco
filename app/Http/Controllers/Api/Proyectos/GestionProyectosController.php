@@ -1027,7 +1027,7 @@ class GestionProyectosController extends Controller
                 ->where('torre', $info->torre)
                 ->where('consecutivo', $info->consecutivo)
                 ->where('estado', 2)
-                ->where('orden_proceso','>=',$info->orden_proceso)
+                ->where('orden_proceso', '>=', $info->orden_proceso)
                 ->get();
 
             // Cambiar estado a 1 y limpiar campos
@@ -1263,7 +1263,25 @@ class GestionProyectosController extends Controller
         }
 
         // Si ambos procesos están completos, habilitar alambrada en ese piso
-        ProyectosDetalle::where('torre', $torre)
+        $Validacion = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['alambrada']))
+            ->where('estado', 0)
+            ->get();
+
+        //si necesita validacion no validar
+        if ($Validacion->contains(function ($item) {
+            return $item->validacion == 1 && $item->estado_validacion == 0;
+        })) {
+            return response()->json([
+                'success' => true,
+                'message' => 'espera validación externa',
+            ], 200);
+        }
+
+
+        $Validacion = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyectoId)
             ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['alambrada']))
@@ -1294,26 +1312,28 @@ class GestionProyectosController extends Controller
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoDestino])
             ->value('numero');
 
-        $pisosMinimos = $minimos ? (int)$minimos : 0;
-        if ($piso < $pisosMinimos) return;
+        // $pisosMinimos = $minimos ? (int)$minimos : 0;
+        // if ($piso < $pisosMinimos) return;
 
-        $PisoCambioProceso = $piso - ($minimos - 1);
+        // $PisoCambioProceso = $piso - ($minimos - 1);
 
         // 3. Validar si requiere validación
         $detalleDestino = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
-            ->where('piso', $PisoCambioProceso)
+            ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
 
-        // if ($detalleDestino && $detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
-        //     return; // espera validación externa
-        // }
+            info("sd".$detalleDestino);
+
+        if ($detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
+            return; // espera validación externa
+        }
 
         // 4. Activar el proceso destino en ese piso
         ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
-            ->where('piso', $PisoCambioProceso)
+            ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->where('estado', 0)
             ->update([
@@ -1449,86 +1469,6 @@ class GestionProyectosController extends Controller
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
     }
-
-    // public function ExportInformeExcelProyecto($id){
-    //     //aqui descargar en excel esta info
-    //      $proyectoId = $id;
-
-    //     if (!$proyectoId) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'ID de proyecto no proporcionado.',
-    //         ], 400);
-    //     }
-
-    //     // Obtener el listado de nombres de torre por código
-    //     $torresConNombre = DB::table('nombre_xtore')
-    //         ->where('proyecto_id', $proyectoId)
-    //         ->pluck('nombre_torre', 'torre') // [codigo => nombre]
-    //         ->toArray();
-
-    //     // Obtener todos los detalles del proyecto incluyendo torre y proceso
-    //     $detalles = DB::table('proyecto_detalle')
-    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso as proceso'
-    //         )
-    //         ->where('proyecto_detalle.proyecto_id', $proyectoId)
-    //         ->get();
-
-    //     if ($detalles->isEmpty()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'No se encontraron detalles para el proyecto.',
-    //         ], 404);
-    //     }
-
-    //     // Agrupar por proceso
-    //     $procesos = $detalles->groupBy('proceso');
-
-    //     // Obtener lista de torres con código y nombre
-    //     $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
-    //         return [
-    //             'codigo' => $codigoTorre,
-    //             'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
-    //         ];
-    //     });
-
-    //     $resultado = [];
-
-    //     foreach ($procesos as $proceso => $itemsProceso) {
-    //         $fila = ['proceso' => $proceso];
-    //         $totalGlobal = 0;
-    //         $terminadosGlobal = 0;
-
-    //         foreach ($torres as $torre) {
-    //             $codigo = $torre['codigo'];
-    //             $nombre = $torre['nombre'];
-
-    //             $filtrados = $itemsProceso->where('torre', $codigo);
-    //             $total = $filtrados->count();
-    //             $terminados = $filtrados->where('estado', 2)->count();
-
-    //             $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
-    //             $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
-
-    //             $totalGlobal += $total;
-    //             $terminadosGlobal += $terminados;
-    //         }
-
-    //         // Agregar total general por proceso
-    //         $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
-    //         $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
-
-    //         $resultado[] = $fila;
-    //     }
-
-
-    // }
-
-
 
     public function ExportInformeExcelProyecto($id)
     {

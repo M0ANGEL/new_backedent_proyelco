@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
 use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
+use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
@@ -131,7 +132,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-iniciar-torre', [GestionProyectosController::class, 'IniciarTorre']);
     Route::get('info-proyecto/{id}', [GestionProyectosController::class, 'infoProyecto']);
     Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarAptNuevaLogica']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
-    Route::post('gestion-confirmar-validar', [GestionProyectosController::class, 'validarProceso']);
+    Route::post('gestion-confirmar-validar', [VaidarProcesoController::class, 'validarProcesoNuevaLogica']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
     Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
 
