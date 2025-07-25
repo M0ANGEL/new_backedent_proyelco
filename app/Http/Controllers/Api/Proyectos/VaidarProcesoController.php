@@ -133,7 +133,6 @@ class VaidarProcesoController extends Controller
                     $apt->estado_validacion = 1;
                     $apt->fecha_validacion = now();
                     $apt->save();
-                    info($apt);
                 }
                 DB::commit();
                 throw new \Exception("La habilitación del piso ha sido cancelada debido a que algunos apartamentos del proceso '{$proceso}' permanecen sin confirmar. Se ha procedido con la actualización del estado de validación.");
@@ -167,7 +166,6 @@ class VaidarProcesoController extends Controller
             )
             ->get();
 
-        info($aptos);
 
         // 2. Validar que existan apartamentos con ese proceso
         if ($aptos->isEmpty()) {
@@ -257,7 +255,6 @@ class VaidarProcesoController extends Controller
                     $apt->estado_validacion = 1;
                     $apt->fecha_validacion = now();
                     $apt->save();
-                    info($apt);
                 }
                 DB::commit();
                 throw new \Exception("La habilitación del piso ha sido cancelada debido a que algunos apartamentos del proceso '{$proceso}' permanecen sin confirmar. Se ha procedido con la actualización del estado de validación.");
