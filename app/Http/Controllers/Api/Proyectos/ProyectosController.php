@@ -142,8 +142,6 @@ class ProyectosController extends Controller
     public function store(Request $request)
     {
         DB::beginTransaction();
-        info($request->all());
-
         try {
             $validator = Validator::make($request->all(), [
                 'estado' => ['required'],
