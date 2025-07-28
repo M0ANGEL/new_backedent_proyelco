@@ -30,7 +30,7 @@ class ActualizarConsecutivos extends Command
 
         $this->info("Actualizando consecutivos de $desde a $hasta → empezando en $nuevoInicio");
 
-        $consecutivos = DB::table('proyecto_Detalle')
+        $consecutivos = DB::table('proyecto_detalle')
             ->select('consecutivo')
             ->whereBetween('consecutivo', [$desde, $hasta])
             ->where('proyecto_id', $proyecto)
@@ -43,7 +43,7 @@ class ActualizarConsecutivos extends Command
         foreach ($consecutivos as $index => $original) {
             $nuevo = $nuevoInicio + $index;
 
-            DB::table('proyecto_Detalle')
+            DB::table('proyecto_detalle')
                 ->where('consecutivo', $original)
                 ->where('proyecto_id', $proyecto)
                 ->where('torre', $torre)
