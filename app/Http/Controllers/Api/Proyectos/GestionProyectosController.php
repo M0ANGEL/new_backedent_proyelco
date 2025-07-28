@@ -1072,7 +1072,6 @@ class GestionProyectosController extends Controller
 
     public function confirmarAptNuevaLogica($id)
     {
-        info($id);
         DB::beginTransaction();
 
         try {
