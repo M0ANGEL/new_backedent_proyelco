@@ -124,6 +124,13 @@ return [
             'level' => 'info',
         ],
 
+        'consecutivos' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/consecutivos.log'),
+            'level' => 'info',
+        ],
+
+
     ],
 
 ];
