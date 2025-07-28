@@ -142,6 +142,7 @@ class ProyectosController extends Controller
     public function store(Request $request)
     {
         DB::beginTransaction();
+        info($request->all());
 
         try {
             $validator = Validator::make($request->all(), [
@@ -182,15 +183,37 @@ class ProyectosController extends Controller
             }
 
 
-            // se valida que los cambios de piso no sea mayor a la cantidad de piso
-            // foreach ($request->procesos as $proceso) {
-            //     if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
-            //         return response()->json([
-            //             'status' => 'error',
-            //             'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
-            //         ], 404);
-            //     }
-            // }
+            // se valida que los cambios de piso no sea mayor a la cantidad de piso de pende el tipo del proyecto
+            if ($request->tipo_obra == 1) {
+
+                foreach ($request->procesos as $proceso) {
+                    if (!isset($proceso['numCambioProceso'])) {
+                        continue;
+                    }
+
+                    $numCambio = (int) $proceso['numCambioProceso'];
+
+                    foreach ($request->bloques as $bloque) {
+                        $pisosBloque = (int) $bloque['pisos'];
+
+                        if ($numCambio > $pisosBloque) {
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$numCambio}) mayor a la cantidad de pisos de la torre: '{$bloque['nombre']}' ({$pisosBloque})",
+                            ], 422);
+                        }
+                    }
+                }
+            } else {
+                foreach ($request->procesos as $proceso) {
+                    if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
+                        ], 404);
+                    }
+                }
+            }
 
 
             // Datos base
