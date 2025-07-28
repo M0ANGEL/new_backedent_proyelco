@@ -172,7 +172,7 @@ class ProyectosController extends Controller
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Codigo no disponible, esta amarrado al proyecto: ' . $proyectoUnico->descripcion_proyecto,
+                    'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
                 ], 404);
             }
 
@@ -183,14 +183,14 @@ class ProyectosController extends Controller
 
 
             // se valida que los cambios de piso no sea mayor a la cantidad de piso
-            foreach ($request->procesos as $proceso) {
-                if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
-                    ], 404);
-                }
-            }
+            // foreach ($request->procesos as $proceso) {
+            //     if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
+            //         return response()->json([
+            //             'status' => 'error',
+            //             'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
+            //         ], 404);
+            //     }
+            // }
 
 
             // Datos base
