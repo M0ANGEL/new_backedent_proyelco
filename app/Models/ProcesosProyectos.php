@@ -17,4 +17,9 @@ class ProcesosProyectos extends Model
         'user_id',
         'estado'
     ];
+
+    public function setNombreProcesoAttribute($value)
+    {
+        $this->attributes['nombre_proceso'] = strtolower($value);
+    }
 }

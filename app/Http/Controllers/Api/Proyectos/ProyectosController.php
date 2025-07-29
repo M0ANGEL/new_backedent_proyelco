@@ -19,21 +19,31 @@ class ProyectosController extends Controller
 {
     public function index()
     {
-        // Consulta a la bd los proyectos
-        $proyectos = DB::connection('mysql')
-            ->table('proyecto')
-            ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id') // relación con los tipos de proyectos
-            ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id') // relación con los clientes
-            ->join('users', 'proyecto.encargado_id', '=', 'users.id') // usuario que crea el proyecto
-            ->join('users as ing', 'proyecto.ingeniero_id', '=', 'ing.id') // ingenieros 
+        $proyectos = DB::table('proyecto')
+            ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
             ->select(
                 'proyecto.*',
                 'tipos_de_proyectos.nombre_tipo',
-                'users.nombre as nombreEncargado',
-                'ing.nombre as nombreIngeniero',
-                'clientes.emp_nombre',
+                'clientes.emp_nombre'
             )
             ->get();
+
+        foreach ($proyectos as $proyecto) {
+            // Decodificar los IDs de encargados e ingenieros
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+
+            // Obtener los nombres desde la tabla de usuarios
+            $proyecto->nombresEncargados = DB::table('users')
+                ->whereIn('id', $encargadoIds)
+                ->pluck('nombre');
+
+            $proyecto->nombresIngenieros = DB::table('users')
+                ->whereIn('id', $ingenieroIds)
+                ->pluck('nombre');
+        }
+
 
         // Calcular el porcentaje de atraso y avance para cada proyecto
         foreach ($proyectos as $proyecto) {
@@ -149,8 +159,8 @@ class ProyectosController extends Controller
                 'codigo_proyecto' => ['required', 'string'],
                 'fecha_inicio' => ['required', 'string'],
                 'tipoProyecto_id' => ['required'],
-                'encargado_id' => ['required'],
-                'ingeniero_id' => ['required'],
+                'encargado_id' => ['required', 'array'],
+                'ingeniero_id' => ['required', 'array'],
                 'torres' => ['required', 'string'],
                 'nit' => ['required', 'string'],
                 'minimoApt' => ['required', 'string'],
@@ -243,11 +253,11 @@ class ProyectosController extends Controller
             $proyecto->apt = $total_apt;
             $proyecto->minimoApt = $request->minimoApt;
             $proyecto->pisosCambiarProceso = 2; //se va a borrar despues
-            $proyecto->encargado_id = $request->encargado_id;
-            $proyecto->ingeniero_id = $request->ingeniero_id;
             $proyecto->activador_pordia_apt = $request->activador_pordia_apt;
 
             // Registrar usuarios de notificación solo si vienen en la solicitud
+            $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
+            $proyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
             $proyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
             $proyecto->save();
 
@@ -400,8 +410,8 @@ class ProyectosController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'encargado_id' => ['required', 'string'],
-                'ingeniero_id' => ['required', 'string'],
+                'encargado_id' => ['required', 'array'],
+                'ingeniero_id' => ['required', 'array'],
                 'emp_nombre' => ['required', 'string'],
                 'nit' => ['required', 'string'],
                 'descripcion_proyecto' => ['required', 'string'],
@@ -437,8 +447,6 @@ class ProyectosController extends Controller
 
             // actualizar el proyecto actual
             $updateProyecto = Proyectos::findOrFail($id);
-            $updateProyecto->encargado_id = $request->encargado_id;
-            $updateProyecto->ingeniero_id = $request->ingeniero_id;
             $updateProyecto->cliente_id = $cliente->id;
             $updateProyecto->descripcion_proyecto = $request->descripcion_proyecto;
             $updateProyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
@@ -447,6 +455,8 @@ class ProyectosController extends Controller
             $updateProyecto->minimoApt = $request->minimoApt;
 
             $updateProyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
+            $updateProyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
+            $updateProyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
             $updateProyecto->save();
 
             return response()->json([
