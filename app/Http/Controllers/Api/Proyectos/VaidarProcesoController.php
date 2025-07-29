@@ -54,6 +54,12 @@ class VaidarProcesoController extends Controller
             $TipoProceso = strtolower(ProcesosProyectos::where('id', $info->procesos_proyectos_id)->value('nombre_proceso'));
 
             switch ($TipoProceso) {
+                case 'destapada':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'fundida', 'destapada');
+                    break;
+                case 'prolongacion':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'fundida', 'prolongacion');
+                    break;
                 case 'alambrada':
                     $this->intentarHabilitarAlambrada($info);
                     break;
@@ -62,8 +68,14 @@ class VaidarProcesoController extends Controller
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'alambrada', 'aparateada');
                     break;
 
+                case 'aparateada fase 2':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', 'aparateada fase 2');
+                    break;
+
                 case 'pruebas':
-                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', 'pruebas');
+                    $fase2 = ProcesosProyectos::whereRaw('LOWER(nombre_proceso) = ?', ['aparateada fase 2'])->exists();
+                    $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'aparateada';
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso,$siguienteProceso, 'pruebas');
                     break;
 
                 case 'retie':
