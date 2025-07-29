@@ -1353,32 +1353,77 @@ class GestionProyectosController extends Controller
             ]);
     }
 
+    // private function intentarHabilitarEntrega($info)
+    // {
+    //     $torre = $info->torre;
+    //     $proyectoId = $info->proyecto_id;
+    //     $piso = $info->piso;
+
+    //     $procesos = ['retie', 'ritel'];
+
+    //     foreach ($procesos as $proceso) {
+    //         $aptos = ProyectosDetalle::where('torre', $torre)
+    //             ->where('proyecto_id', $proyectoId)
+    //             ->where('piso', $piso)
+    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
+    //             ->get();
+
+    //         // Si falta alguno o alguno no está en estado 2, salir
+    //         if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
+    //             return; // No se habilita entrega
+    //         }
+    //     }
+
+    //     // Si ambos procesos están completos, habilitar entrega
+    //     ProyectosDetalle::where('torre', $torre)
+    //         ->where('proyecto_id', $proyectoId)
+    //         ->where('piso', $piso)
+    //         ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega']))
+    //         ->where('estado', 0)
+    //         ->update([
+    //             'estado' => 1,
+    //             'fecha_habilitado' => now()
+    //         ]);
+    // }
+
     private function intentarHabilitarEntrega($info)
     {
         $torre = $info->torre;
         $proyectoId = $info->proyecto_id;
         $piso = $info->piso;
+        $consecutivo = $info->consecutivo;
 
         $procesos = ['retie', 'ritel'];
 
         foreach ($procesos as $proceso) {
-            $aptos = ProyectosDetalle::where('torre', $torre)
+            // Solo buscar el apartamento 1 en cada proceso
+            $apto = ProyectosDetalle::where('torre', $torre)
                 ->where('proyecto_id', $proyectoId)
                 ->where('piso', $piso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
-                ->get();
+                ->where('consecutivo', $consecutivo) // <-- Solo el apto 1
+                ->whereHas(
+                    'proceso',
+                    fn($q) =>
+                    $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso])
+                )
+                ->first();
 
-            // Si falta alguno o alguno no está en estado 2, salir
-            if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
-                return; // No se habilita entrega
+            // Si no existe el apto 1 o no está en estado 2, no habilitar entrega
+            if (!$apto || $apto->estado != 2) {
+                return;
             }
         }
 
-        // Si ambos procesos están completos, habilitar entrega
+        // Si ambos procesos para el apto 1 están completos, habilitar entrega
         ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyectoId)
             ->where('piso', $piso)
-            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega']))
+            ->where('consecutivo', $consecutivo)
+            ->whereHas(
+                'proceso',
+                fn($q) =>
+                $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega'])
+            )
             ->where('estado', 0)
             ->update([
                 'estado' => 1,
