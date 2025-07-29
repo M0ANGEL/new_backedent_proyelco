@@ -21,7 +21,6 @@ class GestionProyectosController extends Controller
 {
     public function index()
     {
-        //consulta a la bd los proyectos
         $proyectosGestion = DB::connection('mysql')
             ->table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
@@ -34,11 +33,13 @@ class GestionProyectosController extends Controller
                 'clientes.emp_nombre',
             )
             ->where(function ($query) {
-                $query->where('proyecto.encargado_id', Auth::id())
-                    ->orWhere('proyecto.ingeniero_id', Auth::id());
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')")
+                    ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
             })
             ->where('proyecto.estado', 1)
             ->get();
+
 
         // Calcular el porcentaje de atraso y avance para cada proyecto
         foreach ($proyectosGestion as $proyecto) {
@@ -1104,8 +1105,17 @@ class GestionProyectosController extends Controller
                     break;
 
                 case 'aparateada':
-                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', 'pruebas');
+                    $fase2 = ProcesosProyectos::whereRaw('LOWER(nombre_proceso) = ?', ['aparateada fase 2'])->exists();
+
+                    $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
+
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', $siguienteProceso);
                     break;
+
+                case 'aparateada fase 2':
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'alambrada', 'pruebas');
+                    break;
+
 
                 case 'pruebas':
                     $this->confirmarPruebas($proyecto, $torre, $orden_proceso, $piso);
@@ -1169,6 +1179,7 @@ class GestionProyectosController extends Controller
 
     private function validarYHabilitarProceso($proyecto, $torre, $piso, $procesoNombre)
     {
+        //Buscamos los pisos minimo pro proceso para poder activar este proceso
         $CambioProceso = DB::table('cambio_procesos_x_proyecto')
             ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
@@ -1178,6 +1189,7 @@ class GestionProyectosController extends Controller
 
         $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
 
+        //validamos si ya el proceso esta iniciado, es decir que tenga en piso 1 un estado diferente a 0
         $inicioProceso = DB::table('proyecto_detalle')
             ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
@@ -1188,6 +1200,7 @@ class GestionProyectosController extends Controller
 
         $yaIniciado = $inicioProceso->isNotEmpty() && $inicioProceso->every(fn($apt) => $apt->estado != 0);
 
+        //se compara, si tiene estado diferente a 0 entra en el if
         if ($yaIniciado) {
 
             $nuevoPiso = $piso - ($pisosRequeridos - 1);
