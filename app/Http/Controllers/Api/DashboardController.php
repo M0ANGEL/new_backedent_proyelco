@@ -28,8 +28,9 @@ class DashboardController extends Controller
                 'clientes.emp_nombre',
             )
             ->where(function ($query) {
-                $query->where('proyecto.encargado_id', Auth::id())
-                    ->orWhere('proyecto.ingeniero_id', Auth::id());
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')")
+                    ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
             })
             ->where('proyecto.estado', 1)
             ->get();
