@@ -427,13 +427,13 @@ class ProyectosController extends Controller
 
             // validar que el codigo del proyecto no este usado por otro
             $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
+                ->select('descripcion_proyecto')
                 ->where('id', '!=', $id)
                 ->first();
-
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Este codigo de proyecto esta amarrado a otro proyecto',
+                    'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
                 ], 404);
             }
 

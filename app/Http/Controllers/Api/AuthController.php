@@ -37,8 +37,8 @@ class AuthController extends Controller
             }
 
 
-            // Verificar si ya tiene una sesión activa (si su rol es "facturación")
-            if (count($user->tokens) > 0 && in_array($user->rol, ["facturacion"])) {
+            // Verificar si ya tiene una sesión activa 
+            if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras"])) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'El Usuario ya tiene una sesión activa en otro dispositivo o navegador',
