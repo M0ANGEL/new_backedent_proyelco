@@ -1113,7 +1113,7 @@ class GestionProyectosController extends Controller
                         ->exists();
 
                     $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
-
+                    info($siguienteProceso);
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', $siguienteProceso);
                     break;
 
@@ -1339,6 +1339,8 @@ class GestionProyectosController extends Controller
             ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
+
+            info($detalleDestino);
 
         if ($detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
             return; // espera validación externa
