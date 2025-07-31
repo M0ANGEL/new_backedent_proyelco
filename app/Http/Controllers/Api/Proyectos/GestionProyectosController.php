@@ -1110,9 +1110,12 @@ class GestionProyectosController extends Controller
                         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['aparateada fase 2'])
                         ->where('proyecto_detalle.torre', $torre)
                         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-                        ->exists();
+                        ->get();
 
-                    $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
+                    // $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
+                    $siguienteProceso = $fase2->isEmpty() ? 'pruebas' : 'aparateada fase 2';
+
+                    info($fase2);
                     info($siguienteProceso);
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', $siguienteProceso);
                     break;
