@@ -1106,17 +1106,13 @@ class GestionProyectosController extends Controller
                     break;
                 case 'aparateada':
                     $fase2 = DB::table('proyecto_detalle')
-                        ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
+                        ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
                         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['aparateada fase 2'])
                         ->where('proyecto_detalle.torre', $torre)
                         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-                        ->get();
+                        ->exists();
 
-                    // $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
-                    $siguienteProceso = $fase2->isEmpty() ? 'pruebas' : 'aparateada fase 2';
-
-                    info($fase2);
-                    info($siguienteProceso);
+                    $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'pruebas';
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, 'aparateada', $siguienteProceso);
                     break;
 
@@ -1342,8 +1338,6 @@ class GestionProyectosController extends Controller
             ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
             ->first();
-
-            info($detalleDestino);
 
         if ($detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
             return; // espera validación externa
