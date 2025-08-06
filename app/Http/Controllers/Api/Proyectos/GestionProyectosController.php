@@ -247,6 +247,392 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+
+    // public function indexProgreso(Request $request)
+    // {
+    //     // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
+    //     $procesosConfig = DB::table('proyecto_detalle')
+    //         ->join('cambio_procesos_x_proyecto', function ($join) {
+    //             $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyecto_detalle.proyecto_id')
+    //                 ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyecto_detalle.procesos_proyectos_id');
+    //         })
+    //         ->where('proyecto_detalle.proyecto_id', $request->id)
+    //         ->select(
+    //             'proyecto_detalle.orden_proceso',
+    //             'proyecto_detalle.procesos_proyectos_id',
+    //             'proyecto_detalle.proyecto_id',
+    //             'cambio_procesos_x_proyecto.numero as pisos_requeridos'
+    //         )
+    //         ->get()
+    //         ->keyBy('orden_proceso');
+
+
+    //     // 2. NOMBRES DE TORRES - Obtiene los nombres personalizados de las torres
+    //     $torresConNombre = DB::table('nombre_xtore')
+    //         ->where('proyecto_id', $request->id)
+    //         ->pluck('nombre_torre', 'torre')
+    //         ->toArray();
+
+    //     // 3. DATOS DEL PROYECTO - Obtiene el estado actual de todos los apartamentos
+    //     $proyectosDetalle = DB::connection('mysql')
+    //         ->table('proyecto_detalle')
+    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
+    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->where('proyecto_detalle.proyecto_id', $request->id)
+    //         ->select(
+    //             'proyecto_detalle.torre',
+    //             'proyecto_detalle.id',
+    //             'proyecto_detalle.validacion',
+    //             'proyecto_detalle.estado_validacion',
+    //             'proyecto_detalle.consecutivo',
+    //             'proyecto_detalle.orden_proceso',
+    //             'proyecto_detalle.piso',
+    //             'proyecto_detalle.apartamento',
+    //             'proyecto_detalle.text_validacion',
+    //             'proyecto_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso',
+    //             'users.nombre as nombre'
+    //         )
+    //         ->orderBy('proyecto_detalle.orden_proceso')
+    //         ->orderBy('proyecto_detalle.piso')
+    //         ->orderBy('proyecto_detalle.apartamento')
+    //         ->get();
+            
+
+    //         info($proyectosDetalle);
+
+    //     $resultado = []; // Almacenará todos los datos estructurados
+    //     $torreResumen = []; // Resumen por torre
+
+    //     // 4. PROCESAR CADA REGISTRO - Organiza la información por torre, proceso, piso y apartamento
+    //     foreach ($proyectosDetalle as $item) {
+    //         $torre = $item->torre;
+    //         $orden_proceso = $item->orden_proceso;
+    //         $piso = $item->piso;
+
+    //         // Inicializar estructuras si no existen
+    //         if (!isset($resultado[$torre])) {
+    //             $resultado[$torre] = [];
+    //         }
+    //         if (!isset($torreResumen[$torre])) {
+    //             $torreResumen[$torre] = [
+    //                 'nombre_torre' => $torresConNombre[$torre] ?? $torre,
+    //                 'total_atraso' => 0,
+    //                 'total_realizados' => 0,
+    //                 'porcentaje_atraso' => 0,
+    //                 'porcentaje_avance' => 0,
+    //                 'serial_avance' => '0/0',
+    //                 'pisos_unicos' => [] // Para contar pisos únicos
+    //             ];
+    //         }
+
+    //         // Registrar pisos únicos por torre
+    //         if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
+    //             $torreResumen[$torre]['pisos_unicos'][] = $piso;
+    //         }
+
+    //         // Inicializar proceso si no existe
+    //         if (!isset($resultado[$torre][$orden_proceso])) {
+    //             $resultado[$torre][$orden_proceso] = [
+    //                 'nombre_proceso' => $item->nombre_proceso,
+    //                 'text_validacion' => $item->text_validacion,
+    //                 'estado_validacion' => $item->estado_validacion,
+    //                 'validacion' => $item->validacion,
+    //                 'pisos' => [],
+    //                 'total_apartamentos' => 0,
+    //                 'apartamentos_atraso' => 0,
+    //                 'apartamentos_realizados' => 0,
+    //                 'porcentaje_atraso' => 0,
+    //                 'porcentaje_avance' => 0,
+    //                 'pisos_completados' => 0,
+    //                 'pisos_requeridos' => $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0
+    //             ];
+    //         }
+
+    //         // Inicializar piso si no existe
+    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
+    //         }
+
+    //         // 5. DETERMINAR ESTADO BLANCO (EB) - Solo para procesos dependientes (no Fundida)
+    //         $eb = false;
+    //         if ($orden_proceso != 1 && $item->estado == 0) {
+    //             $eb = $this->determinarEstadoBlanco(
+    //                 $resultado,
+    //                 $torre,
+    //                 $orden_proceso,
+    //                 $piso,
+    //                 $item->apartamento,
+    //                 $procesosConfig
+    //             );
+    //         }
+
+    //         // 6. AGREGAR APARTAMENTO AL RESULTADO
+    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
+    //             'id' => $item->id,
+    //             'apartamento' => $item->apartamento,
+    //             'consecutivo' => $item->consecutivo,
+    //             'estado' => $item->estado,
+    //             'eb' => $eb, // Estado Blanco (depende de procesos anteriores)
+    //         ];
+
+    //         // 7. ACTUALIZAR CONTADORES
+    //         $this->actualizarContadores($resultado, $torreResumen, $torre, $orden_proceso, $item->estado);
+
+    //         // 8. VERIFICAR SI TODO EL PISO ESTÁ COMPLETO
+    //         $this->verificarPisoCompleto($resultado, $torre, $orden_proceso, $piso);
+    //     }
+
+    //     // 9. CALCULAR PORCENTAJES FINALES
+    //     $this->calcularPorcentajes($resultado, $torreResumen);
+
+    //     // 10. RETORNAR RESULTADO FINAL
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $resultado,
+    //         'torreResumen' => $torreResumen
+    //     ]);
+    // }
+
+
+    // private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
+    // {
+    //     // Pisos requeridos para habilitar este proceso
+    //     $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
+    //     /* 
+    //      * LÓGICA DE DEPENDENCIAS ENTRE PROCESOS:
+    //      * 
+    //      * Ejemplo para torre de 5 pisos con cambio cada 2 pisos:
+    //      * - Si Fundida está en piso 4 (completada):
+    //      *   - Destapada y Prolongación deben estar habilitadas en pisos 1, 2 y 3
+    //      *   - Alambrada debe estar habilitada en pisos 1 y 2
+    //      *   - Si no están completos los procesos anteriores, marca EB
+    //      */
+
+    //     // PROCESOS 2 Y 3 (DESTAPADA Y PROLONGACIÓN) - DEPENDEN DE FUNDIDA
+    //     if (in_array($orden_proceso, [2, 3])) {
+    //         // Habilita si el piso está completo en Fundida (proceso 1)
+    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 1, $piso);
+    //     }
+
+    //     // PROCESO 4 (ALAMBRADA) - DEPENDE DE DESTAPADA Y PROLONGACIÓN
+    //     if ($orden_proceso == 4) {
+    //         // Verifica que se hayan completado los pisos mínimos requeridos en ambos procesos
+    //         $cumpleMinPisos = $this->verificarMinPisosCompletados($resultado, $torre, 2, $pisosRequeridos) &&
+    //             $this->verificarMinPisosCompletados($resultado, $torre, 3, $pisosRequeridos);
+
+    //         // Verifica que este piso específico esté completo en ambos procesos
+    //         $pisoCompletoEnDependencias = $this->verificarPisoCompletoEnProceso($resultado, $torre, 2, $piso) &&
+    //             $this->verificarPisoCompletoEnProceso($resultado, $torre, 3, $piso);
+
+    //         // Habilita si se cumplen ambos: pisos mínimos y este piso completo
+    //         return $cumpleMinPisos && $pisoCompletoEnDependencias;
+    //     }
+
+    //     // PROCESO 5 (APARATEADA) - DEPENDE DE ALAMBRADA
+    //     if ($orden_proceso == 5) {
+    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 4, $piso);
+    //     }
+
+    //     // PROCESO 6 (APARATEADA FASE 2) - DEPENDE DE APARATEADA
+    //     if ($orden_proceso == 6) {
+    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
+    //     }
+
+    //     // PROCESO 7 (PRUEBAS) - DEPENDE DE APARATEADA O APARATEADA FASE 2
+    //     if ($orden_proceso == 7) {
+    //         if (isset($resultado[$torre][6])) {
+    //             return $this->verificarPisoCompletoEnProceso($resultado, $torre, 6, $piso);
+    //         }
+    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
+    //     }
+
+    //     // PROCESOS 8 Y 9 (RETIE Y RITEL) - DEPENDEN DE PRUEBAS
+    //     if (in_array($orden_proceso, [8, 9])) {
+    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 7, $piso);
+    //     }
+
+    //     // PROCESO 10 (ENTREGA) - DEPENDE DE RETIE Y RITEL
+    //     if ($orden_proceso == 10) {
+    //         $retieCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
+    //         $ritelCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
+    //         return $retieCompletado && $ritelCompletado;
+    //     }
+
+    //     return false;
+    // }
+
+    // //Verifica si todo un piso está completo (estado=2) para un proceso
+    // private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
+    // {
+    //     if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+    //         return false;
+    //     }
+
+    //     foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
+    //         if ($apt['estado'] != 2 ) { // 2 = Completado
+    //             return false;
+    //         }
+    //     }
+    //     return true;
+    // }
+
+    // //Verifica si un apartamento específico está completo (estado=2) en un proceso
+    // private function verificarApartamentoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso, $apartamento)
+    // {
+    //     if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+    //         return false;
+    //     }
+
+    //     foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
+    //         if ($apt['apartamento'] == $apartamento) {
+    //             return $apt['estado'] == 2; // 2 = Completado
+    //         }
+    //     }
+
+    //     return false;
+    // }
+
+    // //Verifica si se han completado los pisos mínimos requeridos para un proceso
+    // private function verificarMinPisosCompletados($resultado, $torre, $ordenProceso, $minPisos)
+    // {
+    //     return isset($resultado[$torre][$ordenProceso]['pisos_completados']) &&
+    //         $resultado[$torre][$ordenProceso]['pisos_completados'] >= $minPisos;
+    // }
+
+    // //Actualiza los contadores de realizados y atrasos
+    // private function actualizarContadores(&$resultado, &$torreResumen, $torre, $orden_proceso, $estado)
+    // {
+    //     $resultado[$torre][$orden_proceso]['total_apartamentos']++;
+
+    //     if ($estado == 1) { // 1 = Atraso
+    //         $resultado[$torre][$orden_proceso]['apartamentos_atraso']++;
+    //         if ($orden_proceso != 1) { // No contar Fundida en resumen general
+    //             $torreResumen[$torre]['total_atraso']++;
+    //         }
+    //     } elseif ($estado == 2) { // 2 = Completado
+    //         $resultado[$torre][$orden_proceso]['apartamentos_realizados']++;
+    //         if ($orden_proceso != 1) { // No contar Fundida en resumen general
+    //             $torreResumen[$torre]['total_realizados']++;
+    //         }
+    //     }
+    // }
+
+    // //Verifica si todo un piso está completo y actualiza el contador
+    // private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
+    // {
+    //     if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+    //         return;
+    //     }
+
+    //     $completo = true;
+    //     foreach ($resultado[$torre][$orden_proceso]['pisos'][$piso] as $apt) {
+    //         if ($apt['estado'] != 2) { // 2 = Completado
+    //             $completo = false;
+    //             break;
+    //         }
+    //     }
+
+    //     if ($completo) {
+    //         $resultado[$torre][$orden_proceso]['pisos_completados']++;
+    //     }
+    // }
+
+    // //Calcula porcentajes de avance y atraso para procesos y torres
+    // private function calcularPorcentajes(&$resultado, &$torreResumen)
+    // {
+    //     // Porcentajes por proceso
+    //     foreach ($resultado as $torre => &$procesos) {
+    //         foreach ($procesos as $orden_proceso => &$proceso) {
+    //             if ($orden_proceso === 'nombre_torre') continue;
+
+    //             // Proceso Fundida (1) no lleva porcentajes
+    //             if ($orden_proceso == 1) {
+    //                 $proceso['porcentaje_atraso'] = 0;
+    //                 $proceso['porcentaje_avance'] = 0;
+    //                 continue;
+    //             }
+
+    //             $total_atraso = $proceso['apartamentos_atraso'];
+    //             $total_realizados = $proceso['apartamentos_realizados'];
+    //             $denominador = $total_atraso + $total_realizados;
+
+    //             // % Atraso = (Atrasos / Total iniciados) * 100
+    //             $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+
+    //             // % Avance = (Realizados / Total apartamentos) * 100
+    //             $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
+    //                 round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
+    //         }
+    //     }
+
+    //     // Porcentajes por torre
+    //     foreach ($torreResumen as $torre => &$datos) {
+    //         $total_atraso = $datos['total_atraso'];
+    //         $total_realizados = $datos['total_realizados'];
+    //         $denominador = $total_atraso + $total_realizados;
+
+    //         $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+    //         $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
+    //         $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
+
+    //         unset($datos['pisos_unicos']); // Eliminar campo auxiliar
+    //     }
+    // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //------------------------------------------------------------------------------------
     public function destroy($id)
     {
         $iniciarProyecto = Proyectos::find($id);
@@ -1071,6 +1457,7 @@ class GestionProyectosController extends Controller
         }
     }
 
+    //---------------------------------------------------------
     // //logica bien
 
     // public function confirmarAptNuevaLogica($id)
@@ -2391,7 +2778,7 @@ class GestionProyectosController extends Controller
     //             ->pluck('piso')
     //             ->toArray();
 
-                
+
 
     //         info("validacion exerna-1");
     //         info("apt que cumplen: " . json_encode($pisosCumplen));
