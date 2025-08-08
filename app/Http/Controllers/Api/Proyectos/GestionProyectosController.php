@@ -297,9 +297,9 @@ class GestionProyectosController extends Controller
             ->orderBy('proyecto_detalle.piso')
             ->orderBy('proyecto_detalle.apartamento')
             ->get();
+            
 
-
-        info($proyectosDetalle);
+            info($proyectosDetalle);
 
         $resultado = []; // Almacenará todos los datos estructurados
         $torreResumen = []; // Resumen por torre
@@ -463,19 +463,19 @@ class GestionProyectosController extends Controller
     }
 
     //Verifica si todo un piso está completo (estado=2) para un proceso
-    // private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
-    // {
-    //     if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
-    //         return false;
-    //     }
+    private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
+    {
+        if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+            return false;
+        }
 
-    //     foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
-    //         if ($apt['estado'] != 2 ) { // 2 = Completado
-    //             return false;
-    //         }
-    //     }
-    //     return true;
-    // }
+        foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
+            if ($apt['estado'] != 2 ) { // 2 = Completado
+                return false;
+            }
+        }
+        return true;
+    }
 
     //Verifica si un apartamento específico está completo (estado=2) en un proceso
     private function verificarApartamentoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso, $apartamento)
@@ -519,24 +519,24 @@ class GestionProyectosController extends Controller
     }
 
     //Verifica si todo un piso está completo y actualiza el contador
-    // private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
-    // {
-    //     if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-    //         return;
-    //     }
+    private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
+    {
+        if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+            return;
+        }
 
-    //     $completo = true;
-    //     foreach ($resultado[$torre][$orden_proceso]['pisos'][$piso] as $apt) {
-    //         if ($apt['estado'] != 2) { // 2 = Completado
-    //             $completo = false;
-    //             break;
-    //         }
-    //     }
+        $completo = true;
+        foreach ($resultado[$torre][$orden_proceso]['pisos'][$piso] as $apt) {
+            if ($apt['estado'] != 2) { // 2 = Completado
+                $completo = false;
+                break;
+            }
+        }
 
-    //     if ($completo) {
-    //         $resultado[$torre][$orden_proceso]['pisos_completados']++;
-    //     }
-    // }
+        if ($completo) {
+            $resultado[$torre][$orden_proceso]['pisos_completados']++;
+        }
+    }
 
     //Calcula porcentajes de avance y atraso para procesos y torres
     private function calcularPorcentajes(&$resultado, &$torreResumen)
@@ -578,42 +578,6 @@ class GestionProyectosController extends Controller
             $datos['total_pisos'] = count($datos['pisos_unicos']);
 
             unset($datos['pisos_unicos']); // Eliminar campo auxiliar
-        }
-    }
-
-    private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
-    {
-        if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
-            return false;
-        }
-
-        foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
-            // Un piso se considera "en progreso" si todos están en 1 o 2
-            if (!in_array($apt['estado'], [1, 2])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
-    {
-        if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-            return;
-        }
-
-        $completo = true;
-        foreach ($resultado[$torre][$orden_proceso]['pisos'][$piso] as $apt) {
-            // Aquí solo se marca como COMPLETO si todos están en 2
-            if ($apt['estado'] != 2) {
-                $completo = false;
-                break;
-            }
-        }
-
-        if ($completo) {
-            $resultado[$torre][$orden_proceso]['pisos_completados']++;
         }
     }
 
