@@ -39,12 +39,12 @@ class VaidarProcesoController extends Controller
                 ->where('piso', $pisoActual)
                 ->first();
 
-            if ($info->validacion === 1 && $info->estado_validacion === 1) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Este piso ya fue validado",
-                ], 500);
-            }
+            // if ($info->validacion === 1 && $info->estado_validacion === 1) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => "Este piso ya fue validado",
+            //     ], 500);
+            // }
 
             $torre = $info->torre;
             $orden_proceso = (int) $info->orden_proceso;
@@ -75,7 +75,7 @@ class VaidarProcesoController extends Controller
                 case 'pruebas':
                     $fase2 = ProcesosProyectos::whereRaw('LOWER(nombre_proceso) = ?', ['aparateada fase 2'])->exists();
                     $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'aparateada';
-                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso,$siguienteProceso, 'pruebas');
+                    $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, $siguienteProceso, 'pruebas');
                     break;
 
                 case 'retie':
@@ -86,6 +86,8 @@ class VaidarProcesoController extends Controller
                     break;
 
                 case 'entrega':
+                    $this->intentarHabilitarEntrega($info);
+
                     break;
 
                 default:
@@ -116,59 +118,61 @@ class VaidarProcesoController extends Controller
         $proyectoId = $info->proyecto_id;
         $piso = $info->piso;
 
-        $procesos = ['destapada', 'prolongacion'];
+        // Obtener los consecutivos confirmados (estado = 2) en cada proceso
+        $destapada = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['destapada']))
+            ->where('estado', 2)
+            ->pluck('consecutivo')
+            ->toArray();
 
-        foreach ($procesos as $proceso) {
-            $aptos = ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyectoId)
-                ->where('piso', $piso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
-                ->get();
+        $prolongacion = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['prolongacion']))
+            ->where('estado', 2)
+            ->pluck('consecutivo')
+            ->toArray();
 
-            if ($aptos->isEmpty()) {
-                throw new \Exception("No hay apartamentos con el proceso '{$proceso}' en estado confirmado (2).");
-            }
+        // Buscar consecutivos en común
+        $comunes = array_intersect($destapada, $prolongacion);
 
-            $activarValidacion =  ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyectoId)
-                ->where('piso', $piso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['alambrada']))
-                ->where('estado', 0)
-                ->get();
-
-            $noConfirmados = $aptos->filter(fn($apt) => $apt->estado != 2);
-            $noConfirmadosValidar = $activarValidacion->filter(fn($apt) => $apt->estado != 2);
-
-            if ($noConfirmados->isNotEmpty()) {
-                // Actualizamos la validación solo para los no confirmados
-                foreach ($noConfirmadosValidar as $apt) {
-                    $apt->estado_validacion = 1;
-                    $apt->fecha_validacion = now();
-                    $apt->save();
-                }
-                DB::commit();
-                throw new \Exception("La habilitación del piso ha sido cancelada debido a que algunos apartamentos del proceso '{$proceso}' permanecen sin confirmar. Se ha procedido con la actualización del estado de validación.");
-            }
-        }
-
-        // Si ambos procesos están completos, habilitar alambrada en ese piso
-        ProyectosDetalle::where('torre', $torre)
+        // Obtener todos los apartamentos en alambrada con estado = 0
+        $alambrada = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyectoId)
             ->where('piso', $piso)
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['alambrada']))
             ->where('estado', 0)
-            ->update([
-                'estado' => 1,
-                'fecha_habilitado' => now(),
-                'estado_validacion' => 1,
-                'fecha_validacion' => now(),
-            ]);
+            ->get();
+
+        // Si hay comunes, habilitar solo esos
+        if (!empty($comunes)) {
+            foreach ($alambrada as $apt) {
+                if (in_array($apt->consecutivo, $comunes)) {
+                    $apt->estado = 1;
+                    $apt->fecha_habilitado = now();
+                }
+                $apt->estado_validacion = 1;
+                $apt->fecha_validacion = now();
+                $apt->save();
+            }
+        } else {
+            // No hay comunes: solo actualizar validación
+            foreach ($alambrada as $apt) {
+                $apt->estado_validacion = 1;
+                $apt->fecha_validacion = now();
+                $apt->save();
+            }
+            DB::commit();
+            throw new \Exception("No hay apartamentos confirmados en común entre destapada y prolongación. Se actualizó solo la validación del proceso alambrada.");
+        }
     }
 
     private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoRevisarValidacion, $procesoActual)
     {
-        // 1. Obtener todos los apartamentos del piso que tengan el proceso a revisar
-        $aptos = ProyectosDetalle::where('torre', $torre)
+        // 1. Obtener consecutivos confirmados del proceso a revisar
+        $confirmados = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
             ->where('piso', $piso)
             ->whereHas(
@@ -176,20 +180,13 @@ class VaidarProcesoController extends Controller
                 fn($q) =>
                 $q->whereRaw('LOWER(nombre_proceso) = ?', [strtolower($procesoRevisarValidacion)])
             )
-            ->get();
+            ->where('estado', 2)
+            ->pluck('consecutivo') // o 'id' si usas otro identificador
+            ->toArray();
 
-
-        // 2. Validar que existan apartamentos con ese proceso
-        if ($aptos->isEmpty()) {
-            throw new \Exception("No hay apartamentos con el proceso '{$procesoRevisarValidacion}' en este piso.");
-        }
-
-        // 3. Verificar si hay alguno que no esté en estado 2
-        $noConfirmados = $aptos->filter(fn($apt) => $apt->estado != 2);
-
-        // 4. Si hay apartamentos no confirmados, actualizar solo estado de validación (NO habilitar proceso)
-        if ($noConfirmados->isNotEmpty()) {
-            // Buscar los apartamentos del proceso actual que están en estado 0
+        // 2. Validar que existan confirmados
+        if (empty($confirmados)) {
+            // Si no hay confirmados, validar todos los del proceso actual
             $paraValidar = ProyectosDetalle::where('torre', $torre)
                 ->where('proyecto_id', $proyecto->id)
                 ->where('piso', $piso)
@@ -208,13 +205,11 @@ class VaidarProcesoController extends Controller
             }
 
             DB::commit();
-
-
-            throw new \Exception("No se habilitó el piso porque algunos apartamentos del proceso '{$procesoRevisarValidacion}' no están confirmados. Solo se actualizó el estado de validación.");
+            throw new \Exception("No hay apartamentos confirmados del proceso '{$procesoRevisarValidacion}'. Solo se actualizó el estado de validación en '{$procesoActual}'.");
         }
 
-        // 5. Si todos los apartamentos están confirmados (estado 2), habilitar el proceso actual
-        ProyectosDetalle::where('torre', $torre)
+        // 3. Obtener todos los aptos del proceso actual en estado 0
+        $aptosActual = ProyectosDetalle::where('torre', $torre)
             ->where('proyecto_id', $proyecto->id)
             ->where('piso', $piso)
             ->whereHas(
@@ -223,14 +218,19 @@ class VaidarProcesoController extends Controller
                 $q->whereRaw('LOWER(nombre_proceso) = ?', [strtolower($procesoActual)])
             )
             ->where('estado', 0)
-            ->update([
-                'estado' => 1,
-                'fecha_habilitado' => now(),
-                'estado_validacion' => 1,
-                'fecha_validacion' => now(),
-            ]);
-    }
+            ->get();
 
+        // 4. Recorrer y habilitar los que están en común
+        foreach ($aptosActual as $apt) {
+            if (in_array($apt->consecutivo, $confirmados)) {
+                $apt->estado = 1;
+                $apt->fecha_habilitado = now();
+            }
+            $apt->estado_validacion = 1;
+            $apt->fecha_validacion = now();
+            $apt->save();
+        }
+    }
 
     private function intentarHabilitarPruebas($info)
     {
@@ -283,5 +283,74 @@ class VaidarProcesoController extends Controller
                 'estado' => 1,
                 'fecha_habilitado' => now()
             ]);
+    }
+
+    private function intentarHabilitarEntrega($info)
+    {
+        $torre = $info->torre;
+        $proyectoId = $info->proyecto_id;
+        $piso = $info->piso;
+
+        // Buscar aptos confirmados por proceso
+        $retieConfirmados = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->where('estado', 2)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['retie']))
+            ->pluck('apartamento') // Usamos 'apartamento' como identificador, cámbialo si tu campo es diferente
+            ->toArray();
+
+        $ritelConfirmados = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->where('estado', 2)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['ritel']))
+            ->pluck('apartamento')
+            ->toArray();
+
+        // Obtener intersección de aptos confirmados en ambos procesos
+        $aptosComunes = array_intersect($retieConfirmados, $ritelConfirmados);
+
+        // Obtener aptos con proceso 'entrega' en estado 0
+        $aptosAlambrada = ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega']))
+            ->get();
+
+        if (empty($aptosComunes)) {
+            // Si no hay ningún apto que tenga retie y ritel confirmados
+            foreach ($aptosAlambrada as $apt) {
+                if ($apt->estado == 0) {
+                    $apt->estado_validacion = 1;
+                    $apt->fecha_validacion = now();
+                    $apt->save();
+                }
+            }
+
+            DB::commit();
+            throw new \Exception("No hay apartamentos con ambos procesos (retie y ritel) confirmados. Solo se actualizó la validación.");
+        }
+
+        // Habilitar solo los aptos entrega que estén en la lista común
+        ProyectosDetalle::where('torre', $torre)
+            ->where('proyecto_id', $proyectoId)
+            ->where('piso', $piso)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ['entrega']))
+            ->whereIn('apartamento', $aptosComunes)
+            ->where('estado', 0)
+            ->update([
+                'estado' => 1,
+                'fecha_habilitado' => now()
+            ]);
+
+        // A los demás aptos alambrada, solo se les marca la validación
+        foreach ($aptosAlambrada as $apt) {
+            if (!in_array($apt->apartamento, $aptosComunes) && $apt->estado == 0) {
+                $apt->estado_validacion = 1;
+                $apt->fecha_validacion = now();
+                $apt->save();
+            }
+        }
     }
 }
