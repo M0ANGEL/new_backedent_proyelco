@@ -82,198 +82,14 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-    public function indexProgreso(Request $request)
-    {
-        // Obtener el listado de nombres de torre por código
-        $torresConNombre = DB::table('nombre_xtore')
-            ->where('proyecto_id', $request->id)
-            ->pluck('nombre_torre', 'torre') // ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
-            ->toArray();
-
-        $proyectosDetalle = DB::connection('mysql')
-            ->table('proyecto_detalle')
-            ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-            ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-            ->where('proyecto_detalle.proyecto_id', $request->id)
-            ->select(
-                'proyecto_detalle.torre',
-                'proyecto_detalle.id',
-                'proyecto_detalle.validacion',
-                'proyecto_detalle.estado_validacion',
-                'proyecto_detalle.consecutivo',
-                'proyecto_detalle.orden_proceso',
-                'proyecto_detalle.piso',
-                'proyecto_detalle.apartamento',
-                'proyecto_detalle.text_validacion',
-                'proyecto_detalle.estado',
-                'procesos_proyectos.nombre_proceso',
-                'users.nombre as nombre'
-            )
-            ->get();
-
-        $resultado = [];
-        $torreResumen = [];
-
-        foreach ($proyectosDetalle as $item) {
-            $torre = $item->torre;
-            $orden_proceso = $item->orden_proceso;
-            $nombre_proceso = $item->nombre_proceso;
-            $text_validacion = $item->text_validacion;
-            $validacion = $item->validacion;
-            $estado_validacion = $item->estado_validacion;
-            $consecutivo = $item->consecutivo;
-            $piso = $item->piso;
-
-
-            if (!isset($resultado[$torre])) {
-                $resultado[$torre] = [];
-            }
-
-
-            // Inicializar resumen por torre
-            if (!isset($torreResumen[$torre])) {
-                $torreResumen[$torre] = [
-                    'nombre_torre' => $torresConNombre[$torre] ?? $torre,
-                    'total_atraso' => 0,
-                    'total_realizados' => 0,
-                    'porcentaje_atraso' => 0,
-                    'porcentaje_avance' => 0,
-                    'serial_avance' => '0/0',
-                    'pisos_unicos' => []
-                ];
-            }
-
-            // Registrar piso único por torre
-            if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
-                $torreResumen[$torre]['pisos_unicos'][] = $piso;
-            }
-
-            // Inicializar proceso por torre
-            if (!isset($resultado[$torre][$orden_proceso])) {
-                $resultado[$torre][$orden_proceso] = [
-                    'nombre_proceso' => $nombre_proceso,
-                    'text_validacion' => $text_validacion,
-                    'estado_validacion' => $estado_validacion,
-                    'validacion' => $validacion,
-                    'pisos' => [],
-                    'total_apartamentos' => 0,
-                    'apartamentos_atraso' => 0,
-                    'apartamentos_realizados' => 0,
-                    'porcentaje_atraso' => 0,
-                    'porcentaje_avance' => 0,
-                ];
-            }
-
-            if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-                $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-            }
-
-            // Agregar apartamento
-            $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-                'id' => $item->id,
-                'apartamento' => $item->apartamento,
-                'consecutivo' => $consecutivo,
-                'estado' => $item->estado,
-            ];
-
-            // Contar total apartamentos
-            $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
-
-            // 👉 Solo sumar al resumen de torre si el proceso NO es 1
-            if ($orden_proceso != 1) {
-                if ($item->estado == 1) {
-                    $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-                    $torreResumen[$torre]['total_atraso'] += 1;
-                }
-                if ($item->estado == 2) {
-                    $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-                    $torreResumen[$torre]['total_realizados'] += 1;
-                }
-            } else {
-                if ($item->estado == 1) {
-                    $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-                }
-                if ($item->estado == 2) {
-                    $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-                }
-            }
-        }
-
-        // Calcular porcentajes por proceso
-        foreach ($resultado as $torre => &$procesos) {
-            foreach ($procesos as $orden_proceso => &$proceso) {
-                // Ignorar campo extra "nombre_torre"
-                if ($orden_proceso === 'nombre_torre') continue;
-
-                if ($orden_proceso == 1) {
-                    $proceso['porcentaje_atraso'] = 0;
-                    $proceso['porcentaje_avance'] = 0;
-                    continue;
-                }
-
-                $total_atraso = $proceso['apartamentos_atraso'];
-                $total_realizados = $proceso['apartamentos_realizados'];
-                $denominador = $total_atraso + $total_realizados;
-
-                $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-                $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
-
-                $proceso['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-                $proceso['porcentaje_avance'] = round($porcentaje_avance, 2);
-            }
-        }
-
-        // Calcular porcentaje y avance textual por torre
-        foreach ($torreResumen as $torre => &$datos) {
-            $total_atraso = $datos['total_atraso'];
-            $total_realizados = $datos['total_realizados'];
-            $denominador = $total_atraso + $total_realizados;
-
-            $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-            $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
-
-            $datos['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-            $datos['porcentaje_avance'] = round($porcentaje_avance, 2);
-            $datos['serial_avance'] = $total_realizados . '/' . $denominador;
-            $datos['total_pisos'] = count($datos['pisos_unicos']);
-
-            unset($datos['pisos_unicos']); // eliminar si no deseas mostrar el array
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $resultado,
-            'torreResumen' => $torreResumen
-        ]);
-    }
-
-
     // public function indexProgreso(Request $request)
     // {
-    //     // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
-    //     $procesosConfig = DB::table('proyecto_detalle')
-    //         ->join('cambio_procesos_x_proyecto', function ($join) {
-    //             $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyecto_detalle.proyecto_id')
-    //                 ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyecto_detalle.procesos_proyectos_id');
-    //         })
-    //         ->where('proyecto_detalle.proyecto_id', $request->id)
-    //         ->select(
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.procesos_proyectos_id',
-    //             'proyecto_detalle.proyecto_id',
-    //             'cambio_procesos_x_proyecto.numero as pisos_requeridos'
-    //         )
-    //         ->get()
-    //         ->keyBy('orden_proceso');
-
-
-    //     // 2. NOMBRES DE TORRES - Obtiene los nombres personalizados de las torres
+    //     // Obtener el listado de nombres de torre por código
     //     $torresConNombre = DB::table('nombre_xtore')
     //         ->where('proyecto_id', $request->id)
-    //         ->pluck('nombre_torre', 'torre')
+    //         ->pluck('nombre_torre', 'torre') // ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
     //         ->toArray();
 
-    //     // 3. DATOS DEL PROYECTO - Obtiene el estado actual de todos los apartamentos
     //     $proyectosDetalle = DB::connection('mysql')
     //         ->table('proyecto_detalle')
     //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
@@ -293,27 +109,28 @@ class GestionProyectosController extends Controller
     //             'procesos_proyectos.nombre_proceso',
     //             'users.nombre as nombre'
     //         )
-    //         ->orderBy('proyecto_detalle.orden_proceso')
-    //         ->orderBy('proyecto_detalle.piso')
-    //         ->orderBy('proyecto_detalle.apartamento')
     //         ->get();
-            
 
-    //         info($proyectosDetalle);
+    //     $resultado = [];
+    //     $torreResumen = [];
 
-    //     $resultado = []; // Almacenará todos los datos estructurados
-    //     $torreResumen = []; // Resumen por torre
-
-    //     // 4. PROCESAR CADA REGISTRO - Organiza la información por torre, proceso, piso y apartamento
     //     foreach ($proyectosDetalle as $item) {
     //         $torre = $item->torre;
     //         $orden_proceso = $item->orden_proceso;
+    //         $nombre_proceso = $item->nombre_proceso;
+    //         $text_validacion = $item->text_validacion;
+    //         $validacion = $item->validacion;
+    //         $estado_validacion = $item->estado_validacion;
+    //         $consecutivo = $item->consecutivo;
     //         $piso = $item->piso;
 
-    //         // Inicializar estructuras si no existen
+
     //         if (!isset($resultado[$torre])) {
     //             $resultado[$torre] = [];
     //         }
+
+
+    //         // Inicializar resumen por torre
     //         if (!isset($torreResumen[$torre])) {
     //             $torreResumen[$torre] = [
     //                 'nombre_torre' => $torresConNombre[$torre] ?? $torre,
@@ -322,71 +139,107 @@ class GestionProyectosController extends Controller
     //                 'porcentaje_atraso' => 0,
     //                 'porcentaje_avance' => 0,
     //                 'serial_avance' => '0/0',
-    //                 'pisos_unicos' => [] // Para contar pisos únicos
+    //                 'pisos_unicos' => []
     //             ];
     //         }
 
-    //         // Registrar pisos únicos por torre
+    //         // Registrar piso único por torre
     //         if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
     //             $torreResumen[$torre]['pisos_unicos'][] = $piso;
     //         }
 
-    //         // Inicializar proceso si no existe
+    //         // Inicializar proceso por torre
     //         if (!isset($resultado[$torre][$orden_proceso])) {
     //             $resultado[$torre][$orden_proceso] = [
-    //                 'nombre_proceso' => $item->nombre_proceso,
-    //                 'text_validacion' => $item->text_validacion,
-    //                 'estado_validacion' => $item->estado_validacion,
-    //                 'validacion' => $item->validacion,
+    //                 'nombre_proceso' => $nombre_proceso,
+    //                 'text_validacion' => $text_validacion,
+    //                 'estado_validacion' => $estado_validacion,
+    //                 'validacion' => $validacion,
     //                 'pisos' => [],
     //                 'total_apartamentos' => 0,
     //                 'apartamentos_atraso' => 0,
     //                 'apartamentos_realizados' => 0,
     //                 'porcentaje_atraso' => 0,
     //                 'porcentaje_avance' => 0,
-    //                 'pisos_completados' => 0,
-    //                 'pisos_requeridos' => $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0
     //             ];
     //         }
 
-    //         // Inicializar piso si no existe
     //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
     //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
     //         }
 
-    //         // 5. DETERMINAR ESTADO BLANCO (EB) - Solo para procesos dependientes (no Fundida)
-    //         $eb = false;
-    //         if ($orden_proceso != 1 && $item->estado == 0) {
-    //             $eb = $this->determinarEstadoBlanco(
-    //                 $resultado,
-    //                 $torre,
-    //                 $orden_proceso,
-    //                 $piso,
-    //                 $item->apartamento,
-    //                 $procesosConfig
-    //             );
-    //         }
-
-    //         // 6. AGREGAR APARTAMENTO AL RESULTADO
+    //         // Agregar apartamento
     //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
     //             'id' => $item->id,
     //             'apartamento' => $item->apartamento,
-    //             'consecutivo' => $item->consecutivo,
+    //             'consecutivo' => $consecutivo,
     //             'estado' => $item->estado,
-    //             'eb' => $eb, // Estado Blanco (depende de procesos anteriores)
     //         ];
 
-    //         // 7. ACTUALIZAR CONTADORES
-    //         $this->actualizarContadores($resultado, $torreResumen, $torre, $orden_proceso, $item->estado);
+    //         // Contar total apartamentos
+    //         $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
 
-    //         // 8. VERIFICAR SI TODO EL PISO ESTÁ COMPLETO
-    //         $this->verificarPisoCompleto($resultado, $torre, $orden_proceso, $piso);
+    //         // 👉 Solo sumar al resumen de torre si el proceso NO es 1
+    //         if ($orden_proceso != 1) {
+    //             if ($item->estado == 1) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
+    //                 $torreResumen[$torre]['total_atraso'] += 1;
+    //             }
+    //             if ($item->estado == 2) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
+    //                 $torreResumen[$torre]['total_realizados'] += 1;
+    //             }
+    //         } else {
+    //             if ($item->estado == 1) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
+    //             }
+    //             if ($item->estado == 2) {
+    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
+    //             }
+    //         }
     //     }
 
-    //     // 9. CALCULAR PORCENTAJES FINALES
-    //     $this->calcularPorcentajes($resultado, $torreResumen);
+    //     // Calcular porcentajes por proceso
+    //     foreach ($resultado as $torre => &$procesos) {
+    //         foreach ($procesos as $orden_proceso => &$proceso) {
+    //             // Ignorar campo extra "nombre_torre"
+    //             if ($orden_proceso === 'nombre_torre') continue;
 
-    //     // 10. RETORNAR RESULTADO FINAL
+    //             if ($orden_proceso == 1) {
+    //                 $proceso['porcentaje_atraso'] = 0;
+    //                 $proceso['porcentaje_avance'] = 0;
+    //                 continue;
+    //             }
+
+    //             $total_atraso = $proceso['apartamentos_atraso'];
+    //             $total_realizados = $proceso['apartamentos_realizados'];
+    //             $denominador = $total_atraso + $total_realizados;
+
+    //             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+    //             $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
+
+    //             $proceso['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+    //             $proceso['porcentaje_avance'] = round($porcentaje_avance, 2);
+    //         }
+    //     }
+
+    //     // Calcular porcentaje y avance textual por torre
+    //     foreach ($torreResumen as $torre => &$datos) {
+    //         $total_atraso = $datos['total_atraso'];
+    //         $total_realizados = $datos['total_realizados'];
+    //         $denominador = $total_atraso + $total_realizados;
+
+    //         $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
+    //         $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
+
+    //         $datos['porcentaje_atraso'] = round($porcentaje_atraso, 2);
+    //         $datos['porcentaje_avance'] = round($porcentaje_avance, 2);
+    //         $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
+
+    //         unset($datos['pisos_unicos']); // eliminar si no deseas mostrar el array
+    //     }
+
     //     return response()->json([
     //         'status' => 'success',
     //         'data' => $resultado,
@@ -395,74 +248,221 @@ class GestionProyectosController extends Controller
     // }
 
 
-    // private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
-    // {
-    //     // Pisos requeridos para habilitar este proceso
-    //     $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
-    //     /* 
-    //      * LÓGICA DE DEPENDENCIAS ENTRE PROCESOS:
-    //      * 
-    //      * Ejemplo para torre de 5 pisos con cambio cada 2 pisos:
-    //      * - Si Fundida está en piso 4 (completada):
-    //      *   - Destapada y Prolongación deben estar habilitadas en pisos 1, 2 y 3
-    //      *   - Alambrada debe estar habilitada en pisos 1 y 2
-    //      *   - Si no están completos los procesos anteriores, marca EB
-    //      */
+    public function indexProgreso(Request $request)
+    {
+        // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
+        $procesosConfig = DB::table('proyecto_detalle')
+            ->join('cambio_procesos_x_proyecto', function ($join) {
+                $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyecto_detalle.proyecto_id')
+                    ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyecto_detalle.procesos_proyectos_id');
+            })
+            ->where('proyecto_detalle.proyecto_id', $request->id)
+            ->select(
+                'proyecto_detalle.orden_proceso',
+                'proyecto_detalle.procesos_proyectos_id',
+                'proyecto_detalle.proyecto_id',
+                'cambio_procesos_x_proyecto.numero as pisos_requeridos'
+            )
+            ->get()
+            ->keyBy('orden_proceso');
 
-    //     // PROCESOS 2 Y 3 (DESTAPADA Y PROLONGACIÓN) - DEPENDEN DE FUNDIDA
-    //     if (in_array($orden_proceso, [2, 3])) {
-    //         // Habilita si el piso está completo en Fundida (proceso 1)
-    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 1, $piso);
-    //     }
 
-    //     // PROCESO 4 (ALAMBRADA) - DEPENDE DE DESTAPADA Y PROLONGACIÓN
-    //     if ($orden_proceso == 4) {
-    //         // Verifica que se hayan completado los pisos mínimos requeridos en ambos procesos
-    //         $cumpleMinPisos = $this->verificarMinPisosCompletados($resultado, $torre, 2, $pisosRequeridos) &&
-    //             $this->verificarMinPisosCompletados($resultado, $torre, 3, $pisosRequeridos);
+        // 2. NOMBRES DE TORRES - Obtiene los nombres personalizados de las torres
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $request->id)
+            ->pluck('nombre_torre', 'torre')
+            ->toArray();
 
-    //         // Verifica que este piso específico esté completo en ambos procesos
-    //         $pisoCompletoEnDependencias = $this->verificarPisoCompletoEnProceso($resultado, $torre, 2, $piso) &&
-    //             $this->verificarPisoCompletoEnProceso($resultado, $torre, 3, $piso);
+        // 3. DATOS DEL PROYECTO - Obtiene el estado actual de todos los apartamentos
+        $proyectosDetalle = DB::connection('mysql')
+            ->table('proyecto_detalle')
+            ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
+            ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->where('proyecto_detalle.proyecto_id', $request->id)
+            ->select(
+                'proyecto_detalle.torre',
+                'proyecto_detalle.id',
+                'proyecto_detalle.validacion',
+                'proyecto_detalle.estado_validacion',
+                'proyecto_detalle.consecutivo',
+                'proyecto_detalle.orden_proceso',
+                'proyecto_detalle.piso',
+                'proyecto_detalle.apartamento',
+                'proyecto_detalle.text_validacion',
+                'proyecto_detalle.estado',
+                'procesos_proyectos.nombre_proceso',
+                'users.nombre as nombre'
+            )
+            ->orderBy('proyecto_detalle.orden_proceso')
+            ->orderBy('proyecto_detalle.piso')
+            ->orderBy('proyecto_detalle.apartamento')
+            ->get();
+            
 
-    //         // Habilita si se cumplen ambos: pisos mínimos y este piso completo
-    //         return $cumpleMinPisos && $pisoCompletoEnDependencias;
-    //     }
+            info($proyectosDetalle);
 
-    //     // PROCESO 5 (APARATEADA) - DEPENDE DE ALAMBRADA
-    //     if ($orden_proceso == 5) {
-    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 4, $piso);
-    //     }
+        $resultado = []; // Almacenará todos los datos estructurados
+        $torreResumen = []; // Resumen por torre
 
-    //     // PROCESO 6 (APARATEADA FASE 2) - DEPENDE DE APARATEADA
-    //     if ($orden_proceso == 6) {
-    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
-    //     }
+        // 4. PROCESAR CADA REGISTRO - Organiza la información por torre, proceso, piso y apartamento
+        foreach ($proyectosDetalle as $item) {
+            $torre = $item->torre;
+            $orden_proceso = $item->orden_proceso;
+            $piso = $item->piso;
 
-    //     // PROCESO 7 (PRUEBAS) - DEPENDE DE APARATEADA O APARATEADA FASE 2
-    //     if ($orden_proceso == 7) {
-    //         if (isset($resultado[$torre][6])) {
-    //             return $this->verificarPisoCompletoEnProceso($resultado, $torre, 6, $piso);
-    //         }
-    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
-    //     }
+            // Inicializar estructuras si no existen
+            if (!isset($resultado[$torre])) {
+                $resultado[$torre] = [];
+            }
+            if (!isset($torreResumen[$torre])) {
+                $torreResumen[$torre] = [
+                    'nombre_torre' => $torresConNombre[$torre] ?? $torre,
+                    'total_atraso' => 0,
+                    'total_realizados' => 0,
+                    'porcentaje_atraso' => 0,
+                    'porcentaje_avance' => 0,
+                    'serial_avance' => '0/0',
+                    'pisos_unicos' => [] // Para contar pisos únicos
+                ];
+            }
 
-    //     // PROCESOS 8 Y 9 (RETIE Y RITEL) - DEPENDEN DE PRUEBAS
-    //     if (in_array($orden_proceso, [8, 9])) {
-    //         return $this->verificarPisoCompletoEnProceso($resultado, $torre, 7, $piso);
-    //     }
+            // Registrar pisos únicos por torre
+            if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
+                $torreResumen[$torre]['pisos_unicos'][] = $piso;
+            }
 
-    //     // PROCESO 10 (ENTREGA) - DEPENDE DE RETIE Y RITEL
-    //     if ($orden_proceso == 10) {
-    //         $retieCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
-    //         $ritelCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
-    //         return $retieCompletado && $ritelCompletado;
-    //     }
+            // Inicializar proceso si no existe
+            if (!isset($resultado[$torre][$orden_proceso])) {
+                $resultado[$torre][$orden_proceso] = [
+                    'nombre_proceso' => $item->nombre_proceso,
+                    'text_validacion' => $item->text_validacion,
+                    'estado_validacion' => $item->estado_validacion,
+                    'validacion' => $item->validacion,
+                    'pisos' => [],
+                    'total_apartamentos' => 0,
+                    'apartamentos_atraso' => 0,
+                    'apartamentos_realizados' => 0,
+                    'porcentaje_atraso' => 0,
+                    'porcentaje_avance' => 0,
+                    'pisos_completados' => 0,
+                    'pisos_requeridos' => $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0
+                ];
+            }
 
-    //     return false;
-    // }
+            // Inicializar piso si no existe
+            if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+                $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
+            }
 
-    // //Verifica si todo un piso está completo (estado=2) para un proceso
+            // 5. DETERMINAR ESTADO BLANCO (EB) - Solo para procesos dependientes (no Fundida)
+            $eb = false;
+            if ($orden_proceso != 1 && $item->estado == 0) {
+                $eb = $this->determinarEstadoBlanco(
+                    $resultado,
+                    $torre,
+                    $orden_proceso,
+                    $piso,
+                    $item->apartamento,
+                    $procesosConfig
+                );
+            }
+
+            // 6. AGREGAR APARTAMENTO AL RESULTADO
+            $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
+                'id' => $item->id,
+                'apartamento' => $item->apartamento,
+                'consecutivo' => $item->consecutivo,
+                'estado' => $item->estado,
+                'eb' => $eb, // Estado Blanco (depende de procesos anteriores)
+            ];
+
+            // 7. ACTUALIZAR CONTADORES
+            $this->actualizarContadores($resultado, $torreResumen, $torre, $orden_proceso, $item->estado);
+
+            // 8. VERIFICAR SI TODO EL PISO ESTÁ COMPLETO
+            $this->verificarPisoCompleto($resultado, $torre, $orden_proceso, $piso);
+        }
+
+        // 9. CALCULAR PORCENTAJES FINALES
+        $this->calcularPorcentajes($resultado, $torreResumen);
+
+        // 10. RETORNAR RESULTADO FINAL
+        return response()->json([
+            'status' => 'success',
+            'data' => $resultado,
+            'torreResumen' => $torreResumen
+        ]);
+    }
+
+
+    private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
+    {
+        // Pisos requeridos para habilitar este proceso
+        $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
+        /* 
+         * LÓGICA DE DEPENDENCIAS ENTRE PROCESOS:
+         * 
+         * Ejemplo para torre de 5 pisos con cambio cada 2 pisos:
+         * - Si Fundida está en piso 4 (completada):
+         *   - Destapada y Prolongación deben estar habilitadas en pisos 1, 2 y 3
+         *   - Alambrada debe estar habilitada en pisos 1 y 2
+         *   - Si no están completos los procesos anteriores, marca EB
+         */
+
+        // PROCESOS 2 Y 3 (DESTAPADA Y PROLONGACIÓN) - DEPENDEN DE FUNDIDA
+        if (in_array($orden_proceso, [2, 3])) {
+            // Habilita si el piso está completo en Fundida (proceso 1)
+            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 1, $piso);
+        }
+
+        // PROCESO 4 (ALAMBRADA) - DEPENDE DE DESTAPADA Y PROLONGACIÓN
+        if ($orden_proceso == 4) {
+            // Verifica que se hayan completado los pisos mínimos requeridos en ambos procesos
+            $cumpleMinPisos = $this->verificarMinPisosCompletados($resultado, $torre, 2, $pisosRequeridos) &&
+                $this->verificarMinPisosCompletados($resultado, $torre, 3, $pisosRequeridos);
+
+            // Verifica que este piso específico esté completo en ambos procesos
+            $pisoCompletoEnDependencias = $this->verificarPisoCompletoEnProceso($resultado, $torre, 2, $piso) &&
+                $this->verificarPisoCompletoEnProceso($resultado, $torre, 3, $piso);
+
+            // Habilita si se cumplen ambos: pisos mínimos y este piso completo
+            return $cumpleMinPisos && $pisoCompletoEnDependencias;
+        }
+
+        // PROCESO 5 (APARATEADA) - DEPENDE DE ALAMBRADA
+        if ($orden_proceso == 5) {
+            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 4, $piso);
+        }
+
+        // PROCESO 6 (APARATEADA FASE 2) - DEPENDE DE APARATEADA
+        if ($orden_proceso == 6) {
+            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
+        }
+
+        // PROCESO 7 (PRUEBAS) - DEPENDE DE APARATEADA O APARATEADA FASE 2
+        if ($orden_proceso == 7) {
+            if (isset($resultado[$torre][6])) {
+                return $this->verificarPisoCompletoEnProceso($resultado, $torre, 6, $piso);
+            }
+            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
+        }
+
+        // PROCESOS 8 Y 9 (RETIE Y RITEL) - DEPENDEN DE PRUEBAS
+        if (in_array($orden_proceso, [8, 9])) {
+            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 7, $piso);
+        }
+
+        // PROCESO 10 (ENTREGA) - DEPENDE DE RETIE Y RITEL
+        if ($orden_proceso == 10) {
+            $retieCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
+            $ritelCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
+            return $retieCompletado && $ritelCompletado;
+        }
+
+        return false;
+    }
+
+    //Verifica si todo un piso está completo (estado=2) para un proceso
     // private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
     // {
     //     if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
@@ -477,48 +477,48 @@ class GestionProyectosController extends Controller
     //     return true;
     // }
 
-    // //Verifica si un apartamento específico está completo (estado=2) en un proceso
-    // private function verificarApartamentoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso, $apartamento)
-    // {
-    //     if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
-    //         return false;
-    //     }
+    //Verifica si un apartamento específico está completo (estado=2) en un proceso
+    private function verificarApartamentoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso, $apartamento)
+    {
+        if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+            return false;
+        }
 
-    //     foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
-    //         if ($apt['apartamento'] == $apartamento) {
-    //             return $apt['estado'] == 2; // 2 = Completado
-    //         }
-    //     }
+        foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
+            if ($apt['apartamento'] == $apartamento) {
+                return $apt['estado'] == 2; // 2 = Completado
+            }
+        }
 
-    //     return false;
-    // }
+        return false;
+    }
 
-    // //Verifica si se han completado los pisos mínimos requeridos para un proceso
-    // private function verificarMinPisosCompletados($resultado, $torre, $ordenProceso, $minPisos)
-    // {
-    //     return isset($resultado[$torre][$ordenProceso]['pisos_completados']) &&
-    //         $resultado[$torre][$ordenProceso]['pisos_completados'] >= $minPisos;
-    // }
+    //Verifica si se han completado los pisos mínimos requeridos para un proceso
+    private function verificarMinPisosCompletados($resultado, $torre, $ordenProceso, $minPisos)
+    {
+        return isset($resultado[$torre][$ordenProceso]['pisos_completados']) &&
+            $resultado[$torre][$ordenProceso]['pisos_completados'] >= $minPisos;
+    }
 
-    // //Actualiza los contadores de realizados y atrasos
-    // private function actualizarContadores(&$resultado, &$torreResumen, $torre, $orden_proceso, $estado)
-    // {
-    //     $resultado[$torre][$orden_proceso]['total_apartamentos']++;
+    //Actualiza los contadores de realizados y atrasos
+    private function actualizarContadores(&$resultado, &$torreResumen, $torre, $orden_proceso, $estado)
+    {
+        $resultado[$torre][$orden_proceso]['total_apartamentos']++;
 
-    //     if ($estado == 1) { // 1 = Atraso
-    //         $resultado[$torre][$orden_proceso]['apartamentos_atraso']++;
-    //         if ($orden_proceso != 1) { // No contar Fundida en resumen general
-    //             $torreResumen[$torre]['total_atraso']++;
-    //         }
-    //     } elseif ($estado == 2) { // 2 = Completado
-    //         $resultado[$torre][$orden_proceso]['apartamentos_realizados']++;
-    //         if ($orden_proceso != 1) { // No contar Fundida en resumen general
-    //             $torreResumen[$torre]['total_realizados']++;
-    //         }
-    //     }
-    // }
+        if ($estado == 1) { // 1 = Atraso
+            $resultado[$torre][$orden_proceso]['apartamentos_atraso']++;
+            if ($orden_proceso != 1) { // No contar Fundida en resumen general
+                $torreResumen[$torre]['total_atraso']++;
+            }
+        } elseif ($estado == 2) { // 2 = Completado
+            $resultado[$torre][$orden_proceso]['apartamentos_realizados']++;
+            if ($orden_proceso != 1) { // No contar Fundida en resumen general
+                $torreResumen[$torre]['total_realizados']++;
+            }
+        }
+    }
 
-    // //Verifica si todo un piso está completo y actualiza el contador
+    //Verifica si todo un piso está completo y actualiza el contador
     // private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
     // {
     //     if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
@@ -538,48 +538,84 @@ class GestionProyectosController extends Controller
     //     }
     // }
 
-    // //Calcula porcentajes de avance y atraso para procesos y torres
-    // private function calcularPorcentajes(&$resultado, &$torreResumen)
-    // {
-    //     // Porcentajes por proceso
-    //     foreach ($resultado as $torre => &$procesos) {
-    //         foreach ($procesos as $orden_proceso => &$proceso) {
-    //             if ($orden_proceso === 'nombre_torre') continue;
+    //Calcula porcentajes de avance y atraso para procesos y torres
+    private function calcularPorcentajes(&$resultado, &$torreResumen)
+    {
+        // Porcentajes por proceso
+        foreach ($resultado as $torre => &$procesos) {
+            foreach ($procesos as $orden_proceso => &$proceso) {
+                if ($orden_proceso === 'nombre_torre') continue;
 
-    //             // Proceso Fundida (1) no lleva porcentajes
-    //             if ($orden_proceso == 1) {
-    //                 $proceso['porcentaje_atraso'] = 0;
-    //                 $proceso['porcentaje_avance'] = 0;
-    //                 continue;
-    //             }
+                // Proceso Fundida (1) no lleva porcentajes
+                if ($orden_proceso == 1) {
+                    $proceso['porcentaje_atraso'] = 0;
+                    $proceso['porcentaje_avance'] = 0;
+                    continue;
+                }
 
-    //             $total_atraso = $proceso['apartamentos_atraso'];
-    //             $total_realizados = $proceso['apartamentos_realizados'];
-    //             $denominador = $total_atraso + $total_realizados;
+                $total_atraso = $proceso['apartamentos_atraso'];
+                $total_realizados = $proceso['apartamentos_realizados'];
+                $denominador = $total_atraso + $total_realizados;
 
-    //             // % Atraso = (Atrasos / Total iniciados) * 100
-    //             $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+                // % Atraso = (Atrasos / Total iniciados) * 100
+                $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
 
-    //             // % Avance = (Realizados / Total apartamentos) * 100
-    //             $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
-    //                 round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
-    //         }
-    //     }
+                // % Avance = (Realizados / Total apartamentos) * 100
+                $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
+                    round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
+            }
+        }
 
-    //     // Porcentajes por torre
-    //     foreach ($torreResumen as $torre => &$datos) {
-    //         $total_atraso = $datos['total_atraso'];
-    //         $total_realizados = $datos['total_realizados'];
-    //         $denominador = $total_atraso + $total_realizados;
+        // Porcentajes por torre
+        foreach ($torreResumen as $torre => &$datos) {
+            $total_atraso = $datos['total_atraso'];
+            $total_realizados = $datos['total_realizados'];
+            $denominador = $total_atraso + $total_realizados;
 
-    //         $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
-    //         $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
-    //         $datos['serial_avance'] = $total_realizados . '/' . $denominador;
-    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
+            $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+            $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
+            $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+            $datos['total_pisos'] = count($datos['pisos_unicos']);
 
-    //         unset($datos['pisos_unicos']); // Eliminar campo auxiliar
-    //     }
-    // }
+            unset($datos['pisos_unicos']); // Eliminar campo auxiliar
+        }
+    }
+
+    private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
+{
+    if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+        return false;
+    }
+
+    foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
+        // Un piso se considera "en progreso" si todos están en 1 o 2
+        if (!in_array($apt['estado'], [1, 2])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+private function verificarPisoCompleto(&$resultado, $torre, $orden_proceso, $piso)
+{
+    if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
+        return;
+    }
+
+    $completo = true;
+    foreach ($resultado[$torre][$orden_proceso]['pisos'][$piso] as $apt) {
+        // Aquí solo se marca como COMPLETO si todos están en 2
+        if ($apt['estado'] != 2) {
+            $completo = false;
+            break;
+        }
+    }
+
+    if ($completo) {
+        $resultado[$torre][$orden_proceso]['pisos_completados']++;
+    }
+}
 
 
 
