@@ -184,7 +184,10 @@ class AsistenciasObrasController extends Controller
     public function UsuarioConfirmarAsistencia()
     {
         // Obtengo las obras donde el usuario autenticado es el encargado
-        $obras = Proyectos::where('encargado_id', Auth::id())->pluck('id'); // Solo IDs
+        // $obras = Proyectos::where('encargado_id', Auth::id())->pluck('id'); // Solo IDs
+        $obras = Proyectos::whereJsonContains('encargado_id', Auth::id())
+        ->pluck('id');
+
 
         // Fecha actual
         $hoy = Carbon::now()->toDateString();
