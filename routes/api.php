@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\ActivosFijos\ActivosController;
+use App\Http\Controllers\Api\ActivosFijos\BodegasController;
+use App\Http\Controllers\Api\ActivosFijos\CategoriaActivosController;
+use App\Http\Controllers\Api\ActivosFijos\KadexActivosController;
+use App\Http\Controllers\Api\ActivosFijos\MisActivosController;
+use App\Http\Controllers\Api\ActivosFijos\SubCategoriaActivosController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CargoController;
 use App\Http\Controllers\Api\CargueMasivo\CarguesMasivosCotroller;
@@ -28,7 +34,6 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
-use App\Models\Proyectos;
 
 /*
 |--------------------------------------------------------------------------
@@ -180,6 +185,27 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //descargas en excel
     Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class,'ExportInformeExcelProyecto']);
+
+    //activos fijos
+    Route::apiResource('bodega-areas', BodegasController::class);
+    Route::apiResource('categorias-activos', CategoriaActivosController::class);
+    Route::apiResource('subcategorias-activos', SubCategoriaActivosController::class);
+    Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class,'SubcategoriaFiltrado']);
+
+    Route::apiResource('administar-activos', ActivosController::class); 
+    Route::get('usuariosAsignacion', [ActivosController::class,'usuariosAsignacion']);
+
+    Route::get('mis-activos-pendientes', [MisActivosController::class,'index']); 
+    Route::get('mis-activos', [MisActivosController::class,'misActivos']); 
+
+    Route::apiResource('administar-kardex-activos', KadexActivosController::class); 
+    Route::get('administar-kardex-activos-pendientes', [KadexActivosController::class,'activosPendientes']); 
+    Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+    Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']); 
+
+
+
+
     
 
 });
