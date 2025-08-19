@@ -46,7 +46,7 @@ class GestionProyectosController extends Controller
             $detalles = DB::connection('mysql')
                 ->table('proyecto_detalle')
                 ->where('proyecto_id', $proyecto->id)
-                ->where('orden_proceso', '!=', 1)
+                // ->where('orden_proceso', '!=', 1) //no tener encuenta el proceso 1 fundida
                 ->get();
 
             // Cálculo del atraso (como lo tenías)
@@ -82,172 +82,6 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-    // public function indexProgreso(Request $request)
-    // {
-    //     // Obtener el listado de nombres de torre por código
-    //     $torresConNombre = DB::table('nombre_xtore')
-    //         ->where('proyecto_id', $request->id)
-    //         ->pluck('nombre_torre', 'torre') // ['A' => 'Torre Norte', 'B' => 'Torre Sur', ...]
-    //         ->toArray();
-
-    //     $proyectosDetalle = DB::connection('mysql')
-    //         ->table('proyecto_detalle')
-    //         ->leftJoin('users', 'proyecto_detalle.user_id', '=', 'users.id')
-    //         ->leftJoin('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->where('proyecto_detalle.proyecto_id', $request->id)
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.id',
-    //             'proyecto_detalle.validacion',
-    //             'proyecto_detalle.estado_validacion',
-    //             'proyecto_detalle.consecutivo',
-    //             'proyecto_detalle.orden_proceso',
-    //             'proyecto_detalle.piso',
-    //             'proyecto_detalle.apartamento',
-    //             'proyecto_detalle.text_validacion',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso',
-    //             'users.nombre as nombre'
-    //         )
-    //         ->get();
-
-    //     $resultado = [];
-    //     $torreResumen = [];
-
-    //     foreach ($proyectosDetalle as $item) {
-    //         $torre = $item->torre;
-    //         $orden_proceso = $item->orden_proceso;
-    //         $nombre_proceso = $item->nombre_proceso;
-    //         $text_validacion = $item->text_validacion;
-    //         $validacion = $item->validacion;
-    //         $estado_validacion = $item->estado_validacion;
-    //         $consecutivo = $item->consecutivo;
-    //         $piso = $item->piso;
-
-
-    //         if (!isset($resultado[$torre])) {
-    //             $resultado[$torre] = [];
-    //         }
-
-
-    //         // Inicializar resumen por torre
-    //         if (!isset($torreResumen[$torre])) {
-    //             $torreResumen[$torre] = [
-    //                 'nombre_torre' => $torresConNombre[$torre] ?? $torre,
-    //                 'total_atraso' => 0,
-    //                 'total_realizados' => 0,
-    //                 'porcentaje_atraso' => 0,
-    //                 'porcentaje_avance' => 0,
-    //                 'serial_avance' => '0/0',
-    //                 'pisos_unicos' => []
-    //             ];
-    //         }
-
-    //         // Registrar piso único por torre
-    //         if (!in_array($piso, $torreResumen[$torre]['pisos_unicos'])) {
-    //             $torreResumen[$torre]['pisos_unicos'][] = $piso;
-    //         }
-
-    //         // Inicializar proceso por torre
-    //         if (!isset($resultado[$torre][$orden_proceso])) {
-    //             $resultado[$torre][$orden_proceso] = [
-    //                 'nombre_proceso' => $nombre_proceso,
-    //                 'text_validacion' => $text_validacion,
-    //                 'estado_validacion' => $estado_validacion,
-    //                 'validacion' => $validacion,
-    //                 'pisos' => [],
-    //                 'total_apartamentos' => 0,
-    //                 'apartamentos_atraso' => 0,
-    //                 'apartamentos_realizados' => 0,
-    //                 'porcentaje_atraso' => 0,
-    //                 'porcentaje_avance' => 0,
-    //             ];
-    //         }
-
-    //         if (!isset($resultado[$torre][$orden_proceso]['pisos'][$piso])) {
-    //             $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
-    //         }
-
-    //         // Agregar apartamento
-    //         $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
-    //             'id' => $item->id,
-    //             'apartamento' => $item->apartamento,
-    //             'consecutivo' => $consecutivo,
-    //             'estado' => $item->estado,
-    //         ];
-
-    //         // Contar total apartamentos
-    //         $resultado[$torre][$orden_proceso]['total_apartamentos'] += 1;
-
-    //         // 👉 Solo sumar al resumen de torre si el proceso NO es 1
-    //         if ($orden_proceso != 1) {
-    //             if ($item->estado == 1) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-    //                 $torreResumen[$torre]['total_atraso'] += 1;
-    //             }
-    //             if ($item->estado == 2) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-    //                 $torreResumen[$torre]['total_realizados'] += 1;
-    //             }
-    //         } else {
-    //             if ($item->estado == 1) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_atraso'] += 1;
-    //             }
-    //             if ($item->estado == 2) {
-    //                 $resultado[$torre][$orden_proceso]['apartamentos_realizados'] += 1;
-    //             }
-    //         }
-    //     }
-
-    //     // Calcular porcentajes por proceso
-    //     foreach ($resultado as $torre => &$procesos) {
-    //         foreach ($procesos as $orden_proceso => &$proceso) {
-    //             // Ignorar campo extra "nombre_torre"
-    //             if ($orden_proceso === 'nombre_torre') continue;
-
-    //             if ($orden_proceso == 1) {
-    //                 $proceso['porcentaje_atraso'] = 0;
-    //                 $proceso['porcentaje_avance'] = 0;
-    //                 continue;
-    //             }
-
-    //             $total_atraso = $proceso['apartamentos_atraso'];
-    //             $total_realizados = $proceso['apartamentos_realizados'];
-    //             $denominador = $total_atraso + $total_realizados;
-
-    //             $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-    //             $porcentaje_avance = $proceso['total_apartamentos'] > 0 ? ($total_realizados / $proceso['total_apartamentos']) * 100 : 0;
-
-    //             $proceso['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    //             $proceso['porcentaje_avance'] = round($porcentaje_avance, 2);
-    //         }
-    //     }
-
-    //     // Calcular porcentaje y avance textual por torre
-    //     foreach ($torreResumen as $torre => &$datos) {
-    //         $total_atraso = $datos['total_atraso'];
-    //         $total_realizados = $datos['total_realizados'];
-    //         $denominador = $total_atraso + $total_realizados;
-
-    //         $porcentaje_atraso = $denominador > 0 ? ($total_atraso / $denominador) * 100 : 0;
-    //         $porcentaje_avance = $denominador > 0 ? ($total_realizados / $denominador) * 100 : 0;
-
-    //         $datos['porcentaje_atraso'] = round($porcentaje_atraso, 2);
-    //         $datos['porcentaje_avance'] = round($porcentaje_avance, 2);
-    //         $datos['serial_avance'] = $total_realizados . '/' . $denominador;
-    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
-
-    //         unset($datos['pisos_unicos']); // eliminar si no deseas mostrar el array
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $resultado,
-    //         'torreResumen' => $torreResumen
-    //     ]);
-    // }
-
-
     public function indexProgreso(Request $request)
     {
         // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
@@ -265,7 +99,6 @@ class GestionProyectosController extends Controller
             )
             ->get()
             ->keyBy('orden_proceso');
-
 
         // 2. NOMBRES DE TORRES - Obtiene los nombres personalizados de las torres
         $torresConNombre = DB::table('nombre_xtore')
@@ -297,9 +130,7 @@ class GestionProyectosController extends Controller
             ->orderBy('proyecto_detalle.piso')
             ->orderBy('proyecto_detalle.apartamento')
             ->get();
-            
 
-            info($proyectosDetalle);
 
         $resultado = []; // Almacenará todos los datos estructurados
         $torreResumen = []; // Resumen por torre
@@ -394,87 +225,65 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-
     private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
     {
-        // Pisos requeridos para habilitar este proceso
         $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
-        /* 
-         * LÓGICA DE DEPENDENCIAS ENTRE PROCESOS:
-         * 
-         * Ejemplo para torre de 5 pisos con cambio cada 2 pisos:
-         * - Si Fundida está en piso 4 (completada):
-         *   - Destapada y Prolongación deben estar habilitadas en pisos 1, 2 y 3
-         *   - Alambrada debe estar habilitada en pisos 1 y 2
-         *   - Si no están completos los procesos anteriores, marca EB
-         */
 
-        // PROCESOS 2 Y 3 (DESTAPADA Y PROLONGACIÓN) - DEPENDEN DE FUNDIDA
-        if (in_array($orden_proceso, [2, 3])) {
-            // Habilita si el piso está completo en Fundida (proceso 1)
-            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 1, $piso);
+        // 1. Definir de qué proceso depende el actual
+        $dependencia = null;
+        if (in_array($orden_proceso, [2, 3])) { // Destapada y Prolongación dependen de Fundida
+            $dependencia = 1;
+        } elseif ($orden_proceso == 4) { // Alambrada depende de Destapada y Prolongación
+            $dependencia = 2;
+        } elseif ($orden_proceso == 5) { // Aparateada depende de Alambrada
+            $dependencia = 4;
+        } elseif ($orden_proceso == 6) { // Aparateada Fase 2 depende de Aparateada
+            $dependencia = 5;
+        } elseif ($orden_proceso == 7) { // Pruebas depende de Aparateada o Aparateada Fase 2
+            $dependencia = isset($resultado[$torre][6]) ? 6 : 5;
+        } elseif (in_array($orden_proceso, [8, 9])) { // Retie y Ritel dependen de Pruebas
+            $dependencia = 7;
+        } elseif ($orden_proceso == 10) { // Entrega depende de Retie y Ritel
+            $depRetie = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
+            $depRitel = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
+            return $depRetie && $depRitel;
         }
 
-        // PROCESO 4 (ALAMBRADA) - DEPENDE DE DESTAPADA Y PROLONGACIÓN
-        if ($orden_proceso == 4) {
-            // Verifica que se hayan completado los pisos mínimos requeridos en ambos procesos
-            $cumpleMinPisos = $this->verificarMinPisosCompletados($resultado, $torre, 2, $pisosRequeridos) &&
-                $this->verificarMinPisosCompletados($resultado, $torre, 3, $pisosRequeridos);
-
-            // Verifica que este piso específico esté completo en ambos procesos
-            $pisoCompletoEnDependencias = $this->verificarPisoCompletoEnProceso($resultado, $torre, 2, $piso) &&
-                $this->verificarPisoCompletoEnProceso($resultado, $torre, 3, $piso);
-
-            // Habilita si se cumplen ambos: pisos mínimos y este piso completo
-            return $cumpleMinPisos && $pisoCompletoEnDependencias;
-        }
-
-        // PROCESO 5 (APARATEADA) - DEPENDE DE ALAMBRADA
-        if ($orden_proceso == 5) {
-            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 4, $piso);
-        }
-
-        // PROCESO 6 (APARATEADA FASE 2) - DEPENDE DE APARATEADA
-        if ($orden_proceso == 6) {
-            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
-        }
-
-        // PROCESO 7 (PRUEBAS) - DEPENDE DE APARATEADA O APARATEADA FASE 2
-        if ($orden_proceso == 7) {
-            if (isset($resultado[$torre][6])) {
-                return $this->verificarPisoCompletoEnProceso($resultado, $torre, 6, $piso);
-            }
-            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 5, $piso);
-        }
-
-        // PROCESOS 8 Y 9 (RETIE Y RITEL) - DEPENDEN DE PRUEBAS
-        if (in_array($orden_proceso, [8, 9])) {
-            return $this->verificarPisoCompletoEnProceso($resultado, $torre, 7, $piso);
-        }
-
-        // PROCESO 10 (ENTREGA) - DEPENDE DE RETIE Y RITEL
-        if ($orden_proceso == 10) {
-            $retieCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
-            $ritelCompletado = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
-            return $retieCompletado && $ritelCompletado;
-        }
-
-        return false;
-    }
-
-    //Verifica si todo un piso está completo (estado=2) para un proceso
-    private function verificarPisoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso)
-    {
-        if (!isset($resultado[$torre][$ordenProceso]['pisos'][$piso])) {
+        if (!$dependencia) {
             return false;
         }
 
-        foreach ($resultado[$torre][$ordenProceso]['pisos'][$piso] as $apt) {
-            if ($apt['estado'] != 2 ) { // 2 = Completado
-                return false;
+        // 2. Contar pisos del proceso que depende en estado 1, 2 o EB
+        $pisosConAvance = 0;
+        $pisosMinimos = $pisosRequeridos;
+
+        $dependencias = is_array($dependencia) ? $dependencia : [$dependencia];
+        foreach ($dependencias as $dep) {
+            if (!isset($resultado[$torre][$dep]['pisos'])) continue;
+
+            foreach ($resultado[$torre][$dep]['pisos'] as $pisoDep => $apartamentos) {
+                $completo = true;
+                foreach ($apartamentos as $apt) {
+                    if (!in_array($apt['estado'], [1, 2]) && !$apt['eb']) {
+                        $completo = false;
+                        break;
+                    }
+                }
+                if ($completo) {
+                    $pisosConAvance++;
+                }
             }
         }
-        return true;
+
+        // 3. Calcular cuántos pisos deben estar habilitados
+        $resultadoCalc = ($pisosConAvance - $pisosMinimos) + 1;
+
+        // 4. Verificar si el piso actual está dentro de los que deben habilitarse
+        if ($piso <= $resultadoCalc) {
+            return true; // marcar como EB si el estado es 0
+        }
+
+        return false;
     }
 
     //Verifica si un apartamento específico está completo (estado=2) en un proceso
@@ -491,13 +300,6 @@ class GestionProyectosController extends Controller
         }
 
         return false;
-    }
-
-    //Verifica si se han completado los pisos mínimos requeridos para un proceso
-    private function verificarMinPisosCompletados($resultado, $torre, $ordenProceso, $minPisos)
-    {
-        return isset($resultado[$torre][$ordenProceso]['pisos_completados']) &&
-            $resultado[$torre][$ordenProceso]['pisos_completados'] >= $minPisos;
     }
 
     //Actualiza los contadores de realizados y atrasos
@@ -582,56 +384,6 @@ class GestionProyectosController extends Controller
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     //------------------------------------------------------------------------------------
     public function destroy($id)
     {
@@ -695,163 +447,6 @@ class GestionProyectosController extends Controller
             'data' => $info
         ]);
     }
-
-    // public function validarProceso(Request $request)
-    // {
-    //     DB::beginTransaction();
-
-    //     try {
-    //         // Validar datos de entrada
-    //         $request->validate([
-    //             'torre' => 'required|string',
-    //             'proyecto' => 'required',
-    //             'orden_proceso' => 'required|integer|min:1',
-    //             'piso' => 'required|integer',
-    //         ]);
-
-    //         $torre = $request->torre;
-    //         $proyecto = (int) $request->proyecto;
-    //         $ordenProceso = (int) $request->orden_proceso;
-    //         $pisoActual = (int) $request->piso;
-
-    //         // Buscar información del piso actual
-    //         $pisosPrevios = ProyectosDetalle::where('torre', $torre)
-    //             ->where('orden_proceso', $ordenProceso)
-    //             ->where('proyecto_id', $proyecto)
-    //             ->where('piso', $pisoActual)
-    //             ->first();
-
-    //         // Proyecto padre
-    //         $proyectoPadre = Proyectos::find($proyecto);
-    //         $aptMinimos = $proyectoPadre->minimoApt;
-
-    //         // Si ya está validado, no hacer nada
-    //         if ($pisosPrevios->validacion === 1 && $pisosPrevios->estado_validacion === 1) {
-    //             DB::commit();
-    //             return response()->json([
-    //                 'success' => "Ya validado co: FP-6325.22",
-    //             ]);
-    //         }
-
-    //         // Obtener configuración del proceso
-    //         $configProceso = CambioProcesoProyectos::where('proyecto_id', $proyecto)
-    //             ->where('proceso', $ordenProceso)
-    //             ->first();
-
-    //         if (!$configProceso) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Configuración de proceso no encontrada.',
-    //             ], 400);
-    //         }
-
-    //         $pisosRequeridos = (int) $configProceso->numero;
-
-    //         if ($ordenProceso > 1) {
-    //             $procesoAnterior = $ordenProceso - 1;
-
-    //             $existeProcesoAnterior = ProyectosDetalle::where('torre', $torre)
-    //                 ->where('orden_proceso', $procesoAnterior)
-    //                 ->where('proyecto_id', $proyecto)
-    //                 ->get();
-
-    //             if ($existeProcesoAnterior->isEmpty()) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'No se puede validar porque el proceso anterior no existe.',
-    //                     'details' => ['proceso_faltante' => $procesoAnterior]
-    //                 ], 400);
-    //             }
-
-    //             if ($pisoActual === 1) {
-    //                 // Validación para piso 1
-    //                 $pisosPrevios = ProyectosDetalle::where('torre', $torre)
-    //                     ->where('orden_proceso', $procesoAnterior)
-    //                     ->where('proyecto_id', $proyecto)
-    //                     ->whereIn('piso', range(1, $pisosRequeridos))
-    //                     ->where('estado', 2)
-    //                     ->get()
-    //                     ->groupBy('piso');
-
-    //                 $pisosCumplenMinimo = 0;
-
-    //                 foreach ($pisosPrevios as $piso => $aptos) {
-    //                     if ($aptos->count() >= $aptMinimos) {
-    //                         $pisosCumplenMinimo++;
-    //                     }
-    //                 }
-
-    //                 if ($pisosCumplenMinimo < $pisosRequeridos) {
-    //                     DB::commit();
-    //                     return response()->json([
-    //                         'success' => false,
-    //                         'message' => "No se puede validar este piso porque no se han confirmado al menos $aptMinimos apartamentos en cada uno de los $pisosRequeridos pisos requeridos.",
-    //                     ], 400);
-    //                 }
-    //             } else {
-    //                 // Validación para piso > 1
-    //                 $totalPisos = $existeProcesoAnterior->pluck('piso')->unique()->count();
-
-    //                 $procesoAntCompletado = ProyectosDetalle::where('torre', $torre)
-    //                     ->where('orden_proceso', $procesoAnterior)
-    //                     ->where('proyecto_id', $proyecto)
-    //                     ->whereIn('piso', range(1, $totalPisos))
-    //                     ->get();
-
-    //                 $ProcesoPasadoCompleto = $procesoAntCompletado->isNotEmpty() &&
-    //                     $procesoAntCompletado->every(fn($apt) => $apt->estado === 2);
-
-    //                 $pisoActivador = $pisoActual + ($pisosRequeridos - 1);
-
-    //                 $activador = ProyectosDetalle::where('torre', $torre)
-    //                     ->where('orden_proceso', $procesoAnterior)
-    //                     ->where('proyecto_id', $proyecto)
-    //                     ->where('piso', $pisoActivador)
-    //                     ->where('estado', 2)
-    //                     ->get();
-
-    //                 $puedeValidarse = $activador->count() >= $aptMinimos;
-
-    //                 if (
-    //                     ($pisoActual !== $totalPisos && !$puedeValidarse) ||
-    //                     ($pisoActual === $totalPisos && (!$puedeValidarse || !$ProcesoPasadoCompleto))
-    //                 ) {
-    //                     return response()->json([
-    //                         'success' => false,
-    //                         'message' => "No se puede validar este piso porque no se cumplen los requisitos del proceso anterior.",
-    //                     ], 400);
-    //                 }
-    //             }
-    //         }
-
-    //         // Validación exitosa: habilitar piso actual
-    //         ProyectosDetalle::where('torre', $torre)
-    //             ->where('orden_proceso', $ordenProceso)
-    //             ->where('proyecto_id', $proyecto)
-    //             ->where('piso', $pisoActual)
-    //             ->update([
-    //                 'estado_validacion' => 1,
-    //                 'fecha_validacion' => now(),
-    //                 'user_id' => Auth::id(),
-    //                 'estado' => 1,
-    //                 'fecha_habilitado' => now(),
-    //             ]);
-
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Proceso validado exitosamente.'
-    //         ], 200);
-    //     } catch (\Exception $e) {
-    //         DB::rollBack();
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Error al validar proceso.',
-    //             'error' => $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
 
     // confirmar con secuencia de desfase
     public function confirmarApt($id)
@@ -1220,101 +815,6 @@ class GestionProyectosController extends Controller
             ], 500);
         }
     }
-
-    // public function activacionXDia(Request $request)
-    // {
-    //     $proyectoId = $request->proyecto_id;
-
-    //     // Cantidad de apartamentos a activar por día
-    //     $proyectoAptActivar = Proyectos::where('id', $proyectoId)
-    //         ->select('activador_pordia_apt')
-    //         ->first();
-
-    //     $cantidadActivar = $proyectoAptActivar->activador_pordia_apt;
-
-    //     $procesos = ProyectosDetalle::where('proyecto_id', $proyectoId)
-    //         ->select('orden_proceso')
-    //         ->distinct()
-    //         ->orderBy('orden_proceso')
-    //         ->pluck('orden_proceso')
-    //         ->values();
-
-    //     for ($i = 0; $i < $procesos->count() - 1; $i++) {
-    //         $procesoActual = $procesos[$i];
-    //         $procesoSiguiente = $procesos[$i + 1];
-
-    //         $registrosActual = ProyectosDetalle::where('proyecto_id', $proyectoId)
-    //             ->where('orden_proceso', $procesoActual)
-    //             ->where('torre', $request->torre)
-    //             ->get();
-
-    //         $completado = $registrosActual->every(fn($r) => $r->estado == "2");
-
-    //         if (!$completado) {
-    //             continue;
-    //         }
-
-    //         $pendientesSiguiente = ProyectosDetalle::where('proyecto_id', $proyectoId)
-    //             ->where('orden_proceso', $procesoSiguiente)
-    //             ->where('estado', 0)
-    //             ->where('torre', $request->torre)
-    //             ->orderBy('consecutivo')
-    //             ->get();
-
-    //         // Validación manual
-    //         $procesoActual = ProyectosDetalle::where('torre', $request->torre)
-    //             ->where('orden_proceso', $procesoSiguiente)
-    //             ->where('proyecto_id', $proyectoId)
-    //             ->first();
-
-    //         if ($procesoActual->validacion == 1 && $procesoActual->estado_validacion == 0) {
-    //             continue;
-    //         }
-
-    //         $pendientesSiguiente2 = ProyectosDetalle::where('proyecto_id', $proyectoId)
-    //             ->where('orden_proceso', $procesoSiguiente)
-    //             ->whereIn('estado', [1, 2])
-    //             ->where('torre', $request->torre)
-    //             ->orderBy('consecutivo')
-    //             ->get();
-
-    //         if ($pendientesSiguiente->isEmpty()) {
-    //             continue;
-    //         }
-
-    //         $hoy = Carbon::now()->toDateString();
-    //         $ya_habilitado_hoy = $pendientesSiguiente2->contains('fecha_habilitado', $hoy);
-
-    //         if ($ya_habilitado_hoy) {
-    //             continue;
-    //         }
-
-    //         // Obtener los primeros N apartamentos pendientes
-    //         $apartamentosPorActivar = ProyectosDetalle::where('proyecto_id', $proyectoId)
-    //             ->where('orden_proceso', $procesoSiguiente)
-    //             ->where('estado', 0)
-    //             ->where('torre', $request->torre)
-    //             ->orderBy('consecutivo')
-    //             ->limit($cantidadActivar) // 👉 Solo activar N apartamentos por día
-    //             ->get();
-
-    //         foreach ($apartamentosPorActivar as $apartamento) {
-    //             $apartamento->update([
-    //                 'fecha_habilitado' => $hoy,
-    //                 'estado' => 1,
-    //             ]);
-    //         }
-
-    //         // Solo habilitar N apartamentos por día, por eso hacemos break aquí
-    //         break;
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Validacion de apartamentos que requieren actualizacion por día, realizada',
-    //     ]);
-    // }
-
 
     public function InformeDetalladoProyectos($id)
     {
@@ -2279,53 +1779,6 @@ class GestionProyectosController extends Controller
             ]);
     }
 
-    // private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoOrigen, $procesoDestino)
-    // {
-    //     // 1. Revisar que todo el piso del proceso origen esté confirmado (estado 2)
-    //     $aptos = ProyectosDetalle::where('torre', $torre)
-    //         ->where('proyecto_id', $proyecto->id)
-    //         ->where('piso', $piso)
-    //         ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoOrigen]))
-    //         ->get();
-
-    //     if ($aptos->isEmpty() || $aptos->contains(fn($apt) => $apt->estado != 2)) {
-    //         return; // Piso no está completo aún
-    //     }
-
-    //     // 2. Obtener la cantidad mínima de pisos requeridos
-    //     $minimos = DB::table('cambio_procesos_x_proyecto')
-    //         ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.proceso', '=', 'procesos_proyectos.id')
-    //         ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
-    //         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoDestino])
-    //         ->value('numero');
-
-    //     // $pisosMinimos = $minimos ? (int)$minimos : 0;
-    //     // if ($piso < $pisosMinimos) return;
-
-    //     // $PisoCambioProceso = $piso - ($minimos - 1);
-
-    //     // 3. Validar si requiere validación
-    //     $detalleDestino = ProyectosDetalle::where('torre', $torre)
-    //         ->where('proyecto_id', $proyecto->id)
-    //         ->where('piso', $piso)
-    //         ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
-    //         ->first();
-
-    //     if ($detalleDestino->validacion == 1 && $detalleDestino->estado_validacion == 0) {
-    //         return; // espera validación externa
-    //     }
-
-    //     // 4. Activar el proceso destino en ese piso
-    //     ProyectosDetalle::where('torre', $torre)
-    //         ->where('proyecto_id', $proyecto->id)
-    //         ->where('piso', $piso)
-    //         ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoDestino]))
-    //         ->where('estado', 0)
-    //         ->update([
-    //             'estado' => 1,
-    //             'fecha_habilitado' => now()
-    //         ]);
-    // }
 
     private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoOrigen, $procesoDestino)
     {
@@ -2653,6 +2106,8 @@ class GestionProyectosController extends Controller
         }
     }
 
+
+    //futuro en caso tal retie y ritel 
     // private function confirmarPruebas($proyecto, $torre, $orden_proceso, $piso)
     // {
     //     $aptMinimos = $proyecto->minimoApt;

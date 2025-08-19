@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ActivosFijos\ActivosController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,3 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// routes/web.php
+Route::get('activos/{id}/qr', [ActivosController::class, 'verActivoQR']);
+
