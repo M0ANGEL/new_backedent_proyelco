@@ -23,7 +23,7 @@ class KadexActivosController extends Controller
             ->join('users', 'activo.user_id', '=', 'users.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('bodegas_area', 'activo.ubicacion_id', '=', 'bodegas_area.id')
+            ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
@@ -31,7 +31,7 @@ class KadexActivosController extends Controller
                 'subcategoria_activos.nombre as subcategoria',
                 'bodegas_area.nombre as bodega_actual'
             )
-            ->where('activo.salida', '!=',1) //todo los activos que no esten en transito de aceptacion
+            ->where('activo.aceptacion', '=', 0) //todo los activos que no esten en transito de aceptacion
             ->get();
 
         return response()->json([
@@ -39,6 +39,31 @@ class KadexActivosController extends Controller
             'data' => $clientes
         ]);
     }
+
+    // public function indexPendientes()
+    // {
+    //     //consulta a la bd los clientes
+    //     $clientes = DB::connection('mysql')
+    //         ->table('activo')
+    //         ->join('users', 'activo.user_id', '=', 'users.id')
+    //         ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+    //         ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+    //         ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+    //         ->select(
+    //             'activo.*',
+    //             'users.nombre as usuario',
+    //             'categoria_activos.nombre as categoria',
+    //             'subcategoria_activos.nombre as subcategoria',
+    //             'bodegas_area.nombre as bodega_actual'
+    //         )
+    //         ->where('activo.aceptacion', '=',1) //todo los activos que no esten en transito de aceptacion
+    //         ->get();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $clientes
+    //     ]);
+    // }
 
     public function store(Request $request)
     {
@@ -84,12 +109,14 @@ class KadexActivosController extends Controller
             $cliente->activo_id = $request->id;
             $cliente->user_id = $user->id; //usuario quien crea el traslado
             $cliente->usuarios_asignados = $request->filled('usuarios') ? json_encode($request->usuarios) : null;
-            $cliente->ubicacion_actual_id = $activoData->ubicacion_id;
+            $cliente->ubicacion_actual_id = $activoData->ubicacion_actual_id;
             $cliente->ubicacion_destino_id = $request->ubicacion_destino;
             $cliente->observacion = $request->observacion;
             $cliente->save(); // se guarda para obtener el ID
 
-            $activoData->salida = 1; //se pone el activo en estado 1 ya que esta en envio de aceptacion
+            $activoData->aceptacion = 1; //se pone el activo en estado 1 ya que esta en envio de aceptacion
+            $activoData->usuarios_asignados = $request->filled('usuarios') ? json_encode($request->usuarios) : null;
+            $activoData->ubicacion_destino_id = $request->ubicacion_destino;
             $activoData->save();
 
 
@@ -180,7 +207,7 @@ class KadexActivosController extends Controller
                 'bodega_destino.nombre as bodega_destino',
                 'kadex_activos.codigo_traslado',
             )
-            ->where('activo.salida', 1)
+            ->where('activo.aceptacion', 1)
             ->get();
 
         return response()->json([
@@ -257,12 +284,73 @@ class KadexActivosController extends Controller
                 $userId = Auth::id();
                 $query->whereRaw("JSON_CONTAINS(kadex_activos.usuarios_asignados, '\"$userId\"')");
             })
-            ->where('activo.salida', 1)
+            ->where('activo.aceptacion', 1)
             ->get();
 
         return response()->json([
             'status' => 'success',
             'data' => $clientes
+        ]);
+    }
+
+    public function misActivos()
+    {
+        $clientes = DB::connection('mysql')
+            ->table('activo')
+            ->join('users', 'activo.user_id', '=', 'users.id')
+            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area as bodega_origen', 'activo.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->join('bodegas_area as bodega_destino', 'activo.ubicacion_destino_id', '=', 'bodega_destino.id')
+            ->select(
+                'activo.*',
+                'users.nombre as usuario',
+                'categoria_activos.nombre as categoria',
+                'subcategoria_activos.nombre as subcategoria',
+                'bodega_origen.nombre as bodega_actual',
+                'bodega_destino.nombre as bodega_destino',
+            )
+            ->where(function ($query) {
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(activo.usuarios_confirmaron, '\"$userId\"')");
+            })
+            ->where('activo.aceptacion', 2)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $clientes
+        ]);
+    }
+
+    public function aceptarActivo($id)
+    {
+        $userId = Auth::id();
+
+        $activo = Activo::where(function ($query) use ($userId) {
+            $query->whereRaw("JSON_CONTAINS(usuarios_asignados, '\"$userId\"')");
+        })
+            ->where('id', $id)
+            ->where('aceptacion', 1)
+            ->firstOrFail();
+
+        // actualizar estado
+        $activo->aceptacion = 2;
+
+        // actualizar usuarios_confirmaron en formato ["id"]
+        $usuariosConfirmaron = $activo->usuarios_confirmaron ?? [];
+
+        if (!in_array($userId, $usuariosConfirmaron)) {
+            $usuariosConfirmaron[] = $userId;
+        }
+
+        $activo->usuarios_confirmaron = $usuariosConfirmaron;
+
+        $activo->save();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $activo
         ]);
     }
 }

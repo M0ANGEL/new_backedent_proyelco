@@ -26,14 +26,23 @@ return new class extends Migration
             $table->string("marca",50)->nullable();
             $table->string("serial",100)->nullable();
             $table->tinyInteger('estado')->default(1);
-            $table->tinyInteger('salida')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado 
-            $table->unsignedBigInteger('ubicacion_id'); //es la ubicacion actual de ese activo para los traslados no poner donde esta
+            $table->tinyInteger('aceptacion')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado 
+            $table->unsignedBigInteger('ubicacion_actual_id'); //relacion con ubicacion
+            $table->unsignedBigInteger('ubicacion_destino_id')->default(); //relacion con ubicacion
+            
+            //DATOS DE ASIGNACION DEL ACTIVO
+            $table->json('usuarios_asignados')->nullable(); //quien se le asigna el activo
+            $table->json('usuarios_confirmaron')->nullable(); //quien se le asigna el activo
+            
+            
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users');
             $table->foreign('categoria_id')->references('id')->on('categoria_activos');
             $table->foreign('subcategoria_id')->references('id')->on('subcategoria_activos');
-            $table->foreign('ubicacion_id')->references('id')->on('bodegas_area');
+            $table->foreign('ubicacion_actual_id')->references('id')->on('bodegas_area');
+            $table->foreign('ubicacion_destino_id')->references('id')->on('bodegas_area');
+
         });
     }
 

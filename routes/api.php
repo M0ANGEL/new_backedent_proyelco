@@ -198,10 +198,17 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('mis-activos-pendientes', [MisActivosController::class,'index']); 
     Route::get('mis-activos', [MisActivosController::class,'misActivos']); 
 
+    //administar activos
     Route::apiResource('administar-kardex-activos', KadexActivosController::class); 
-    Route::get('administar-kardex-activos-pendientes', [KadexActivosController::class,'activosPendientes']); 
-    Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+    Route::get('administar-activos-all', [KadexActivosController::class,'index']); 
+    Route::get('administar-activos-pendientes-all', [KadexActivosController::class,'activosPendientes']); 
+
+
+    Route::get('administar-mis-activos', [KadexActivosController::class,'misActivos']); 
     Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']); 
+    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class,'aceptarActivo']); 
+    Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+
 
 
 
