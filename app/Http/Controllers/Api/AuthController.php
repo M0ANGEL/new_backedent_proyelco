@@ -38,12 +38,12 @@ class AuthController extends Controller
 
 
             // Verificar si ya tiene una sesión activa 
-            if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras"])) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'El Usuario ya tiene una sesión activa en otro dispositivo o navegador',
-                ], 401);
-            }
+            // if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras"])) {
+            //     return response()->json([
+            //         'status' => 'error',
+            //         'message' => 'El Usuario ya tiene una sesión activa en otro dispositivo o navegador',
+            //     ], 401);
+            // }
 
             // Crear token de acceso
             $token = $user->createToken('token')->plainTextToken;

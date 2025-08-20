@@ -65,7 +65,7 @@ class ActivosController extends Controller
             $cliente->condicion = $request->condicion;
             $cliente->marca = $request->marca ? $request->marca : null;
             $cliente->serial = $request->serial ? $request->serial : null;
-            $cliente->ubicacion_id = $request->ubicacion_actual;
+            $cliente->ubicacion_actual_id = $request->ubicacion_actual;
             $cliente->save(); // se guarda para obtener el ID
 
             
@@ -129,7 +129,7 @@ class ActivosController extends Controller
             $cliente->valor = $request->valor;
             $cliente->fecha_fin_garantia = Carbon::parse($request->fecha_fin_garantia)->format('Y-m-d');
             $cliente->condicion = $request->condicion;
-            $cliente->ubicacion_id = $request->ubicacion_actual;
+            $cliente->ubicacion_actual_id = $request->ubicacion_actual;
             $cliente->marca = $request->marca ? $request->marca : null;
             $cliente->serial = $request->serial ? $request->serial : null;
             $cliente->save(); // se guarda para obtener el ID
