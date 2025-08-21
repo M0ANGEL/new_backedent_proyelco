@@ -24,9 +24,9 @@ class Kernel extends ConsoleKernel
         // everyMinute cada minuto para pruebas
 
         // job de activar pisos diarios si el procesos esta completo, solo dias habilis 
-        // $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
-        //     ->dailyAt('00:00')
-        //     ->timezone('America/Bogota');
+        $schedule->job(new \App\Jobs\ActivacionApartamentosJob)
+            ->dailyAt('00:00')
+            ->timezone('America/Bogota');
 
         // job de alerta de inactividad
         $schedule->job(new \App\Jobs\VerificarAptsSinFechaFinJob)

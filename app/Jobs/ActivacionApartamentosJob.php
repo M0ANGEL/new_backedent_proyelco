@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ActivacionApartamentosJob implements ShouldQueue
 {
@@ -20,111 +21,200 @@ class ActivacionApartamentosJob implements ShouldQueue
     {
         $hoy = Carbon::now();
 
-        // Omitir fines de semana
-        if ($hoy->isWeekend()) {
+        // Omitir fines de semana y festivos
+        if ($hoy->isWeekend() || Festivos::whereDate('festivo_fecha', $hoy->toDateString())->exists()) {
+            Log::info("📅 Job detenido: Hoy es fin de semana o festivo ({$hoy->toDateString()})");
             return;
         }
 
-        // Omitir días festivos
-        if (Festivos::whereDate('festivo_fecha', $hoy->toDateString())->exists()) {
-            return;
-        }
-
-        // Procesar todos los proyectos
-        $proyectos = Proyectos::all();
+        // Solo proyectos activos
+        $proyectos = Proyectos::where('estado', 1)->get();
+        Log::info("🔍 Iniciando activación. Total proyectos activos: " . $proyectos->count());
 
         foreach ($proyectos as $proyecto) {
-            $aptMinimos = $proyecto->aptMinimos;
-            $cantidadActivar = $proyecto->activador_pordia_apt;
+            $this->procesarProyecto($proyecto, $hoy);
+        }
+    }
 
-            $procesos = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                ->select('orden_proceso')
-                ->distinct()
-                ->orderBy('orden_proceso')
-                ->pluck('orden_proceso')
-                ->values();
+    private function procesarProyecto(Proyectos $proyecto, Carbon $hoy): void
+    {
+        $torres = ProyectosDetalle::where('proyecto_id', $proyecto->id)
+            ->pluck('torre')
+            ->unique()
+            ->values();
 
-            $torres = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                ->select('torre')
-                ->distinct()
-                ->pluck('torre');
+        Log::info("🏢 Proyecto {$proyecto->id} ({$proyecto->nombre}) - Torres encontradas: " . $torres->implode(', '));
 
-            foreach ($torres as $torre) {
-                for ($i = 0; $i < $procesos->count() - 1; $i++) {
-                    $procesoActual = $procesos[$i];
-                    $procesoSiguiente = $procesos[$i + 1];
+        foreach ($torres as $torre) {
+            $this->procesarTorre($proyecto, $torre, $hoy);
+        }
+    }
 
-                    $registrosActual = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                        ->where('orden_proceso', $procesoActual)
-                        ->where('torre', $torre)
-                        ->get();
+    private function procesarTorre(Proyectos $proyecto, string $torre, Carbon $hoy): void
+    {
+        if ($this->procesoCompleto($proyecto->id, $torre, 'fundida')) {
+            Log::info("✅ Fundida completa en Proyecto {$proyecto->id}, Torre {$torre}");
 
-                    $registrosSiguiente = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                        ->where('orden_proceso', $procesoSiguiente)
-                        ->where('estado', 0)
-                        ->where('torre', $torre)
-                        ->orderBy('piso')
-                        ->orderBy('consecutivo')
-                        ->get();
+            $this->activarProcesosSimultaneos($proyecto, $torre, ['destapada', 'prolongacion'], $hoy);
 
-                    if ($registrosSiguiente->isEmpty()) {
-                        continue;
+            if ($this->procesosCompletos($proyecto->id, $torre, ['destapada', 'prolongacion'])) {
+                Log::info("✅ Destapada y prolongacion completas → Activando alambrada");
+                $this->activarApartamentos($proyecto, $torre, 'alambrada', $hoy);
+            }
+
+            if ($this->procesoCompleto($proyecto->id, $torre, 'alambrada')) {
+                Log::info("✅ Alambrada completa → Activando aparateada");
+                $this->activarApartamentos($proyecto, $torre, 'aparateada', $hoy);
+            }
+
+            if ($this->procesoCompleto($proyecto->id, $torre, 'aparateada')) {
+                if ($this->tieneFase2($proyecto->id, $torre)) {
+                    Log::info("🔄 Aparateada completa con fase 2 → Activando aparateada fase 2");
+                    $this->activarApartamentos($proyecto, $torre, 'aparateada fase 2', $hoy);
+
+                    if ($this->procesoCompleto($proyecto->id, $torre, 'aparateada fase 2')) {
+                        Log::info("✅ Aparateada fase 2 completa → Activando pruebas");
+                        $this->activarApartamentos($proyecto, $torre, 'pruebas', $hoy);
                     }
-
-                    $registroValidar = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                        ->where('orden_proceso', $procesoSiguiente)
-                        ->where('torre', $torre)
-                        ->first();
-
-                    if ($registroValidar && $registroValidar->validacion == 1 && $registroValidar->estado_validacion == 0) {
-                        continue;
-                    }
-
-                    $ya_habilitado_hoy = ProyectosDetalle::where('proyecto_id', $proyecto->id)
-                        ->where('orden_proceso', $procesoSiguiente)
-                        ->where('torre', $torre)
-                        ->whereIn('estado', [1, 2])
-                        ->whereDate('fecha_habilitado', $hoy->toDateString())
-                        ->exists();
-
-                    if ($ya_habilitado_hoy) {
-                        continue;
-                    }
-
-                    // Agrupar por piso el proceso actual
-                    $agrupadosPorPiso = $registrosActual->groupBy('piso');
-
-                    // Determinar los pisos que ya están completos
-                    $pisosCompletos = [];
-                    foreach ($agrupadosPorPiso as $piso => $items) {
-                        $confirmados = $items->where('estado', 2)->count();
-                        if ($confirmados >= $aptMinimos) {
-                            $pisosCompletos[] = $piso;
-                        }
-                    }
-
-                    // Solo activar los apartamentos del proceso siguiente que estén en pisos ya completos
-                    $activables = $registrosSiguiente->filter(function ($item) use ($pisosCompletos) {
-                        return in_array($item->piso, $pisosCompletos);
-                    });
-
-                    if ($activables->isEmpty()) {
-                        continue;
-                    }
-
-                    // Activar solo la cantidad diaria permitida
-                    $activadosHoy = $activables->take($cantidadActivar);
-
-                    foreach ($activadosHoy as $apt) {
-                        $apt->update([
-                            'fecha_habilitado' => $hoy->toDateString(),
-                            'estado' => 1,
-                        ]);
-                    }
-
-                    break; // activar solo una tanda diaria por torre
+                } else {
+                    Log::info("⚡ Aparateada completa sin fase 2 → Activando pruebas");
+                    $this->activarApartamentos($proyecto, $torre, 'pruebas', $hoy);
                 }
             }
+
+            if ($this->procesoCompleto($proyecto->id, $torre, 'pruebas')) {
+                Log::info("✅ Pruebas completas → Activando retie y ritel");
+                $this->activarApartamentos($proyecto, $torre, 'retie', $hoy);
+                $this->activarApartamentos($proyecto, $torre, 'ritel', $hoy);
+            }
+        } else {
+            Log::info("⏳ Fundida NO completa en Proyecto {$proyecto->id}, Torre {$torre}");
         }
+    }
+
+    private function procesoCompleto(int $proyectoId, string $torre, string $proceso): bool
+    {
+        $proceso = strtolower(trim($proceso));
+
+        $pisos = ProyectosDetalle::where('proyecto_detalle.proyecto_id', $proyectoId)
+            ->where('proyecto_detalle.torre', $torre)
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+            ->select('proyecto_detalle.piso')
+            ->distinct()
+            ->pluck('piso');
+
+        foreach ($pisos as $piso) {
+            $incompletosEnPiso = ProyectosDetalle::where('proyecto_detalle.proyecto_id', $proyectoId)
+                ->where('proyecto_detalle.torre', $torre)
+                ->where('proyecto_detalle.piso', $piso)
+                ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+                ->where('proyecto_detalle.estado', '!=', 2)
+                ->count();
+
+            if ($incompletosEnPiso > 0) {
+                Log::warning("📋 Proceso '{$proceso}' Torre {$torre}, Piso {$piso} → Incompletos: {$incompletosEnPiso}");
+                return false;
+            }
+        }
+
+        Log::info("📋 Proceso '{$proceso}' en Torre {$torre} → TODOS los pisos completos");
+        return true;
+    }
+
+    private function procesosCompletos(int $proyectoId, string $torre, array $procesos): bool
+    {
+        foreach ($procesos as $proceso) {
+            if (!$this->procesoCompleto($proyectoId, $torre, $proceso)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function activarProcesosSimultaneos(Proyectos $proyecto, string $torre, array $procesos, Carbon $hoy): void
+    {
+        foreach ($procesos as $proceso) {
+            $this->activarApartamentos($proyecto, $torre, $proceso, $hoy);
+        }
+    }
+
+    // private function activarApartamentos(Proyectos $proyecto, string $torre, string $proceso, Carbon $hoy): void
+    // {
+    //     $proceso = strtolower(trim($proceso));
+
+    //     $aptosParaActivar = ProyectosDetalle::select('proyecto_detalle.*')
+    //         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //         ->where('proyecto_detalle.torre', $torre)
+    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+    //         ->where('proyecto_detalle.estado', 0)
+    //         ->orderBy('proyecto_detalle.piso')
+    //         ->orderBy('proyecto_detalle.consecutivo')
+    //         ->take($proyecto->activador_pordia_apt)
+    //         ->get();
+
+    //     Log::info("🚀 Intentando activar '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre} → Encontrados: " . $aptosParaActivar->count());
+
+    //     foreach ($aptosParaActivar as $apto) {
+    //         Log::info("    ➡ Apto {$apto->apartamento} (Piso {$apto->piso}) ID {$apto->id} → Estado actual: {$apto->estado}");
+    //         $apto->update([
+    //             'fecha_habilitado' => now(),
+    //             'estado' => 1,
+    //         ]);
+    //         Log::info("    ✅ Activado Apto {$apto->apartamento} en '{$proceso}'");
+    //     }
+    // }
+
+    private function activarApartamentos(Proyectos $proyecto, string $torre, string $proceso, Carbon $hoy): void
+{
+    $proceso = strtolower(trim($proceso));
+
+    // 🔹 Verificar si ya se habilitó hoy este proceso en esta torre
+    $yaActivadoHoy = ProyectosDetalle::join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+        ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+        ->where('proyecto_detalle.torre', $torre)
+        ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+        ->whereDate('proyecto_detalle.fecha_habilitado', $hoy->toDateString())
+        ->exists();
+
+    if ($yaActivadoHoy) {
+        Log::info("⏭ Ya se activó hoy el proceso '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre}. No se activa más.");
+        return;
+    }
+
+    // 🔹 Buscar apartamentos pendientes de activar (estado = 0)
+    $aptosParaActivar = ProyectosDetalle::select('proyecto_detalle.*')
+        ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+        ->where('proyecto_detalle.torre', $torre)
+        ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+        ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+        ->where('proyecto_detalle.estado', 0)
+        ->orderBy('proyecto_detalle.piso')
+        ->orderBy('proyecto_detalle.consecutivo')
+        ->take($proyecto->activador_pordia_apt)
+        ->get();
+
+    Log::info("🚀 Intentando activar '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre} → Encontrados: " . $aptosParaActivar->count());
+
+    foreach ($aptosParaActivar as $apto) {
+        Log::info("    ➡ Apto {$apto->apartamento} (Piso {$apto->piso}) ID {$apto->id} → Estado actual: {$apto->estado}");
+        $apto->update([
+            'fecha_habilitado' => now(),
+            'estado' => 1,
+        ]);
+        Log::info("    ✅ Activado Apto {$apto->apartamento} en '{$proceso}'");
+    }
+}
+
+
+    private function tieneFase2(int $proyectoId, string $torre): bool
+    {
+        return ProyectosDetalle::where('proyecto_id', $proyectoId)
+            ->where('torre', $torre)
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['aparateada fase 2'])
+            ->exists();
     }
 }
