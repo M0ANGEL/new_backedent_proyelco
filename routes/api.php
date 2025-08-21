@@ -210,6 +210,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
 
 
+    //kardex historico
+    Route::get('activos-historico', [KadexActivosController::class,'historico']); 
+
+
 
 
 
