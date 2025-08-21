@@ -149,6 +149,7 @@ class ProyectosController extends Controller
     }
 
 
+    //lo que se quiere es, que en el array de procesos numCambioProceso no este vacion, este no importa si es el proceso 1, ya que el no depende, pero los demas si, deben tener un numero, si no hay enviar error y no guardar
     public function store(Request $request)
     {
         DB::beginTransaction();
@@ -168,11 +169,21 @@ class ProyectosController extends Controller
                 'cant_pisos' /* => ['string','null'] */,
                 'apt' /* => ['string','null'] */,
                 'activador_pordia_apt' => ['required', 'string'],
-                'procesos' => ['required', 'array'],
+                'procesos' => ['required', 'array'], //tiene numero de numCambioProceso vacio de error
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            // 🚨 Validación personalizada de numCambioProceso
+            foreach ($request->procesos as $index => $proceso) {
+                if ($index > 0 && (empty($proceso['numCambioProceso']) || !is_numeric($proceso['numCambioProceso']))) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Error: El proceso '{$proceso['label']}' debe tener un número de cambio de piso válido.",
+                    ], 422);
+                }
             }
 
             $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
@@ -222,6 +233,7 @@ class ProyectosController extends Controller
                     }
                 }
             }
+
 
 
             // Datos base
@@ -388,22 +400,38 @@ class ProyectosController extends Controller
 
     public function show($id)
     {
-
-        $proyectos = DB::connection('mysql')
+        $proyecto = DB::connection('mysql')
             ->table('proyecto')
-            ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id') //relacion con los tipos de proyectos
-            ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id') //relacion con los clientes
+            ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
             ->where('proyecto.id', $id)
             ->select(
                 'proyecto.*',
                 'clientes.emp_nombre',
-                'clientes.nit',
+                'clientes.nit'
             )
             ->first();
 
+        // Ahora traemos todos los procesos relacionados con el proyecto
+        $procesos = DB::connection('mysql')
+            ->table('cambio_procesos_x_proyecto')
+            ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.proceso', '=', 'procesos_proyectos.id')
+            ->where('proyecto_id', $id)
+            ->select(
+                'cambio_procesos_x_proyecto.proyecto_id',
+                'cambio_procesos_x_proyecto.numero',
+                'cambio_procesos_x_proyecto.proceso',
+                'procesos_proyectos.nombre_proceso'
+            )
+            ->get();
 
-        return response()->json($proyectos, 200);
+        // Unimos todo en la respuesta
+        return response()->json([
+            'proyecto' => $proyecto,
+            'procesos' => $procesos
+        ], 200);
     }
+
 
 
     public function update(Request $request, $id)
@@ -419,6 +447,7 @@ class ProyectosController extends Controller
                 'codigo_proyecto' => ['required', 'string'],
                 'activador_pordia_apt' => ['required', 'string'],
                 'minimoApt' => ['required', 'string'],
+                'procesos' => ['required', 'array'],
             ]);
 
             if ($validator->fails()) {
@@ -458,6 +487,15 @@ class ProyectosController extends Controller
             $updateProyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
             $updateProyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
             $updateProyecto->save();
+
+            //actualizar procesos
+            // $datos es el array que recibes (el que tiene proceso y numero)
+            foreach ($request->procesos as $dato) {
+                CambioProcesoProyectos::where('proyecto_id', $updateProyecto->id)
+                    ->where('proceso', $dato['proceso'])
+                    ->update(['numero' => $dato['numero']]);
+            }
+
 
             return response()->json([
                 'status' => 'success',

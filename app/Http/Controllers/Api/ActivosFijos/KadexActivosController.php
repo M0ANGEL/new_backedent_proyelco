@@ -117,6 +117,7 @@ class KadexActivosController extends Controller
             $activoData->aceptacion = 1; //se pone el activo en estado 1 ya que esta en envio de aceptacion
             $activoData->usuarios_asignados = $request->filled('usuarios') ? json_encode($request->usuarios) : null;
             $activoData->ubicacion_destino_id = $request->ubicacion_destino;
+            $activoData->usuarios_confirmaron = null;
             $activoData->save();
 
 
@@ -219,26 +220,26 @@ class KadexActivosController extends Controller
     public function infoActivo($id)
     {
 
-        $clientes = DB::connection('mysql')
-            ->table('activo')
-            ->join('users', 'activo.user_id', '=', 'users.id')
+          $clientes = DB::connection('mysql')
+            ->table('kadex_activos')
+            ->join('users', 'kadex_activos.user_id', '=', 'users.id')
+            ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('kadex_activos', 'activo.id', '=', 'kadex_activos.activo_id')
             ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
             ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
             ->select(
-                'activo.*',
+                'kadex_activos.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
                 'bodega_origen.nombre as bodega_origen',
                 'bodega_destino.nombre as bodega_destino',
-                'kadex_activos.codigo_traslado',
-                'kadex_activos.usuarios_asignados',
-                'kadex_activos.usuarios_confirmaron'
+                'activo.numero_activo',
+                'activo.valor',
+                'activo.condicion',
             )
-            ->where('activo.id', $id)
+            ->where('kadex_activos.id',$id)
             ->get();
 
         foreach ($clientes as $proyecto) {
@@ -301,14 +302,12 @@ class KadexActivosController extends Controller
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
             ->join('bodegas_area as bodega_origen', 'activo.ubicacion_actual_id', '=', 'bodega_origen.id')
-            ->join('bodegas_area as bodega_destino', 'activo.ubicacion_destino_id', '=', 'bodega_destino.id')
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
                 'bodega_origen.nombre as bodega_actual',
-                'bodega_destino.nombre as bodega_destino',
             )
             ->where(function ($query) {
                 $userId = Auth::id();
@@ -325,7 +324,7 @@ class KadexActivosController extends Controller
 
     public function aceptarActivo($id)
     {
-        $userId = Auth::id();
+        $userId = (string) Auth::id(); // forzar a string
 
         $activo = Activo::where(function ($query) use ($userId) {
             $query->whereRaw("JSON_CONTAINS(usuarios_asignados, '\"$userId\"')");
@@ -337,13 +336,20 @@ class KadexActivosController extends Controller
         // actualizar estado
         $activo->aceptacion = 2;
 
-        // actualizar usuarios_confirmaron en formato ["id"]
+        // aseguramos que siempre sea un array
         $usuariosConfirmaron = $activo->usuarios_confirmaron ?? [];
 
+        // convertir todo a string
+        $usuariosConfirmaron = array_map('strval', $usuariosConfirmaron);
+
+        // agregar el user logueado si no está
         if (!in_array($userId, $usuariosConfirmaron)) {
             $usuariosConfirmaron[] = $userId;
         }
 
+        // actualizar ubicaciones y confirmaciones
+        $activo->ubicacion_actual_id = $activo->ubicacion_destino_id;
+        $activo->ubicacion_destino_id = null;
         $activo->usuarios_confirmaron = $usuariosConfirmaron;
 
         $activo->save();
@@ -351,6 +357,36 @@ class KadexActivosController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $activo
+        ]);
+    }
+
+     public function historico()
+    {
+        $clientes = DB::connection('mysql')
+            ->table('kadex_activos')
+            ->join('users', 'kadex_activos.user_id', '=', 'users.id')
+            ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
+            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
+            ->select(
+                'kadex_activos.*',
+                'users.nombre as usuario',
+                'categoria_activos.nombre as categoria',
+                'subcategoria_activos.nombre as subcategoria',
+                'bodega_origen.nombre as bodega_origen',
+                'bodega_destino.nombre as bodega_destino',
+                'activo.numero_activo',
+                'activo.valor',
+                'activo.condicion',
+            )
+            ->orderBy('id','asc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $clientes
         ]);
     }
 }

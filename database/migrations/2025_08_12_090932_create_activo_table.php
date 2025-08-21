@@ -28,7 +28,7 @@ return new class extends Migration
             $table->tinyInteger('estado')->default(1);
             $table->tinyInteger('aceptacion')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado 
             $table->unsignedBigInteger('ubicacion_actual_id'); //relacion con ubicacion
-            $table->unsignedBigInteger('ubicacion_destino_id')->default(); //relacion con ubicacion
+            $table->unsignedBigInteger('ubicacion_destino_id')->nullable(); //relacion con ubicacion
             
             //DATOS DE ASIGNACION DEL ACTIVO
             $table->json('usuarios_asignados')->nullable(); //quien se le asigna el activo
