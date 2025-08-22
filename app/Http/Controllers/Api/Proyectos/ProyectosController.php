@@ -17,8 +17,85 @@ use Illuminate\Support\Facades\Validator;
 
 class ProyectosController extends Controller
 {
+    // public function index()
+    // {
+    //     $proyectos = DB::table('proyecto')
+    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
+    //         ->select(
+    //             'proyecto.*',
+    //             'tipos_de_proyectos.nombre_tipo',
+    //             'clientes.emp_nombre'
+    //         )
+    //         ->get();
+
+    //     foreach ($proyectos as $proyecto) {
+    //         // Decodificar los IDs de encargados e ingenieros
+    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+
+    //         // Obtener los nombres desde la tabla de usuarios
+    //         $proyecto->nombresEncargados = DB::table('users')
+    //             ->whereIn('id', $encargadoIds)
+    //             ->pluck('nombre');
+
+    //         $proyecto->nombresIngenieros = DB::table('users')
+    //             ->whereIn('id', $ingenieroIds)
+    //             ->pluck('nombre');
+    //     }
+
+
+    //     // Calcular el porcentaje de atraso y avance para cada proyecto
+    //     foreach ($proyectos as $proyecto) {
+    //         $detalles = DB::connection('mysql')
+    //             ->table('proyecto_detalle')
+    //             ->where('proyecto_id', $proyecto->id)
+    //             ->where('orden_proceso', '!=', 1)
+    //             ->get();
+
+    //         // Cálculo de atraso
+    //         $totalEjecutando = $detalles->where('estado', 1)->count();
+    //         $totalTerminado = $detalles->where('estado', 2)->count();
+    //         $total = $totalEjecutando + $totalTerminado;
+
+    //         $porcentaje = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
+    //         $proyecto->porcentaje = round($porcentaje, 2);
+
+    //         // Cálculo de avance
+    //         // $totalApartamentos = $detalles->count();
+    //         // $apartamentosRealizados = $totalTerminado;
+
+    //         // $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
+    //         // $proyecto->avance = round($avance, 2);
+
+    //         foreach ($proyectos as $proyecto) {
+    //             $AVANCE = DB::connection('mysql')
+    //                 ->table('proyecto_detalle')
+    //                 ->where('proyecto_id', $proyecto->id)
+    //                 ->get();
+
+    //             $totalEjecutando = $AVANCE->where('estado', 1)->count();
+    //             $totalTerminado = $AVANCE->where('estado', 2)->count();
+    //             $total = $totalEjecutando + $totalTerminado;
+
+    //             // Cálculo del avance (nuevo)
+    //             $totalApartamentos = $AVANCE->count();
+    //             $apartamentosRealizados = $totalTerminado;
+
+    //             $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
+    //             $proyecto->avance = round($avance, 2);
+    //         }
+    //     }
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $proyectos
+    //     ]);
+    // }
+
     public function index()
     {
+        // Traer proyectos con joins básicos
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
@@ -29,62 +106,50 @@ class ProyectosController extends Controller
             )
             ->get();
 
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
+
         foreach ($proyectos as $proyecto) {
-            // Decodificar los IDs de encargados e ingenieros
-            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-
-            // Obtener los nombres desde la tabla de usuarios
-            $proyecto->nombresEncargados = DB::table('users')
-                ->whereIn('id', $encargadoIds)
-                ->pluck('nombre');
-
-            $proyecto->nombresIngenieros = DB::table('users')
-                ->whereIn('id', $ingenieroIds)
-                ->pluck('nombre');
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
         }
 
+        // 2️⃣ Obtener todos los usuarios de una sola consulta
+        $usuarios = DB::table('users')
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id'); // => [id => nombre]
 
-        // Calcular el porcentaje de atraso y avance para cada proyecto
+        // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+        $detalles = DB::table('proyecto_detalle')
+            ->whereIn('proyecto_id', $proyectos->pluck('id'))
+            ->get()
+            ->groupBy('proyecto_id');
+
+        // 4️⃣ Asignar nombres y cálculos a cada proyecto
         foreach ($proyectos as $proyecto) {
-            $detalles = DB::connection('mysql')
-                ->table('proyecto_detalle')
-                ->where('proyecto_id', $proyecto->id)
-                ->where('orden_proceso', '!=', 1)
-                ->get();
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Detalles del proyecto
+            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
             // Cálculo de atraso
-            $totalEjecutando = $detalles->where('estado', 1)->count();
-            $totalTerminado = $detalles->where('estado', 2)->count();
-            $total = $totalEjecutando + $totalTerminado;
+            $ejecutando = $detalleProyecto->where('estado', 1)->count();
+            $terminado = $detalleProyecto->where('estado', 2)->count();
+            $total = $ejecutando + $terminado;
 
-            $porcentaje = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
-            $proyecto->porcentaje = round($porcentaje, 2);
+            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
 
             // Cálculo de avance
-            // $totalApartamentos = $detalles->count();
-            // $apartamentosRealizados = $totalTerminado;
-
-            // $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-            // $proyecto->avance = round($avance, 2);
-
-            foreach ($proyectos as $proyecto) {
-                $AVANCE = DB::connection('mysql')
-                    ->table('proyecto_detalle')
-                    ->where('proyecto_id', $proyecto->id)
-                    ->get();
-
-                $totalEjecutando = $AVANCE->where('estado', 1)->count();
-                $totalTerminado = $AVANCE->where('estado', 2)->count();
-                $total = $totalEjecutando + $totalTerminado;
-
-                // Cálculo del avance (nuevo)
-                $totalApartamentos = $AVANCE->count();
-                $apartamentosRealizados = $totalTerminado;
-
-                $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-                $proyecto->avance = round($avance, 2);
-            }
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $terminado;
+            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
         }
 
         return response()->json([
@@ -92,6 +157,7 @@ class ProyectosController extends Controller
             'data' => $proyectos
         ]);
     }
+
 
     public function usuariosProyectos()
     {
