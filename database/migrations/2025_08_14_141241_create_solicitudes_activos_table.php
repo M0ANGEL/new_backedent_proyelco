@@ -17,8 +17,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('activo_id'); 
             $table->unsignedBigInteger('user_id'); 
+            $table->string('bodega_solicita'); 
             $table->string("motivo");
             $table->string("estado")->default(0); //estados de la solicitud 0 creada, 1 aceptada, 2 rechazada
+            $table->string("tipo_ubicacion"); 
             $table->timestamps();
             
             $table->foreign('activo_id')->references('id')->on('activo');

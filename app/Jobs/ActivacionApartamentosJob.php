@@ -144,6 +144,20 @@ class ActivacionApartamentosJob implements ShouldQueue
     // {
     //     $proceso = strtolower(trim($proceso));
 
+    //     // 🔹 Verificar si ya se habilitó hoy este proceso en esta torre
+    //     $yaActivadoHoy = ProyectosDetalle::join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+    //         ->where('proyecto_detalle.torre', $torre)
+    //         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+    //         ->whereDate('proyecto_detalle.fecha_habilitado', $hoy->toDateString())
+    //         ->exists();
+
+    //     if ($yaActivadoHoy) {
+    //         Log::info("⏭ Ya se activó hoy el proceso '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre}. No se activa más.");
+    //         return;
+    //     }
+
+    //     // 🔹 Buscar apartamentos pendientes de activar (estado = 0)
     //     $aptosParaActivar = ProyectosDetalle::select('proyecto_detalle.*')
     //         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
     //         ->where('proyecto_detalle.torre', $torre)
@@ -168,45 +182,60 @@ class ActivacionApartamentosJob implements ShouldQueue
     // }
 
     private function activarApartamentos(Proyectos $proyecto, string $torre, string $proceso, Carbon $hoy): void
-{
-    $proceso = strtolower(trim($proceso));
+    {
+        $proceso = strtolower(trim($proceso));
 
-    // 🔹 Verificar si ya se habilitó hoy este proceso en esta torre
-    $yaActivadoHoy = ProyectosDetalle::join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-        ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-        ->where('proyecto_detalle.torre', $torre)
-        ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
-        ->whereDate('proyecto_detalle.fecha_habilitado', $hoy->toDateString())
-        ->exists();
+        // 🔹 Verificar si ya se habilitó hoy este proceso en esta torre
+        $yaActivadoHoy = ProyectosDetalle::join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+            ->where('proyecto_detalle.torre', $torre)
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+            ->whereDate('proyecto_detalle.fecha_habilitado', $hoy->toDateString())
+            ->exists();
 
-    if ($yaActivadoHoy) {
-        Log::info("⏭ Ya se activó hoy el proceso '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre}. No se activa más.");
-        return;
+        if ($yaActivadoHoy) {
+            Log::info("⏭ Ya se activó hoy el proceso '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre}. No se activa más.");
+            return;
+        }
+
+        // 🚨 Nueva validación: si hay algún apartamento con validacion=1 y estado_validacion=0, NO activar
+        $hayPendientesValidacion = ProyectosDetalle::join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+            ->where('proyecto_detalle.torre', $torre)
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+            ->where('proyecto_detalle.validacion', 1)
+            ->where('proyecto_detalle.estado_validacion', 0)
+            ->exists();
+
+        if ($hayPendientesValidacion) {
+            Log::warning("⛔ No se activan aptos en '{$proceso}' → Hay apartamentos con validacion=1 y estado_validacion=0 en Proyecto {$proyecto->id}, Torre {$torre}");
+            return;
+        }
+
+        // 🔹 Buscar apartamentos pendientes de activar (estado = 0)
+        $aptosParaActivar = ProyectosDetalle::select('proyecto_detalle.*')
+            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+            ->where('proyecto_detalle.torre', $torre)
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
+            ->where('proyecto_detalle.estado', 0)
+            ->orderBy('proyecto_detalle.piso')
+            ->orderBy('proyecto_detalle.consecutivo')
+            ->take($proyecto->activador_pordia_apt)
+            ->get();
+
+        Log::info("🚀 Intentando activar '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre} → Encontrados: " . $aptosParaActivar->count());
+
+        foreach ($aptosParaActivar as $apto) {
+            Log::info("    ➡ Apto {$apto->apartamento} (Piso {$apto->piso}) ID {$apto->id} → Estado actual: {$apto->estado}");
+            $apto->update([
+                'fecha_habilitado' => now(),
+                'estado' => 1,
+            ]);
+            Log::info("    ✅ Activado Apto {$apto->apartamento} en '{$proceso}'");
+        }
     }
 
-    // 🔹 Buscar apartamentos pendientes de activar (estado = 0)
-    $aptosParaActivar = ProyectosDetalle::select('proyecto_detalle.*')
-        ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-        ->where('proyecto_detalle.torre', $torre)
-        ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-        ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$proceso])
-        ->where('proyecto_detalle.estado', 0)
-        ->orderBy('proyecto_detalle.piso')
-        ->orderBy('proyecto_detalle.consecutivo')
-        ->take($proyecto->activador_pordia_apt)
-        ->get();
-
-    Log::info("🚀 Intentando activar '{$proceso}' en Proyecto {$proyecto->id}, Torre {$torre} → Encontrados: " . $aptosParaActivar->count());
-
-    foreach ($aptosParaActivar as $apto) {
-        Log::info("    ➡ Apto {$apto->apartamento} (Piso {$apto->piso}) ID {$apto->id} → Estado actual: {$apto->estado}");
-        $apto->update([
-            'fecha_habilitado' => now(),
-            'estado' => 1,
-        ]);
-        Log::info("    ✅ Activado Apto {$apto->apartamento} en '{$proceso}'");
-    }
-}
 
 
     private function tieneFase2(int $proyectoId, string $torre): bool
