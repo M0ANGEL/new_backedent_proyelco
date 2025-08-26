@@ -12,13 +12,28 @@ use Illuminate\Support\Facades\Validator;
 
 class BodegasController extends Controller
 {
-    public function index()
+    public function index() 
     {
         //consulta a la bd los clientes
         $clientes = DB::connection('mysql')
             ->table('bodegas_area')
             ->join('users', 'bodegas_area.user_id', '=', 'users.id') // Se especifica users.user_id
             ->select('bodegas_area.*', 'users.nombre as usuario') 
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $clientes
+        ]);
+    }
+
+    public function obras() 
+    {
+        //consulta a la bd los clientes
+        $clientes = DB::connection('mysql')
+            ->table('proyecto')
+            ->select('id','descripcion_proyecto as nombre') 
+            ->where('estado',1)
             ->get();
 
         return response()->json([

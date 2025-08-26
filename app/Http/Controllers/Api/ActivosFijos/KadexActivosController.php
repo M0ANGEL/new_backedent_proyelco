@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Activo;
 use App\Models\CategoriaActivos;
 use App\Models\KadexActivosModel;
+use App\Models\SolicitudActivoModel;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -220,7 +221,7 @@ class KadexActivosController extends Controller
     public function infoActivo($id)
     {
 
-          $clientes = DB::connection('mysql')
+        $clientes = DB::connection('mysql')
             ->table('kadex_activos')
             ->join('users', 'kadex_activos.user_id', '=', 'users.id')
             ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
@@ -239,7 +240,7 @@ class KadexActivosController extends Controller
                 'activo.valor',
                 'activo.condicion',
             )
-            ->where('kadex_activos.id',$id)
+            ->where('kadex_activos.id', $id)
             ->get();
 
         foreach ($clientes as $proyecto) {
@@ -266,24 +267,20 @@ class KadexActivosController extends Controller
     {
         $clientes = DB::connection('mysql')
             ->table('activo')
-            ->join('users', 'activo.user_id', '=', 'users.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('kadex_activos', 'activo.id', '=', 'kadex_activos.activo_id')
-            ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
-            ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
+            ->join('bodegas_area as bodega_origen', 'activo.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->join('bodegas_area as bodega_destino', 'activo.ubicacion_destino_id', '=', 'bodega_destino.id')
             ->select(
                 'activo.*',
-                'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
                 'bodega_origen.nombre as bodega_origen',
                 'bodega_destino.nombre as bodega_destino',
-                'kadex_activos.codigo_traslado',
             )
             ->where(function ($query) {
                 $userId = Auth::id();
-                $query->whereRaw("JSON_CONTAINS(kadex_activos.usuarios_asignados, '\"$userId\"')");
+                $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
             })
             ->where('activo.aceptacion', 1)
             ->get();
@@ -296,23 +293,27 @@ class KadexActivosController extends Controller
 
     public function misActivos()
     {
+        $userId = Auth::id();
+
         $clientes = DB::connection('mysql')
             ->table('activo')
             ->join('users', 'activo.user_id', '=', 'users.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
             ->join('bodegas_area as bodega_origen', 'activo.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->leftJoin('solicitudes_activos', 'activo.id', '=', 'solicitudes_activos.activo_id') // 👈 left join para no perder activos
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
                 'bodega_origen.nombre as bodega_actual',
+                DB::raw("CASE 
+                        WHEN solicitudes_activos.estado = 0 THEN true 
+                        ELSE false 
+                     END as solicitud")
             )
-            ->where(function ($query) {
-                $userId = Auth::id();
-                $query->whereRaw("JSON_CONTAINS(activo.usuarios_confirmaron, '\"$userId\"')");
-            })
+            ->whereRaw("JSON_CONTAINS(activo.usuarios_confirmaron, '\"$userId\"')")
             ->where('activo.aceptacion', 2)
             ->get();
 
@@ -321,6 +322,7 @@ class KadexActivosController extends Controller
             'data' => $clientes
         ]);
     }
+
 
     public function aceptarActivo($id)
     {
@@ -360,7 +362,7 @@ class KadexActivosController extends Controller
         ]);
     }
 
-     public function historico()
+    public function historico()
     {
         $clientes = DB::connection('mysql')
             ->table('kadex_activos')
@@ -381,12 +383,78 @@ class KadexActivosController extends Controller
                 'activo.valor',
                 'activo.condicion',
             )
-            ->orderBy('id','asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         return response()->json([
             'status' => 'success',
             'data' => $clientes
         ]);
+    }
+
+    public function solicitarActivos()
+    {
+        $ActivosSolicitar = DB::connection('mysql')
+            ->table('activo')
+            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area as bodega_origen', 'activo.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->select(
+                'activo.*',
+                'categoria_activos.nombre as categoria',
+                'subcategoria_activos.nombre as subcategoria',
+                'bodega_origen.nombre as bodega_actual',
+            )
+            ->where(function ($query) {
+                $userId = Auth::id();
+                // Traer solo activos donde NO esté asignado este usuario
+                $query->whereRaw("NOT JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
+            })
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $ActivosSolicitar
+        ]);
+    }
+
+    public function envioSolicitudActivo(Request $request)
+    {
+
+        try {
+            $validator = Validator::make($request->all(), [
+                'id' => ['required'],
+                'observacion' => ['required'],
+                'ubicacion_destino' => ['required'],
+                'tipoUbicacion' => ['required'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            $user = Auth::user();
+
+            $solicitud = new SolicitudActivoModel();
+            $solicitud->activo_id = $request->id;
+            $solicitud->user_id = $user->id; //usuario quien crea el traslado
+            $solicitud->bodega_solicita = $request->ubicacion_destino;
+            $solicitud->motivo = $request->observacion;
+            $solicitud->tipo_ubicacion = $request->tipoUbicacion;
+            $solicitud->save();
+
+
+
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $solicitud
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'error ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
