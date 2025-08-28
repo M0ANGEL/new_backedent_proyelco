@@ -50,8 +50,8 @@ class AuthController extends Controller
             $cookie = cookie('cookie_token', $token, 60 * 24);
 
             // Registrar IP y ubicación
-            $ipaddress = json_decode(file_get_contents("http://www.geoplugin.net/json.gp?ip=" . $request->header('Public')));
-            Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: " . $request->header('Public') . " | Ciudad: $ipaddress->geoplugin_city | Departamento: $ipaddress->geoplugin_region | Lat: $ipaddress->geoplugin_latitude | Lon: $ipaddress->geoplugin_longitude");
+            // $ipaddress = json_decode(file_get_contents("http://www.geoplugin.net/json.gp?ip=" . $request->header('Public')));
+            // Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: " . $request->header('Public') . " | Ciudad: $ipaddress->geoplugin_city | Departamento: $ipaddress->geoplugin_region | Lat: $ipaddress->geoplugin_latitude | Lon: $ipaddress->geoplugin_longitude");
 
             // Registrar el inicio de sesión en la tabla de logs
             // $sessionLog = new UserSessionLogs();

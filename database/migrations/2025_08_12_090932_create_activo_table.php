@@ -27,8 +27,9 @@ return new class extends Migration
             $table->string("serial",100)->nullable();
             $table->tinyInteger('estado')->default(1);
             $table->tinyInteger('aceptacion')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado 
-            $table->unsignedBigInteger('ubicacion_actual_id'); //relacion con ubicacion
-            $table->unsignedBigInteger('ubicacion_destino_id')->nullable(); //relacion con ubicacion
+            $table->tinyInteger('tipo_ubicacion')->default(1); // 1 administrativas 2 obras
+            $table->string('ubicacion_actual_id',5); //relacion con ubicacion
+            $table->string('ubicacion_destino_id',5)->nullable(); //relacion con ubicacion
             
             //DATOS DE ASIGNACION DEL ACTIVO
             $table->json('usuarios_asignados')->nullable(); //quien se le asigna el activo
@@ -40,9 +41,6 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users');
             $table->foreign('categoria_id')->references('id')->on('categoria_activos');
             $table->foreign('subcategoria_id')->references('id')->on('subcategoria_activos');
-            $table->foreign('ubicacion_actual_id')->references('id')->on('bodegas_area');
-            $table->foreign('ubicacion_destino_id')->references('id')->on('bodegas_area');
-
         });
     }
 

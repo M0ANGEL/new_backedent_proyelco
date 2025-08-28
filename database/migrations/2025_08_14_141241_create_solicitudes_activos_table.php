@@ -17,6 +17,8 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('activo_id'); 
             $table->unsignedBigInteger('user_id'); 
+            $table->tinyInteger('tipo_ubicacion')->default(1); // 1 administrativas 2 obras
+            $table->string('bodega_solicita',5); 
             $table->string("motivo");
             $table->string("estado")->default(0); //estados de la solicitud 0 creada, 1 aceptada, 2 rechazada
             $table->timestamps();

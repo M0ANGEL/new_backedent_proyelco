@@ -188,6 +188,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //activos fijos
     Route::apiResource('bodega-areas', BodegasController::class);
+    Route::get('bodega-areas-obras', [BodegasController::class,'obras']);
     Route::apiResource('categorias-activos', CategoriaActivosController::class);
     Route::apiResource('subcategorias-activos', SubCategoriaActivosController::class);
     Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class,'SubcategoriaFiltrado']);
@@ -205,9 +206,14 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
 
     Route::get('administar-mis-activos', [KadexActivosController::class,'misActivos']); 
-    Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']); 
+    Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']);
     Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class,'aceptarActivo']); 
     Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+
+    //solicitar activo
+    Route::get('solicitar-activos', [KadexActivosController::class,'solicitarActivos']);   
+    Route::post('envio-solicitud-activo', [KadexActivosController::class,'envioSolicitudActivo']);   
+
 
 
     //kardex historico
