@@ -26,5 +26,6 @@ class Activo extends Model
         'serial',
         'observacion',
         'estado',
+        'tipo_ubicacion',
     ];
 }

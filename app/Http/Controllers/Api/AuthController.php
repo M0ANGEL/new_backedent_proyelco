@@ -15,9 +15,61 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
+    // public function login(Request $request)
+    // {
+    //     $credentials = $request->validate([
+    //         'username' => 'required',
+    //         'password' => 'required',
+    //     ]);
+
+    //     if (Auth::attempt($credentials)) {
+    //         $user = Auth::user();
+
+    //         // Validar si el usuario está activo
+    //         if ($user->estado != 1) {
+    //             return response()->json([
+    //                 'status' => 'error',
+    //                 'message' => 'Usuario inactivo, por favor contacta con el personal de TI',
+    //             ], 403);
+    //         }
+
+
+    //         // Verificar si ya tiene una sesión activa 
+    //         if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras","Directora Proyectos"])) {
+    //             return response()->json([
+    //                 'status' => 'error',
+    //                 'message' => 'El Usuario ya tiene una sesión activa en otro dispositivo o navegador',
+    //             ], 401);
+    //         }
+
+    //         // Crear token de acceso
+    //         $token = $user->createToken('token')->plainTextToken;
+    //         $cookie = cookie('cookie_token', $token, 60 * 24);
+
+    //         // Registrar IP y ubicación
+    //         $ipaddress = json_decode(file_get_contents("http://www.geoplugin.net/json.gp?ip=" . $request->header('Public')));
+    //         Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: " . $request->header('Public') . " | Ciudad: $ipaddress->geoplugin_city | Departamento: $ipaddress->geoplugin_region | Lat: $ipaddress->geoplugin_latitude | Lon: $ipaddress->geoplugin_longitude");
+
+    //         // Registrar el inicio de sesión en la tabla de logs
+    //         // $sessionLog = new UserSessionLogs();
+    //         // $sessionLog->user_id = $user->id;
+    //         // $sessionLog->start_session = now();
+    //         // $sessionLog->action = 'inicio de sesion';
+    //         // $sessionLog->save();
+
+    //         return response(["token" => $token], Response::HTTP_OK)->withoutCookie($cookie);
+    //     } else {
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'Credenciales incorrectas',
+    //         ], 404);
+    //     }
+    // }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -28,7 +80,6 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
 
-            // Validar si el usuario está activo
             if ($user->estado != 1) {
                 return response()->json([
                     'status' => 'error',
@@ -36,29 +87,27 @@ class AuthController extends Controller
                 ], 403);
             }
 
-
-            // Verificar si ya tiene una sesión activa 
-            if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras","Directora Proyectos"])) {
+            if (count($user->tokens) > 0 && in_array($user->rol, ["Encargado Obras", "Directora Proyectos"])) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'El Usuario ya tiene una sesión activa en otro dispositivo o navegador',
                 ], 401);
             }
 
-            // Crear token de acceso
             $token = $user->createToken('token')->plainTextToken;
             $cookie = cookie('cookie_token', $token, 60 * 24);
 
-            // Registrar IP y ubicación
-            $ipaddress = json_decode(file_get_contents("http://www.geoplugin.net/json.gp?ip=" . $request->header('Public')));
-            Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: " . $request->header('Public') . " | Ciudad: $ipaddress->geoplugin_city | Departamento: $ipaddress->geoplugin_region | Lat: $ipaddress->geoplugin_latitude | Lon: $ipaddress->geoplugin_longitude");
+            // ✅ Obtener IP pública desde el header o desde la request
+            $ip = $request->header('Public') ?? $request->ip();
 
-            // Registrar el inicio de sesión en la tabla de logs
-            // $sessionLog = new UserSessionLogs();
-            // $sessionLog->user_id = $user->id;
-            // $sessionLog->start_session = now();
-            // $sessionLog->action = 'inicio de sesion';
-            // $sessionLog->save();
+            // ✅ Llamada segura a GeoPlugin
+            $response = Http::get("https://www.geoplugin.net/json.gp", [
+                'ip' => $ip
+            ]);
+
+            $data = $response->ok() ? $response->json() : [];
+
+            Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: {$ip} | Ciudad: " . ($data['geoplugin_city'] ?? 'N/A') . " | Departamento: " . ($data['geoplugin_region'] ?? 'N/A') . " | Lat: " . ($data['geoplugin_latitude'] ?? 'N/A') . " | Lon: " . ($data['geoplugin_longitude'] ?? 'N/A'));
 
             return response(["token" => $token], Response::HTTP_OK)->withoutCookie($cookie);
         } else {
