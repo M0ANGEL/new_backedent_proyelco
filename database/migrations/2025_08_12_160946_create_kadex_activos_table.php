@@ -24,9 +24,7 @@ return new class extends Migration
             $table->tinyInteger('tipo_ubicacion')->default(1); // 1 administrativas 2 obras
             $table->string('ubicacion_actual_id',5); //relacion con ubicacion
             $table->string('ubicacion_destino_id',5)->nullable(); //relacion con ubicacion
-            $table->date('fecha_Aceptacion')->nullable();
             $table->string('observacion')->nullable();
-            $table->string('tipo')->nullable(); //los tipos de movimientos 1 traslados | 2 solicitud | 3 mantenimientos
             $table->timestamps();
 
             $table->foreign('activo_id')->references('id')->on('activo');

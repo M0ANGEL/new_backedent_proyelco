@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\NombreTorres;
@@ -283,7 +284,6 @@ class ProyectosController extends Controller
     }
 
 
-    //lo que se quiere es, que en el array de procesos numCambioProceso no este vacion, este no importa si es el proceso 1, ya que el no depende, pero los demas si, deben tener un numero, si no hay enviar error y no guardar
     public function store(Request $request)
     {
         DB::beginTransaction();
@@ -655,6 +655,13 @@ class ProyectosController extends Controller
     public function infoCard()
     {
         $usuario = Auth::user();
+        $activos = Activo::where(function ($query) {
+            $userId = Auth::id();
+            $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
+        })
+            ->where('estado', 1)
+            ->where('aceptacion', 1)
+            ->count();
 
         switch ($usuario->rol) {
             case 'Administrador':
@@ -674,6 +681,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -700,6 +708,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -740,6 +749,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -777,6 +787,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
