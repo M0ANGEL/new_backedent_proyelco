@@ -68,13 +68,26 @@ class ActivosController extends Controller
             $cliente->ubicacion_actual_id = $request->ubicacion_actual;
             $cliente->save(); // se guarda para obtener el ID
 
-            
+
 
             // Si hay archivo, lo guardamos usando el ID como nombre
             if ($request->hasFile('file')) {
+                // Validar que solo sean jpg o png
+                $request->validate([
+                    'file' => 'mimes:jpg,jpeg,png|max:2048' // máximo 2 MB (ajústalo si quieres)
+                ]);
+
                 $extension = $request->file('file')->getClientOriginalExtension();
-                $request->file('file')->storeAs('public/activos', $cliente->id . '.' . $extension);
+
+                // Forzar que solo guarde como .jpg o .png
+                if (in_array(strtolower($extension), ['jpg', 'jpeg', 'png'])) {
+                    $request->file('file')->storeAs(
+                        'public/activos',
+                        $cliente->id . '.' . $extension
+                    );
+                }
             }
+
 
             return response()->json([
                 'status' => 'success',
@@ -91,13 +104,12 @@ class ActivosController extends Controller
     public function show($id)
     {
         return response()->json(Activo::find($id), 200);
-        
     }
 
     public function update(Request $request, $id)
     {
         try {
-             $validator = Validator::make($request->all(), [
+            $validator = Validator::make($request->all(), [
                 'categoria_id' => ['required'],
                 'subcategoria_id' => ['required'],
                 'numero_activo' => ['required', 'string'],
@@ -169,18 +181,32 @@ class ActivosController extends Controller
     public function verActivoQR($id)
     {
 
+        
+
         $activo = DB::connection('mysql')
             ->table('activo')
             ->join('users', 'activo.user_id', '=', 'users.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.categoria_id', '=', 'subcategoria_activos.id')
-            ->join('bodegas_area', 'activo.ubicacion_id', '=', 'bodegas_area.id')
+            ->leftJoin('bodegas_area', function ($join) {
+                $join->on('activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+                    ->where('activo.tipo_ubicacion', 1); // solo si es bodega
+            })
+            ->leftJoin('proyecto', function ($join) {
+                $join->on('activo.ubicacion_actual_id', '=', 'proyecto.id')
+                    ->where('activo.tipo_ubicacion', 2); // solo si es proyecto
+            })
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
-                'bodegas_area.nombre as ubicacion',
+                DB::raw("
+                CASE 
+                    WHEN activo.tipo_ubicacion = 1 THEN bodegas_area.nombre
+                    WHEN activo.tipo_ubicacion = 2 THEN proyecto.descripcion_proyecto
+                END as ubicacion
+            "),
             )
             ->where('activo.id', $id)
             ->first($id);
