@@ -34,6 +34,7 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
+use App\Models\ProyectosDetalle;
 
 /*
 |--------------------------------------------------------------------------
@@ -218,6 +219,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //kardex historico
     Route::get('activos-historico', [KadexActivosController::class,'historico']); 
+
+    //nomenclaturas de proyes
+    Route::get('nomenclaturas/{id}',[ProyectosController::class,'nomenclaturas']);
+    Route::post('ActualizarNomenclaturas',[ProyectosController::class,'ActualizarNomenclaturas']);
 
 
 
