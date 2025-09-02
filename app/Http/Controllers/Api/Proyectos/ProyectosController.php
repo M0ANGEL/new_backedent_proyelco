@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\NombreTorres;
@@ -13,150 +14,11 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ProyectosController extends Controller
 {
-    // public function index()
-    // {
-    //     $proyectos = DB::table('proyecto')
-    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
-    //         ->select(
-    //             'proyecto.*',
-    //             'tipos_de_proyectos.nombre_tipo',
-    //             'clientes.emp_nombre'
-    //         )
-    //         ->get();
-
-    //     foreach ($proyectos as $proyecto) {
-    //         // Decodificar los IDs de encargados e ingenieros
-    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-
-    //         // Obtener los nombres desde la tabla de usuarios
-    //         $proyecto->nombresEncargados = DB::table('users')
-    //             ->whereIn('id', $encargadoIds)
-    //             ->pluck('nombre');
-
-    //         $proyecto->nombresIngenieros = DB::table('users')
-    //             ->whereIn('id', $ingenieroIds)
-    //             ->pluck('nombre');
-    //     }
-
-
-    //     // Calcular el porcentaje de atraso y avance para cada proyecto
-    //     foreach ($proyectos as $proyecto) {
-    //         $detalles = DB::connection('mysql')
-    //             ->table('proyecto_detalle')
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->where('orden_proceso', '!=', 1)
-    //             ->get();
-
-    //         // Cálculo de atraso
-    //         $totalEjecutando = $detalles->where('estado', 1)->count();
-    //         $totalTerminado = $detalles->where('estado', 2)->count();
-    //         $total = $totalEjecutando + $totalTerminado;
-
-    //         $porcentaje = $total > 0 ? ($totalEjecutando / $total) * 100 : 0;
-    //         $proyecto->porcentaje = round($porcentaje, 2);
-
-    //         // Cálculo de avance
-    //         // $totalApartamentos = $detalles->count();
-    //         // $apartamentosRealizados = $totalTerminado;
-
-    //         // $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-    //         // $proyecto->avance = round($avance, 2);
-
-    //         foreach ($proyectos as $proyecto) {
-    //             $AVANCE = DB::connection('mysql')
-    //                 ->table('proyecto_detalle')
-    //                 ->where('proyecto_id', $proyecto->id)
-    //                 ->get();
-
-    //             $totalEjecutando = $AVANCE->where('estado', 1)->count();
-    //             $totalTerminado = $AVANCE->where('estado', 2)->count();
-    //             $total = $totalEjecutando + $totalTerminado;
-
-    //             // Cálculo del avance (nuevo)
-    //             $totalApartamentos = $AVANCE->count();
-    //             $apartamentosRealizados = $totalTerminado;
-
-    //             $avance = $totalApartamentos > 0 ? ($apartamentosRealizados / $totalApartamentos) * 100 : 0;
-    //             $proyecto->avance = round($avance, 2);
-    //         }
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $proyectos
-    //     ]);
-    // }
-
-    // public function index()
-    // {
-    //     // Traer proyectos con joins básicos
-    //     $proyectos = DB::table('proyecto')
-    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
-    //         ->select(
-    //             'proyecto.*',
-    //             'tipos_de_proyectos.nombre_tipo',
-    //             'clientes.emp_nombre'
-    //         )
-    //         ->get();
-
-    //     // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
-    //     $encargadoIdsGlobal = [];
-    //     $ingenieroIdsGlobal = [];
-
-    //     foreach ($proyectos as $proyecto) {
-    //         $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
-    //         $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
-    //     }
-
-    //     // 2️⃣ Obtener todos los usuarios de una sola consulta
-    //     $usuarios = DB::table('users')
-    //         ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
-    //         ->pluck('nombre', 'id'); // => [id => nombre]
-
-    //     // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
-    //     $detalles = DB::table('proyecto_detalle')
-    //         ->whereIn('proyecto_id', $proyectos->pluck('id'))
-    //         ->get()
-    //         ->groupBy('proyecto_id');
-
-    //     // 4️⃣ Asignar nombres y cálculos a cada proyecto
-    //     foreach ($proyectos as $proyecto) {
-    //         // Encargados
-    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-    //         $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-    //         // Ingenieros
-    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-    //         $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-    //         // Detalles del proyecto
-    //         $detalleProyecto = $detalles[$proyecto->id] ?? collect();
-
-    //         // Cálculo de atraso
-    //         $ejecutando = $detalleProyecto->where('estado', 1)->count();
-    //         $terminado = $detalleProyecto->where('estado', 2)->count();
-    //         $total = $ejecutando + $terminado;
-
-    //         $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
-
-    //         // Cálculo de avance
-    //         $totalApartamentos = $detalleProyecto->count();
-    //         $apartamentosRealizados = $terminado;
-    //         $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $proyectos
-    //     ]);
-    // }
 
     public function index()
     {
@@ -226,7 +88,6 @@ class ProyectosController extends Controller
         ]);
     }
 
-
     public function usuariosProyectos()
     {
         //consulta a la bd los proyectos
@@ -282,8 +143,6 @@ class ProyectosController extends Controller
         ]);
     }
 
-
-    //lo que se quiere es, que en el array de procesos numCambioProceso no este vacion, este no importa si es el proceso 1, ya que el no depende, pero los demas si, deben tener un numero, si no hay enviar error y no guardar
     public function store(Request $request)
     {
         DB::beginTransaction();
@@ -531,7 +390,6 @@ class ProyectosController extends Controller
         }
     }
 
-
     public function show($id)
     {
         $proyecto = DB::connection('mysql')
@@ -565,8 +423,6 @@ class ProyectosController extends Controller
             'procesos' => $procesos
         ], 200);
     }
-
-
 
     public function update(Request $request, $id)
     {
@@ -655,6 +511,13 @@ class ProyectosController extends Controller
     public function infoCard()
     {
         $usuario = Auth::user();
+        $activos = Activo::where(function ($query) {
+            $userId = Auth::id();
+            $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
+        })
+            ->where('estado', 1)
+            ->where('aceptacion', 1)
+            ->count();
 
         switch ($usuario->rol) {
             case 'Administrador':
@@ -674,6 +537,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -700,6 +564,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -740,6 +605,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -777,6 +643,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -791,7 +658,6 @@ class ProyectosController extends Controller
                 break;
         }
     }
-
 
     public function PorcentajeDetalles(Request $request)
     {
@@ -867,5 +733,83 @@ class ProyectosController extends Controller
                 'porcentajeXProceso' => $porcentajeXProceso,
             ],
         ], 200);
+    }
+
+    /* si hay estos apartamenots 201 202 enotnces siginifica que hay 2, estos dos los debes poner en apt_piso */
+    public function nomenclaturas($id)
+    {
+        $data = ProyectosDetalle::where('proyecto_id', $id)
+            ->where('orden_proceso', 1)
+            ->select(
+                'id',
+                'proyecto_id',
+                'torre',
+                'piso',
+                'apartamento',
+                'consecutivo'
+            )
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data
+        ]);
+    }
+
+    //actualizar la nomenclaturas
+
+    public function ActualizarNomenclaturas(Request $request)
+    {
+        $desde = (int) $request->input('apt_inicio');
+        $hasta = (int) $request->input('apt_fin');
+        $nuevoInicio = (int) $request->input('nuevo_inicio');
+        $proyecto = (int) $request->input('id');
+        $torre = $request->input('torre');
+        $piso = $request->input('piso');
+        $usuario = Auth::id();
+
+
+        $consecutivos = DB::table('proyecto_detalle')
+            ->select('consecutivo')
+            ->whereBetween('consecutivo', [$desde, $hasta])
+            ->where('proyecto_id', $proyecto)
+            ->where('torre', $torre)
+            ->where('piso', $piso)
+            ->distinct()
+            ->orderBy('consecutivo')
+            ->pluck('consecutivo');
+
+
+
+        if ($consecutivos->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Rango no válido',
+            ], 500);
+        }
+
+
+        Log::channel('consecutivos')->info("Usuario-modifica: $usuario Torre $torre Piso $piso Actualizando consecutivos de $desde a $hasta → empezando en $nuevoInicio");
+
+
+
+
+        foreach ($consecutivos as $index => $original) {
+            $nuevo = $nuevoInicio + $index;
+
+            DB::table('proyecto_detalle')
+                ->where('consecutivo', $original)
+                ->where('proyecto_id', $proyecto)
+                ->where('torre', $torre)
+                ->where('piso', $piso)
+                ->update(['consecutivo' => $nuevo]);
+
+            info("✔️  $original → $nuevo");
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => '¡Consecutivos actualizados correctamente!',
+        ]);
     }
 }
