@@ -171,6 +171,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //cargue masivos
     Route::post('cargueEmpleados', [CarguesMasivosCotroller::class, 'cargueEmpleados']);
+    Route::post('cargueUpdateProyecto', [CarguesMasivosCotroller::class, 'cargueUpdateProyecto']);
 
 
     //fin cargue masivos
