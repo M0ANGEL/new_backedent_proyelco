@@ -211,7 +211,7 @@ class CarguesMasivosCotroller extends Controller
                 }
 
                 $datosInsertar[] = [
-                    'user_id'         => $fila[0],
+                    'user_id'         => $fila[0] ?  $fila[0] : null,
                     'proyecto_id'     => $fila[1],
                     'torre'           => $fila[2],
                     'piso'            => $fila[3],
@@ -219,7 +219,7 @@ class CarguesMasivosCotroller extends Controller
                     'consecutivo'     => $fila[5],
                     'orden_proceso'  => $fila[6],
                     'procesos_proyectos_id'     => $fila[7],
-                    'text_validaicon' => $fila[8],
+                    'text_validaicon' => $fila[8] ?  $fila[8] : null,
                     'estado'          => $fila[9],
                     'fecha_habilitado'=>  now(),
                     'validacion'      => $fila[10],
