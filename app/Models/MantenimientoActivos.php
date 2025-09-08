@@ -17,5 +17,6 @@ class MantenimientoActivos extends Model
         'fecha_inicio',
         'fecha_fin',
         'observacion',
+        'user_id',
     ];
 }

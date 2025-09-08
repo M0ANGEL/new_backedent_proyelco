@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ActivosFijos\ActivosController;
 use App\Http\Controllers\Api\ActivosFijos\BodegasController;
 use App\Http\Controllers\Api\ActivosFijos\CategoriaActivosController;
 use App\Http\Controllers\Api\ActivosFijos\KadexActivosController;
+use App\Http\Controllers\Api\ActivosFijos\MantenimientoActivosController;
 use App\Http\Controllers\Api\ActivosFijos\MisActivosController;
 use App\Http\Controllers\Api\ActivosFijos\SubCategoriaActivosController;
 use App\Http\Controllers\Api\AuthController;
@@ -34,6 +35,7 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
+use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
 /*
@@ -196,6 +198,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class,'SubcategoriaFiltrado']);
 
     Route::apiResource('administar-activos', ActivosController::class); 
+    Route::get('administar-activosBaja', [ActivosController::class,'indexActivosBaja']); 
     Route::get('usuariosAsignacion', [ActivosController::class,'usuariosAsignacion']);
 
     Route::get('mis-activos-pendientes', [MisActivosController::class,'index']); 
@@ -210,11 +213,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('administar-mis-activos', [KadexActivosController::class,'misActivos']); 
     Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']);
     Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class,'aceptarActivo']); 
+    Route::post('activo-rechazarActivo', [KadexActivosController::class,'rechazarActivo']); 
     Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
 
     //solicitar activo
     Route::get('solicitar-activos', [KadexActivosController::class,'solicitarActivos']);   
     Route::post('envio-solicitud-activo', [KadexActivosController::class,'envioSolicitudActivo']);   
+    Route::post('liberar-activos', [KadexActivosController::class,'liberarActivos']);   
 
 
 
@@ -224,6 +229,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //nomenclaturas de proyes
     Route::get('nomenclaturas/{id}',[ProyectosController::class,'nomenclaturas']);
     Route::post('ActualizarNomenclaturas',[ProyectosController::class,'ActualizarNomenclaturas']);
+
+    //mantenimiento activos
+    Route::apiResource('administra-mantenimiento-activos', MantenimientoActivosController::class);
+    Route::get('activosBodegaPrincipal',[ MantenimientoActivosController::class,'activosBodegaPrincipal']);
+
+    //notificacions de obras isn movimientos mas de un dia
+    Route::get('obras-sin-movimientos',[ProyectosController::class,'obrasSinMovimientos']);
 
 
 

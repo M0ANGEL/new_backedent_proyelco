@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
+use App\Models\Festivos;
 use App\Models\NombreTorres;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
@@ -511,13 +512,13 @@ class ProyectosController extends Controller
     public function infoCard()
     {
         $usuario = Auth::user();
-        $activos = Activo::where(function ($query) {
-            $userId = Auth::id();
-            $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
-        })
-            ->where('estado', 1)
-            ->where('aceptacion', 1)
-            ->count();
+        // $activos = Activo::where(function ($query) {
+        //     $userId = Auth::id();
+        //     $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
+        // })
+        //     ->where('estado', 1)
+        //     ->where('aceptacion', 1)
+        //     ->count();
 
         switch ($usuario->rol) {
             case 'Administrador':
@@ -537,7 +538,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        'activos_pendinetes' => $activos,
+                        // 'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -564,7 +565,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        'activos_pendinetes' => $activos,
+                        // 'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -605,7 +606,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        'activos_pendinetes' => $activos,
+                        // 'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -643,7 +644,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        'activos_pendinetes' => $activos,
+                        // 'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -810,6 +811,60 @@ class ProyectosController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => '¡Consecutivos actualizados correctamente!',
+        ]);
+    }
+
+    //alertar de proyectos sin movimientos
+    public function obrasSinMovimientos()
+    {
+        $festivos = Festivos::pluck('festivo_fecha')->toArray();
+        $hoy = Carbon::now();
+
+        $resultado = [];
+
+        // Obtener todos los proyectos
+        $proyectos = Proyectos::where('estado','=',1)->get();
+
+        foreach ($proyectos as $proyecto) {
+            $ultimoDetalle = $proyecto->detalles()
+                ->whereNotNull('fecha_fin')
+                ->orderByDesc('fecha_fin')
+                ->first();
+
+            if (!$ultimoDetalle) {
+                continue;
+            }
+
+            $ultimaFechaFin = Carbon::parse($ultimoDetalle->fecha_fin);
+            $diasHabiles = 0;
+            $fechaTemp = $ultimaFechaFin->copy();
+
+            // Contar días hábiles desde la última fecha_fin hasta hoy
+            while ($fechaTemp->lt($hoy)) {
+                $fechaTemp->addDay();
+                if (
+                    !$fechaTemp->isSunday() &&
+                    !in_array($fechaTemp->format('Y-m-d'), $festivos)
+                ) {
+                    $diasHabiles++;
+                }
+            }
+
+            // Si tiene 1 día hábil de inactividad, lo agregamos al resultado
+            if ($diasHabiles >= 1) {
+                $resultado[] = [
+                    'proyecto_id'   => $proyecto->id,
+                    'descripcion'   => $proyecto->descripcion_proyecto,
+                    'ultima_fecha'  => $ultimaFechaFin->format('Y-m-d'),
+                    'dias_inactivo' => $diasHabiles,
+                ];
+            }
+        }
+
+
+         return response()->json([
+            'status' => 'success',
+            'data' => $resultado
         ]);
     }
 }

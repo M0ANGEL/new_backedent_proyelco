@@ -20,15 +20,19 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id'); //quien crea la asignacion
             $table->json('usuarios_asignados')->nullable(); //quien se le asigna el activo
             $table->json('usuarios_confirmaron')->nullable(); //quien se le asigna el activo
-            $table->tinyInteger('aceptacion')->default(1); //aceptacion del activo, 0 sin asignar, 1 asignado, 2 aceptado
+            $table->tinyInteger('aceptacion')->default(1); //aceptacion del activo, 0 sin asignar, 1 asignado, 2 aceptado, 3 rechazado
             $table->tinyInteger('tipo_ubicacion')->default(1); // 1 administrativas 2 obras
             $table->string('ubicacion_actual_id',5); //relacion con ubicacion
             $table->string('ubicacion_destino_id',5)->nullable(); //relacion con ubicacion
             $table->string('observacion')->nullable();
+            $table->string('observacion_rachazo')->nullable();
+            $table->unsignedBigInteger('userRechaza_id')->nullable(); //quien rechaza el activo
+
             $table->timestamps();
 
             $table->foreign('activo_id')->references('id')->on('activo');
             $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('userRechaza_id')->references('id')->on('users');
         });
     }
 
