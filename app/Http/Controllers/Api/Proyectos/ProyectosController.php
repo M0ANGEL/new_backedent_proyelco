@@ -851,7 +851,7 @@ class ProyectosController extends Controller
             }
 
             // Si tiene 1 día hábil de inactividad, lo agregamos al resultado
-            if ($diasHabiles >= 1) {
+            if ($diasHabiles >= 2) {
                 $resultado[] = [
                     'proyecto_id'   => $proyecto->id,
                     'descripcion'   => $proyecto->descripcion_proyecto,
