@@ -516,9 +516,9 @@ class ProyectosController extends Controller
         //     $userId = Auth::id();
         //     $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
         // })
-            ->where('estado', 1)
-            ->where('aceptacion', 1)
-            ->count();
+        //     ->where('estado', 1)
+        //     ->where('aceptacion', 1)
+        //     ->count();
 
         switch ($usuario->rol) {
             case 'Administrador':
