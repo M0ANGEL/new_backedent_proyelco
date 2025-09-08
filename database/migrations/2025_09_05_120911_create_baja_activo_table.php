@@ -13,15 +13,17 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('categoria_activos', function (Blueprint $table) {
+        Schema::create('baja_activo', function (Blueprint $table) {
             $table->id();
-            $table->string("prefijo",5)->unique();
-            $table->string("nombre");
-            $table->tinyInteger('estado')->default(1);
-            $table->unsignedBigInteger('user_id')->nullable(); //quien crea la categoria
+            $table->date("fecha_baja");
+            $table->string("observaciones");
+            $table->unsignedBigInteger('activo_id')->nullable(); //relacion con activos
+            $table->unsignedBigInteger('user_id')->nullable(); //relacion con usuario que da debaja
             $table->timestamps();
 
+            $table->foreign('activo_id')->references('id')->on('activo');
             $table->foreign('user_id')->references('id')->on('users');
+
         });
     }
 
@@ -32,6 +34,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('categoria_activos');
+        Schema::dropIfExists('baja_activo');
     }
 };

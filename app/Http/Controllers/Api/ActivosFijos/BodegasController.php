@@ -42,7 +42,6 @@ class BodegasController extends Controller
         ]);
     }
 
-
     public function store(Request $request)
     {
         try {
@@ -76,7 +75,6 @@ class BodegasController extends Controller
             ], 500);
         }
     }
-
 
     public function show($id)
     {
@@ -116,7 +114,6 @@ class BodegasController extends Controller
             ], 500);
         }
     }
-
 
     public function destroy($id)
     {

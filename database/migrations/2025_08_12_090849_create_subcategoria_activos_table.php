@@ -16,7 +16,6 @@ return new class extends Migration
         Schema::create('subcategoria_activos', function (Blueprint $table) {
             $table->id();
             $table->string("nombre");
-            $table->string("descripcion");
             $table->tinyInteger('estado')->default(1);
             $table->unsignedBigInteger('user_id')->nullable(); //quien crea la categoria
             $table->unsignedBigInteger('categoria_id')->nullable(); //relacion con categorias
