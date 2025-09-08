@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class ActivosController extends Controller
 {
@@ -22,13 +23,55 @@ class ActivosController extends Controller
             ->join('users', 'activo.user_id', '=', 'users.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
-                'subcategoria_activos.nombre as subcategoria'
+                'subcategoria_activos.nombre as subcategoria',
+                'bodegas_area.nombre as bodega_actual'
             )
+            ->where('activo.estado', 1)
             ->get();
+
+        foreach ($clientes as $proyecto) {
+            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+            $proyecto->usuariosAsignados = DB::table('users')
+                ->whereIn('id', $encargadoIds)
+                ->pluck('nombre');
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $clientes
+        ]);
+    }
+
+    public function indexActivosBaja()
+    {
+        //consulta a la bd los clientes
+        $clientes = DB::connection('mysql')
+            ->table('activo')
+            ->join('users', 'activo.user_id', '=', 'users.id')
+            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+            ->select(
+                'activo.*',
+                'users.nombre as usuario',
+                'categoria_activos.nombre as categoria',
+                'subcategoria_activos.nombre as subcategoria',
+                'bodegas_area.nombre as bodega_actual'
+            )
+            ->where('activo.estado', 0)
+            ->get();
+
+        foreach ($clientes as $proyecto) {
+            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+            $proyecto->usuariosAsignados = DB::table('users')
+                ->whereIn('id', $encargadoIds)
+                ->pluck('nombre');
+        }
 
         return response()->json([
             'status' => 'success',
@@ -45,27 +88,41 @@ class ActivosController extends Controller
                 'numero_activo' => ['required', 'string'],
                 'valor' => ['required', 'string'],
                 'condicion' => ['required'],
-                'ubicacion_actual' => ['required'],
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
+            //validacion si el prefijo existe
+            $existePrefijo = Activo::where('numero_activo', $request->numero_activo)->exists();
+
+            if ($existePrefijo) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Numero de activo en uso',
+                ], 500);
+            }
+
             $user = Auth::user();
 
             $cliente = new Activo();
+            $cliente->tipo_activo = $request->tipo_activo;
+            $cliente->origen_activo = $request->origen_activo;
+            $cliente->proveedor_activo = $request->proveedor;
             $cliente->numero_activo = $request->numero_activo;
             $cliente->categoria_id = $request->categoria_id;
             $cliente->subcategoria_id = $request->subcategoria_id;
             $cliente->user_id = $user->id;
             $cliente->descripcion = $request->descripcion ? $request->descripcion : "..";
             $cliente->valor = $request->valor;
-            $cliente->fecha_fin_garantia = Carbon::parse($request->fecha_fin_garantia)->format('Y-m-d');
+            $cliente->fecha_aquiler = $request->origen_activo == 1  ? null : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
+            $cliente->fecha_compra = $request->origen_activo == 1  ? Carbon::parse($request->fecha_compra)->format('Y-m-d')  : null;
             $cliente->condicion = $request->condicion;
             $cliente->marca = $request->marca ? $request->marca : null;
             $cliente->serial = $request->serial ? $request->serial : null;
-            $cliente->ubicacion_actual_id = $request->ubicacion_actual;
+            // $cliente->ubicacion_actual_id = $request->ubicacion_actual;
+            $cliente->ubicacion_actual_id = 1;
             $cliente->save(); // se guarda para obtener el ID
 
 
@@ -74,7 +131,7 @@ class ActivosController extends Controller
             if ($request->hasFile('file')) {
                 // Validar que solo sean jpg o png
                 $request->validate([
-                    'file' => 'mimes:jpg,jpeg,png|max:2048' // máximo 2 MB (ajústalo si quieres)
+                    'file' => 'mimes:jpg,jpeg,png|max:2048' // máximo 2 MB 
                 ]);
 
                 $extension = $request->file('file')->getClientOriginalExtension();
@@ -122,29 +179,57 @@ class ActivosController extends Controller
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // validar que el codigo del proyecto no este usado por otro
+            // Validar que el numero de activo sea único
             $proyectoUnico = Activo::where('numero_activo', $request->numero_activo)
                 ->where('id', '!=', $id)
                 ->first();
             if ($proyectoUnico) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Este numero de activo ya esta registrado:   ',
+                    'message' => 'Error: Este numero de activo ya esta registrado',
                 ], 404);
             }
 
-            $cliente = new Activo();
+            // 👇 OJO: obtener el registro existente
+            $cliente = Activo::findOrFail($id);
+
+            // Actualizar campos
             $cliente->numero_activo = $request->numero_activo;
             $cliente->categoria_id = $request->categoria_id;
             $cliente->subcategoria_id = $request->subcategoria_id;
-            $cliente->descripcion = $request->descripcion ? $request->descripcion : "..";
+            $cliente->descripcion = $request->descripcion ?: "..";
             $cliente->valor = $request->valor;
-            $cliente->fecha_fin_garantia = Carbon::parse($request->fecha_fin_garantia)->format('Y-m-d');
+            $cliente->fecha_compra = $request->origen_activo == 1
+                ? Carbon::parse($request->fecha_compra)->format('Y-m-d')
+                : null;
+            $cliente->fecha_aquiler = $request->origen_activo == 1
+                ? null
+                : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
             $cliente->condicion = $request->condicion;
             $cliente->ubicacion_actual_id = $request->ubicacion_actual;
-            $cliente->marca = $request->marca ? $request->marca : null;
-            $cliente->serial = $request->serial ? $request->serial : null;
-            $cliente->save(); // se guarda para obtener el ID
+            $cliente->marca = $request->marca ?: null;
+            $cliente->serial = $request->serial ?: null;
+            $cliente->save();
+
+            // Manejo de imagen
+            if ($request->hasFile('file')) {
+                $request->validate([
+                    'file' => 'mimes:jpg,jpeg,png|max:2048'
+                ]);
+
+                // Eliminar anteriores (si existen)
+                $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
+                foreach ($oldFiles as $oldFile) {
+                    @unlink($oldFile);
+                }
+
+                // Guardar nueva
+                $extension = strtolower($request->file('file')->getClientOriginalExtension());
+                $request->file('file')->storeAs(
+                    'public/activos',
+                    $cliente->id . '.' . $extension
+                );
+            }
 
             return response()->json([
                 'status' => 'success',
@@ -169,7 +254,7 @@ class ActivosController extends Controller
 
     public function usuariosAsignacion()
     {
-        $datos = User::select('id', 'nombre')->get();
+        $datos = User::select('id', 'nombre')->where('estado', 1)->get();
 
         return response()->json([
             'status' => 'success',
@@ -180,9 +265,6 @@ class ActivosController extends Controller
     // ActivoController.php
     public function verActivoQR($id)
     {
-
-        
-
         $activo = DB::connection('mysql')
             ->table('activo')
             ->join('users', 'activo.user_id', '=', 'users.id')

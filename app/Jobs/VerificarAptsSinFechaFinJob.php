@@ -13,6 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class VerificarAptsSinFechaFinJob implements ShouldQueue
 {
@@ -27,14 +28,12 @@ class VerificarAptsSinFechaFinJob implements ShouldQueue
         $proyectos = Proyectos::all();
 
         foreach ($proyectos as $proyecto) {
-            // Buscar el último registro con fecha_fin no nula
             $ultimoDetalle = $proyecto->detalles()
                 ->whereNotNull('fecha_fin')
                 ->orderByDesc('fecha_fin')
                 ->first();
 
             if (!$ultimoDetalle) {
-                // Si nunca ha tenido una fecha_fin, se puede omitir o enviar alerta según tu necesidad
                 continue;
             }
 
@@ -54,10 +53,22 @@ class VerificarAptsSinFechaFinJob implements ShouldQueue
             }
 
             if ($diasHabiles >= 3) {
-                $correo = $proyecto->ingeniero?->correo;
+                // Obtener IDs de ingenieros desde el JSON
+                $ingenierosIds = json_decode($proyecto->ingeniero_id, true);
 
-                if ($correo) {
-                    Mail::to($correo)->send(new AvisoFechaFinFaltante($proyecto));
+                if (is_array($ingenierosIds) && count($ingenierosIds) > 0) {
+                    $usuarios = User::whereIn('id', $ingenierosIds)
+                        ->whereNotNull('correo')
+                        ->get();
+
+                    foreach ($usuarios as $usuario) {
+                        try {
+                            Mail::to($usuario->correo)->send(new AvisoFechaFinFaltante($proyecto));
+                            Log::info("Correo enviado a {$usuario->correo} para proyecto {$proyecto->id}");
+                        } catch (\Exception $e) {
+                            Log::error("Error al enviar correo a {$usuario->correo}: " . $e->getMessage());
+                        }
+                    }
                 }
             }
         }

@@ -5,50 +5,72 @@
     <meta charset="UTF-8">
     <title>Activo {{ $activo->id }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    
     {{-- Bootstrap CSS desde CDN --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    {{-- Íconos de Bootstrap --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    
     <style>
         body {
-            background-color: #f8f9fa;
-            padding: 20px;
+            background: linear-gradient(135deg, #e9f0ff, #f8f9fa);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 30px;
         }
         .card {
-            max-width: 500px;
+            max-width: 550px;
             margin: auto;
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
+            border: none;
         }
         .card-header {
-            background-color: #0d6efd;
+            background: linear-gradient(135deg, #0d6efd, #0a58ca);
             color: white;
             text-align: center;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 15px;
+        }
+        .list-group-item {
+            border: none;
+            padding: 12px 16px;
+            font-size: 0.95rem;
         }
         .list-group-item strong {
             color: #0d6efd;
+        }
+        .btn-modern {
+            border-radius: 30px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-modern:hover {
+            transform: scale(1.05);
         }
     </style>
 </head>
 <body>
 
-    <div class="card shadow">
+    <div class="card shadow-lg">
         <div class="card-header">
-            📦 Detalles del Activo #{{ $activo->id }}
+            <i class="bi bi-box-seam"></i> Activo #{{ $activo->numero_activo }}
         </div>
-        <div class="card-body">
-            <h5 class="card-title">{{ $activo->numero_activo }}</h5>
-            <p class="card-text">{{ $activo->descripcion }}</p>
+        <div class="card-body text-center">
+            <p class="card-text text-muted">Descripcion: {{ $activo->descripcion }}</p>
         </div>
         <ul class="list-group list-group-flush">
-            <li class="list-group-item"><strong>Categoría:</strong> {{ $activo->categoria }}</li>
-            <li class="list-group-item"><strong>Subcategoría:</strong> {{ $activo->subcategoria }}</li>
-            <li class="list-group-item"><strong>Ubicación:</strong> {{ $activo->ubicacion }}</li>
-            <li class="list-group-item"><strong>Usuario Asignado:</strong> {{ $activo->usuario }}</li>
-            <li class="list-group-item"><strong>Valor:</strong> ${{ number_format($activo->valor, 0, ',', '.') }}</li>
-            <li class="list-group-item"><strong>Fecha fin garantía:</strong> {{ \Carbon\Carbon::parse($activo->fecha_fin_garantia)->format('d/m/Y') }}</li>
+            <li class="list-group-item"><strong><i class="bi bi-tag"></i> Categoría:</strong> {{ $activo->categoria }}</li>
+            <li class="list-group-item"><strong><i class="bi bi-diagram-3"></i> Subcategoría:</strong> {{ $activo->subcategoria }}</li>
+            <li class="list-group-item"><strong><i class="bi bi-geo-alt"></i> Ubicación:</strong> {{ $activo->ubicacion }}</li>
+            <li class="list-group-item"><strong><i class="bi bi-person"></i> Usuario Asignado:</strong> {{ $activo->usuario }}</li>
+            <li class="list-group-item"><strong><i class="bi bi-cash-coin"></i> Valor:</strong> ${{ $activo->valor}}</li>
         </ul>
         <div class="card-body text-center">
-            <a href="javascript:window.print()" class="btn btn-primary">Imprimir</a>
+            <a href="javascript:window.print()" class="btn btn-primary btn-modern">
+                <i class="bi bi-printer"></i> Imprimir
+            </a>
         </div>
     </div>
 

@@ -12,14 +12,19 @@ class Activo extends Model
     protected $table = "activo";
 
     protected $fillable = [
+        'tipo_activo',
+        'origen_activo',
+        'proveedor_activo',
         'numero_activo',
         'categoria_id',
         'subcategoria_id',
+        'user_id',
         'descripcion',
         'ubicacion_id',
         'usuarios_asignados',
         'valor',
-        'fecha_fin_garantia',
+        'fecha_aquiler',
+        'fecha_compra',
         'condicion',
         'modelo',
         'marca',
@@ -27,5 +32,6 @@ class Activo extends Model
         'observacion',
         'estado',
         'tipo_ubicacion',
+        'ubicacion_actual_id',
     ];
 }

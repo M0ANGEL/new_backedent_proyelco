@@ -20,9 +20,12 @@ return new class extends Migration
             $table->date("fecha_fin")->nullable();
             $table->string("observaciones");
             $table->unsignedBigInteger('activo_id')->nullable(); //relacion con activos
+            $table->unsignedBigInteger('user_id')->nullable(); //relacion con usuarios
+            $table->tinyInteger('estado')->default(1); //mantenimiento activo o ya terminado 1 activo 2 terminado
             $table->timestamps();
 
             $table->foreign('activo_id')->references('id')->on('activo');
+            $table->foreign('user_id')->references('id')->on('users');
 
         });
     }

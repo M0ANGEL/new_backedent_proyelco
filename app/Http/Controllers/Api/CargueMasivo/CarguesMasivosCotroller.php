@@ -132,13 +132,11 @@ class CarguesMasivosCotroller extends Controller
     {
         DB::beginTransaction();
 
-        info("Entro");
         try {
             $request->validate([
                 'archivo' => 'required|file|mimes:xlsx,xls'
             ]);
 
-            info("Entro--");
 
             $archivo = $request->file('archivo');
             $data = Excel::toArray([], $archivo)[0];

@@ -33,7 +33,6 @@ class CategoriaActivosController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'nombre' => ['required', 'string'],
-                'descripcion' => ['required', 'string'],
                 'prefijo' => ['required', 'string'],
             ]);
 
@@ -56,7 +55,6 @@ class CategoriaActivosController extends Controller
             // Si la validación ok creamos la nueva categoría
             $cliente = new CategoriaActivos();
             $cliente->nombre = $request->nombre;
-            $cliente->descripcion = $request->descripcion;
             $cliente->prefijo = $request->prefijo;
             $cliente->user_id = $user->id;
             $cliente->save();
@@ -84,7 +82,6 @@ class CategoriaActivosController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'nombre' => ['required', 'string'],
-                'descripcion' => ['required', 'string'],
                 'prefijo' => ['required', 'string'],
             ]);
 
@@ -109,7 +106,6 @@ class CategoriaActivosController extends Controller
 
             // Actualizar la categoría
             $cliente->nombre = $request->nombre;
-            $cliente->descripcion = $request->descripcion;
             $cliente->prefijo = $request->prefijo;
             $cliente->user_id = Auth::id();
             $cliente->save();
