@@ -73,7 +73,12 @@ class VaidarProcesoController extends Controller
                     break;
 
                 case 'pruebas':
-                    $fase2 = ProcesosProyectos::whereRaw('LOWER(nombre_proceso) = ?', ['aparateada fase 2'])->exists();
+                    $fase2 = DB::table('proyecto_detalle')
+                        ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+                        ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', ['aparateada fase 2'])
+                        ->where('proyecto_detalle.torre', $torre)
+                        ->where('proyecto_detalle.proyecto_id', $proyecto->id)
+                        ->exists();
                     $siguienteProceso = $fase2 ? 'aparateada fase 2' : 'aparateada';
                     $this->validarYHabilitarPorPiso($proyecto, $torre, $piso, $siguienteProceso, 'pruebas');
                     break;
