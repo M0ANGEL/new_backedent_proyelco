@@ -814,16 +814,16 @@ class ProyectosController extends Controller
         ]);
     }
 
-    //alertar de proyectos sin movimientos
+    // Alertar de proyectos sin movimientos
     public function obrasSinMovimientos()
     {
         $festivos = Festivos::pluck('festivo_fecha')->toArray();
-        $hoy = Carbon::now();
+        $hoy = Carbon::today();
 
         $resultado = [];
 
-        // Obtener todos los proyectos
-        $proyectos = Proyectos::where('estado','=',1)->get();
+        // Obtener todos los proyectos activos
+        $proyectos = Proyectos::where('estado', 1)->get();
 
         foreach ($proyectos as $proyecto) {
             $ultimoDetalle = $proyecto->detalles()
@@ -835,13 +835,15 @@ class ProyectosController extends Controller
                 continue;
             }
 
-            $ultimaFechaFin = Carbon::parse($ultimoDetalle->fecha_fin);
+            $ultimaFechaFin = Carbon::parse($ultimoDetalle->fecha_fin)->startOfDay();
             $diasHabiles = 0;
             $fechaTemp = $ultimaFechaFin->copy();
 
             // Contar días hábiles desde la última fecha_fin hasta hoy
             while ($fechaTemp->lt($hoy)) {
                 $fechaTemp->addDay();
+
+                // ✅ Omitir domingos y festivos
                 if (
                     !$fechaTemp->isSunday() &&
                     !in_array($fechaTemp->format('Y-m-d'), $festivos)
@@ -850,7 +852,7 @@ class ProyectosController extends Controller
                 }
             }
 
-            // Si tiene 1 día hábil de inactividad, lo agregamos al resultado
+            // Si tiene 2 o más días hábiles de inactividad, lo agregamos
             if ($diasHabiles >= 2) {
                 $resultado[] = [
                     'proyecto_id'   => $proyecto->id,
@@ -861,8 +863,7 @@ class ProyectosController extends Controller
             }
         }
 
-
-         return response()->json([
+        return response()->json([
             'status' => 'success',
             'data' => $resultado
         ]);
