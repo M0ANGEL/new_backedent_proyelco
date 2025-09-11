@@ -146,233 +146,271 @@ class ProyectosController extends Controller
 
     public function store(Request $request)
     {
+
+        info($request->all());
         DB::beginTransaction();
         try {
-            $validator = Validator::make($request->all(), [
-                'estado' => ['required'],
-                'bloques' => ['array'],
-                'codigo_proyecto' => ['required', 'string'],
-                'fecha_inicio' => ['required', 'string'],
-                'tipoProyecto_id' => ['required'],
-                'encargado_id' => ['required', 'array'],
-                'ingeniero_id' => ['required', 'array'],
-                'torres' => ['required', 'string'],
-                'nit' => ['required', 'string'],
-                'minimoApt' => ['required', 'string'],
-                'tipo_obra' => ['required'],
-                'cant_pisos' /* => ['string','null'] */,
-                'apt' /* => ['string','null'] */,
-                'activador_pordia_apt' => ['required', 'string'],
-                'procesos' => ['required', 'array'], //tiene numero de numCambioProceso vacio de error
-            ]);
+            if ($request->tipoProyecto_id == 1) {
+                $validator = Validator::make($request->all(), [
+                    'estado' => ['required'],
+                    'bloques' => ['array'],
+                    'codigo_proyecto' => ['required', 'string'],
+                    'fecha_inicio' => ['required', 'string'],
+                    'tipoProyecto_id' => ['required'],
+                    'encargado_id' => ['required', 'array'],
+                    'ingeniero_id' => ['required', 'array'],
+                    'torres' => ['required', 'string'],
+                    'nit' => ['required', 'string'],
+                    'minimoApt' => ['required', 'string'],
+                    'tipo_obra' => ['required'],
+                    'cant_pisos' /* => ['string','null'] */,
+                    'apt' /* => ['string','null'] */,
+                    'activador_pordia_apt' => ['required', 'string'],
+                    'procesos' => ['required', 'array'], //tiene numero de numCambioProceso vacio de error
+                ]);
+            } else {
+                $validator = Validator::make($request->all(), [
+                    'estado' => ['required'],
+                    'codigo_proyecto' => ['required', 'string'],
+                    'fecha_inicio' => ['required', 'string'],
+                    'tipoProyecto_id' => ['required'],
+                    'encargado_id' => ['required', 'array'],
+                    'ingeniero_id' => ['required', 'array'],
+                    'nit' => ['required', 'string'],
+                    'activador_pordia_casa' => ['required'],
+                    'procesos' => ['required', 'array'], //tiene numero de numCambioProceso vacio de error
+                ]);
+            }
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // 🚨 Validación personalizada de numCambioProceso
-            foreach ($request->procesos as $index => $proceso) {
-                if ($index > 0 && (empty($proceso['numCambioProceso']) || !is_numeric($proceso['numCambioProceso']))) {
+            //aqui validamos que tipo de proyeto es para posteriomente realizar las validaciones
+            //si tipoProyecto_id es 1 son apartamentos si no, es casa que seria 2
+
+            if ($request->tipoProyecto_id == 1) {
+                // 🚨 Validación personalizada de numCambioProceso
+                foreach ($request->procesos as $index => $proceso) {
+                    if ($index > 0 && (empty($proceso['numCambioProceso']) || !is_numeric($proceso['numCambioProceso']))) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Error: El proceso '{$proceso['label']}' debe tener un número de cambio de piso válido.",
+                        ], 422);
+                    }
+                }
+
+                $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
+                    ->select('descripcion_proyecto')
+                    ->first();
+                if ($proyectoUnico) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => "Error: El proceso '{$proceso['label']}' debe tener un número de cambio de piso válido.",
-                    ], 422);
+                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
+                    ], 404);
                 }
-            }
 
-            $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
-                ->select('descripcion_proyecto')
-                ->first();
-            if ($proyectoUnico) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
-                ], 404);
-            }
-
-            $cliente = Clientes::where('nit', $request->nit)->first();
-            if (!$cliente) {
-                return response()->json(['error' => 'Cliente no encontrado'], 404);
-            }
+                $cliente = Clientes::where('nit', $request->nit)->first();
+                if (!$cliente) {
+                    return response()->json(['error' => 'Cliente no encontrado'], 404);
+                }
 
 
-            // se valida que los cambios de piso no sea mayor a la cantidad de piso de pende el tipo del proyecto
-            if ($request->tipo_obra == 1) {
+                // se valida que los cambios de piso no sea mayor a la cantidad de piso de pende el tipo del proyecto
+                if ($request->tipo_obra == 1) {
 
-                foreach ($request->procesos as $proceso) {
-                    if (!isset($proceso['numCambioProceso'])) {
-                        continue;
+                    foreach ($request->procesos as $proceso) {
+                        if (!isset($proceso['numCambioProceso'])) {
+                            continue;
+                        }
+
+                        $numCambio = (int) $proceso['numCambioProceso'];
+
+                        foreach ($request->bloques as $bloque) {
+                            $pisosBloque = (int) $bloque['pisos'];
+
+                            if ($numCambio > $pisosBloque) {
+                                return response()->json([
+                                    'status' => 'error',
+                                    'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$numCambio}) mayor a la cantidad de pisos de la torre: '{$bloque['nombre']}' ({$pisosBloque})",
+                                ], 422);
+                            }
+                        }
                     }
-
-                    $numCambio = (int) $proceso['numCambioProceso'];
-
-                    foreach ($request->bloques as $bloque) {
-                        $pisosBloque = (int) $bloque['pisos'];
-
-                        if ($numCambio > $pisosBloque) {
+                } else {
+                    foreach ($request->procesos as $proceso) {
+                        if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
                             return response()->json([
                                 'status' => 'error',
-                                'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$numCambio}) mayor a la cantidad de pisos de la torre: '{$bloque['nombre']}' ({$pisosBloque})",
-                            ], 422);
+                                'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
+                            ], 404);
+                        }
+                    }
+                }
+
+
+
+                // Datos base
+                $cant_pisos = (int)$request->cant_pisos;
+                $total_apt = (int)$request->apt;
+
+                if ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
+                    $cant_pisos = 0;
+                    $total_apt = 0;
+                    foreach ($request->bloques as $bloque) {
+                        if (!empty($bloque['apartamentosPorPiso'])) {
+                            $cant_pisos = max($cant_pisos, count($bloque['apartamentosPorPiso']));
+                            foreach ($bloque['apartamentosPorPiso'] as $aptPorPiso) {
+                                $total_apt += (int)$aptPorPiso;
+                            }
+                        }
+                    }
+                }
+
+                $proyecto = new Proyectos();
+                $proyecto->tipoProyecto_id = $request->tipoProyecto_id;
+                $proyecto->cliente_id = $cliente->id;
+                $proyecto->usuario_crea_id = Auth::id();
+                $proyecto->descripcion_proyecto = $request->descripcion_proyecto;
+                $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
+                $proyecto->codigo_proyecto = $request->codigo_proyecto;
+                $proyecto->torres = (int)$request->torres ?? count($request->bloques);
+                $proyecto->cant_pisos = $cant_pisos;
+                $proyecto->apt = $total_apt;
+                $proyecto->minimoApt = $request->minimoApt;
+                $proyecto->pisosCambiarProceso = 2; //se va a borrar despues
+                $proyecto->activador_pordia_apt = $request->activador_pordia_apt;
+
+                // Registrar usuarios de notificación solo si vienen en la solicitud
+                $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
+                $proyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
+                $proyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
+                $proyecto->save();
+
+
+                // === SIMÉTRICA ===
+                if ((int)$request->tipo_obra === 0) {
+                    $torres = (int)$request->torres;
+                    $pisos = (int)$request->cant_pisos;
+                    $aptXPiso = (int)$request->apt;
+
+                    for ($torre = 1; $torre <= $torres; $torre++) {
+                        for ($piso = 1; $piso <= $pisos; $piso++) {
+                            for ($apt = 1; $apt <= $aptXPiso; $apt++) {
+                                $consecutivo = $piso * 100 + $apt;
+
+                                foreach ($request->procesos as $index => $proceso) {
+                                    $detalle = new ProyectosDetalle();
+                                    $detalle->proyecto_id = $proyecto->id;
+                                    $detalle->torre = $torre;
+                                    $detalle->piso = $piso;
+                                    $detalle->apartamento = $apt;
+                                    $detalle->consecutivo = $consecutivo;
+                                    $detalle->orden_proceso = $index + 1;
+                                    $detalle->procesos_proyectos_id = $proceso['value'];
+                                    $detalle->validacion = $proceso['requiereValidacion'] === 'si' ? 1 : 0;
+                                    $detalle->text_validacion = $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null;
+                                    $detalle->save();
+                                }
+                            }
+                        }
+                    }
+                    if (isset($request->procesos) && is_array($request->procesos)) {
+                        foreach ($request->procesos as $index => $proceso) {
+                            if (isset($proceso['numCambioProceso'])) {
+                                $cambioPisosNuevo = new CambioProcesoProyectos();
+                                $cambioPisosNuevo->proyecto_id = $proyecto->id;
+                                $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
+                                $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
+                                $cambioPisosNuevo->save();
+                            }
+                        }
+                    }
+
+                    // nombre de torres
+                    if (isset($request->torreNombres) && is_array($request->torreNombres)) {
+                        foreach ($request->torreNombres as $index => $nombreTorre) {
+                            if (!empty($nombreTorre)) {
+                                $cambioPisosNuevo = new NombreTorres();
+                                $cambioPisosNuevo->proyecto_id = $proyecto->id;
+                                $cambioPisosNuevo->nombre_torre = $nombreTorre;
+                                $cambioPisosNuevo->torre = $index + 1; // Mantener el orden
+                                $cambioPisosNuevo->save();
+                            }
+                        }
+                    }
+
+
+
+                    // === PERSONALIZADA ===
+                } elseif ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
+                    foreach ($request->bloques as $torreIndex => $bloque) {
+                        $piso = 1;
+                        foreach ($bloque['apartamentosPorPiso'] as $aptCount) {
+                            for ($apt = 1; $apt <= (int)$aptCount; $apt++) {
+                                // Generar el número consecutivo 
+                                $consecutivo = $piso * 100 + $apt;
+
+                                foreach ($request->procesos as $index => $proceso) {
+                                    $detalle = new ProyectosDetalle();
+                                    $detalle->proyecto_id = $proyecto->id;
+                                    $detalle->torre = $torreIndex + 1;
+                                    $detalle->piso = $piso;
+                                    $detalle->apartamento = $apt;
+                                    $detalle->consecutivo = $consecutivo;
+                                    $detalle->orden_proceso = $index + 1;
+                                    $detalle->procesos_proyectos_id = $proceso['value'];
+                                    $detalle->validacion = $proceso['requiereValidacion'] === 'si' ? 1 : 0;
+                                    $detalle->text_validacion = $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null;
+                                    $detalle->save();
+                                }
+                            }
+                            $piso++;
+                        }
+                    }
+
+                    if (isset($request->procesos) && is_array($request->procesos)) {
+                        foreach ($request->procesos as $index => $proceso) {
+                            if (isset($proceso['numCambioProceso'])) {
+                                $cambioPisosNuevo = new CambioProcesoProyectos();
+                                $cambioPisosNuevo->proyecto_id = $proyecto->id;
+                                $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
+                                $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
+                                $cambioPisosNuevo->save();
+                            }
+                        }
+                    }
+
+                    // nombre de torres personalizado
+                    if (isset($request->bloques) && is_array($request->bloques)) {
+                        foreach ($request->bloques as $index => $bloque) {
+                            if (!empty($bloque['nombre'])) {
+                                $nombreTorre = new NombreTorres();
+                                $nombreTorre->proyecto_id = $proyecto->id;
+                                $nombreTorre->nombre_torre = $bloque['nombre'];
+                                $nombreTorre->torre = $index + 1; // posición/orden
+                                $nombreTorre->save();
+                            }
                         }
                     }
                 }
             } else {
-                foreach ($request->procesos as $proceso) {
-                    if (isset($proceso['numCambioProceso']) && $proceso['numCambioProceso'] > $request->cant_pisos) {
-                        return response()->json([
-                            'status' => 'error',
-                            'message' => "Error: El proceso '{$proceso['label']}' tiene una cantidad de cambios de piso ({$proceso['numCambioProceso']}) mayor a la cantidad total de pisos ({$request->cant_pisos})",
-                        ], 404);
-                    }
-                }
-            }
-
-
-
-            // Datos base
-            $cant_pisos = (int)$request->cant_pisos;
-            $total_apt = (int)$request->apt;
-
-            if ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
-                $cant_pisos = 0;
-                $total_apt = 0;
-                foreach ($request->bloques as $bloque) {
-                    if (!empty($bloque['apartamentosPorPiso'])) {
-                        $cant_pisos = max($cant_pisos, count($bloque['apartamentosPorPiso']));
-                        foreach ($bloque['apartamentosPorPiso'] as $aptPorPiso) {
-                            $total_apt += (int)$aptPorPiso;
-                        }
-                    }
-                }
-            }
-
-            $proyecto = new Proyectos();
-            $proyecto->tipoProyecto_id = $request->tipoProyecto_id;
-            $proyecto->cliente_id = $cliente->id;
-            $proyecto->usuario_crea_id = Auth::id();
-            $proyecto->descripcion_proyecto = $request->descripcion_proyecto;
-            $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
-            $proyecto->codigo_proyecto = $request->codigo_proyecto;
-            $proyecto->torres = (int)$request->torres ?? count($request->bloques);
-            $proyecto->cant_pisos = $cant_pisos;
-            $proyecto->apt = $total_apt;
-            $proyecto->minimoApt = $request->minimoApt;
-            $proyecto->pisosCambiarProceso = 2; //se va a borrar despues
-            $proyecto->activador_pordia_apt = $request->activador_pordia_apt;
-
-            // Registrar usuarios de notificación solo si vienen en la solicitud
-            $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
-            $proyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
-            $proyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
-            $proyecto->save();
-
-
-            // === SIMÉTRICA ===
-            if ((int)$request->tipo_obra === 0) {
-                $torres = (int)$request->torres;
-                $pisos = (int)$request->cant_pisos;
-                $aptXPiso = (int)$request->apt;
-
-                for ($torre = 1; $torre <= $torres; $torre++) {
-                    for ($piso = 1; $piso <= $pisos; $piso++) {
-                        for ($apt = 1; $apt <= $aptXPiso; $apt++) {
-                            $consecutivo = $piso * 100 + $apt;
-
-                            foreach ($request->procesos as $index => $proceso) {
-                                $detalle = new ProyectosDetalle();
-                                $detalle->proyecto_id = $proyecto->id;
-                                $detalle->torre = $torre;
-                                $detalle->piso = $piso;
-                                $detalle->apartamento = $apt;
-                                $detalle->consecutivo = $consecutivo;
-                                $detalle->orden_proceso = $index + 1;
-                                $detalle->procesos_proyectos_id = $proceso['value'];
-                                $detalle->validacion = $proceso['requiereValidacion'] === 'si' ? 1 : 0;
-                                $detalle->text_validacion = $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null;
-                                $detalle->save();
-                            }
-                        }
-                    }
-                }
-                if (isset($request->procesos) && is_array($request->procesos)) {
-                    foreach ($request->procesos as $index => $proceso) {
-                        if (isset($proceso['numCambioProceso'])) {
-                            $cambioPisosNuevo = new CambioProcesoProyectos();
-                            $cambioPisosNuevo->proyecto_id = $proyecto->id;
-                            $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
-                            $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
-                            $cambioPisosNuevo->save();
-                        }
-                    }
+                $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
+                    ->select('descripcion_proyecto')
+                    ->first();
+                if ($proyectoUnico) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
+                    ], 404);
                 }
 
-                // nombre de torres
-                if (isset($request->torreNombres) && is_array($request->torreNombres)) {
-                    foreach ($request->torreNombres as $index => $nombreTorre) {
-                        if (!empty($nombreTorre)) {
-                            $cambioPisosNuevo = new NombreTorres();
-                            $cambioPisosNuevo->proyecto_id = $proyecto->id;
-                            $cambioPisosNuevo->nombre_torre = $nombreTorre;
-                            $cambioPisosNuevo->torre = $index + 1; // Mantener el orden
-                            $cambioPisosNuevo->save();
-                        }
-                    }
+                $cliente = Clientes::where('nit', $request->nit)->first();
+                if (!$cliente) {
+                    return response()->json(['error' => 'Cliente no encontrado'], 404);
                 }
 
-
-
-                // === PERSONALIZADA ===
-            } elseif ((int)$request->tipo_obra === 1 && !empty($request->bloques)) {
-                foreach ($request->bloques as $torreIndex => $bloque) {
-                    $piso = 1;
-                    foreach ($bloque['apartamentosPorPiso'] as $aptCount) {
-                        for ($apt = 1; $apt <= (int)$aptCount; $apt++) {
-                            // Generar el número consecutivo 
-                            $consecutivo = $piso * 100 + $apt;
-
-                            foreach ($request->procesos as $index => $proceso) {
-                                $detalle = new ProyectosDetalle();
-                                $detalle->proyecto_id = $proyecto->id;
-                                $detalle->torre = $torreIndex + 1;
-                                $detalle->piso = $piso;
-                                $detalle->apartamento = $apt;
-                                $detalle->consecutivo = $consecutivo;
-                                $detalle->orden_proceso = $index + 1;
-                                $detalle->procesos_proyectos_id = $proceso['value'];
-                                $detalle->validacion = $proceso['requiereValidacion'] === 'si' ? 1 : 0;
-                                $detalle->text_validacion = $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null;
-                                $detalle->save();
-                            }
-                        }
-                        $piso++;
-                    }
-                }
-
-                if (isset($request->procesos) && is_array($request->procesos)) {
-                    foreach ($request->procesos as $index => $proceso) {
-                        if (isset($proceso['numCambioProceso'])) {
-                            $cambioPisosNuevo = new CambioProcesoProyectos();
-                            $cambioPisosNuevo->proyecto_id = $proyecto->id;
-                            $cambioPisosNuevo->proceso = $proceso['value']; // Esto mantiene el orden
-                            $cambioPisosNuevo->numero = $proceso['numCambioProceso'];
-                            $cambioPisosNuevo->save();
-                        }
-                    }
-                }
-
-                // nombre de torres personalizado
-                if (isset($request->bloques) && is_array($request->bloques)) {
-                    foreach ($request->bloques as $index => $bloque) {
-                        if (!empty($bloque['nombre'])) {
-                            $nombreTorre = new NombreTorres();
-                            $nombreTorre->proyecto_id = $proyecto->id;
-                            $nombreTorre->nombre_torre = $bloque['nombre'];
-                            $nombreTorre->torre = $index + 1; // posición/orden
-                            $nombreTorre->save();
-                        }
-                    }
-                }
+                //logica para casas para guardar data
             }
 
             DB::commit(); // Confirmamos los cambios
@@ -758,7 +796,6 @@ class ProyectosController extends Controller
     }
 
     //actualizar la nomenclaturas
-
     public function ActualizarNomenclaturas(Request $request)
     {
         $desde = (int) $request->input('apt_inicio');
@@ -896,7 +933,7 @@ class ProyectosController extends Controller
                 ->orderByDesc('fecha_fin')
                 ->first();
 
-                info($proyecto);
+            info($proyecto);
 
             if (!$ultimoDetalle) {
                 continue;
