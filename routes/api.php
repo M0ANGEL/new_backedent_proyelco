@@ -143,7 +143,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-confirmar-validar', [VaidarProcesoController::class, 'validarProcesoNuevaLogica']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
     Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
-
+    Route::get('gestion-proyectos-encargados', [GestionProyectosController::class,'indexEncargadoObra']); 
 
     //cart dashboard
     Route::get('info-dashboard-card', [ProyectosController::class, 'infoCard']);
@@ -236,6 +236,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //notificacions de obras isn movimientos mas de un dia
     Route::get('obras-sin-movimientos',[ProyectosController::class,'obrasSinMovimientos']);
+    Route::get('obras-sin-movimientos-ing',[ProyectosController::class,'obrasSinMovimientosIng']);
 
 
 
