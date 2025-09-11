@@ -166,7 +166,6 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-
     public function indexProgreso(Request $request)
     {
         // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
@@ -467,7 +466,6 @@ class GestionProyectosController extends Controller
             unset($datos['pisos_unicos']); // Eliminar campo auxiliar
         }
     }
-
 
     //------------------------------------------------------------------------------------
     public function destroy($id)
@@ -1467,77 +1465,77 @@ class GestionProyectosController extends Controller
     //     }
     // }
 
-    // public function ExportInformeExcelProyecto($id)
-    // {
-    //     $proyectoId = $id;
+    public function ExportInformeExcelProyecto($id)
+    {
+        $proyectoId = $id;
 
-    //     if (!$proyectoId) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'ID de proyecto no proporcionado.',
-    //         ], 400);
-    //     }
+        if (!$proyectoId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID de proyecto no proporcionado.',
+            ], 400);
+        }
 
-    //     $torresConNombre = DB::table('nombre_xtore')
-    //         ->where('proyecto_id', $proyectoId)
-    //         ->pluck('nombre_torre', 'torre')
-    //         ->toArray();
+        $torresConNombre = DB::table('nombre_xtore')
+            ->where('proyecto_id', $proyectoId)
+            ->pluck('nombre_torre', 'torre')
+            ->toArray();
 
-    //     $detalles = DB::table('proyecto_detalle')
-    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->select(
-    //             'proyecto_detalle.torre',
-    //             'proyecto_detalle.estado',
-    //             'procesos_proyectos.nombre_proceso as proceso'
-    //         )
-    //         ->where('proyecto_detalle.proyecto_id', $proyectoId)
-    //         ->get();
+        $detalles = DB::table('proyecto_detalle')
+            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->select(
+                'proyecto_detalle.torre',
+                'proyecto_detalle.estado',
+                'procesos_proyectos.nombre_proceso as proceso'
+            )
+            ->where('proyecto_detalle.proyecto_id', $proyectoId)
+            ->get();
 
-    //     if ($detalles->isEmpty()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'No se encontraron detalles para el proyecto.',
-    //         ], 404);
-    //     }
+        if ($detalles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron detalles para el proyecto.',
+            ], 404);
+        }
 
-    //     $procesos = $detalles->groupBy('proceso');
-    //     $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
-    //         return [
-    //             'codigo' => $codigoTorre,
-    //             'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
-    //         ];
-    //     });
+        $procesos = $detalles->groupBy('proceso');
+        $torres = $detalles->pluck('torre')->unique()->sort()->values()->map(function ($codigoTorre) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoTorre,
+                'nombre' => $torresConNombre[$codigoTorre] ?? "Torre {$codigoTorre}"
+            ];
+        });
 
-    //     $resultado = [];
+        $resultado = [];
 
-    //     foreach ($procesos as $proceso => $itemsProceso) {
-    //         $fila = ['Proceso' => $proceso];
-    //         $totalGlobal = 0;
-    //         $terminadosGlobal = 0;
+        foreach ($procesos as $proceso => $itemsProceso) {
+            $fila = ['Proceso' => $proceso];
+            $totalGlobal = 0;
+            $terminadosGlobal = 0;
 
-    //         foreach ($torres as $torre) {
-    //             $codigo = $torre['codigo'];
-    //             $nombre = $torre['nombre'];
+            foreach ($torres as $torre) {
+                $codigo = $torre['codigo'];
+                $nombre = $torre['nombre'];
 
-    //             $filtrados = $itemsProceso->where('torre', $codigo);
-    //             $total = $filtrados->count();
-    //             $terminados = $filtrados->where('estado', 2)->count();
+                $filtrados = $itemsProceso->where('torre', $codigo);
+                $total = $filtrados->count();
+                $terminados = $filtrados->where('estado', 2)->count();
 
-    //             $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
-    //             $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+                $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 2) : 0;
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
 
-    //             $totalGlobal += $total;
-    //             $terminadosGlobal += $terminados;
-    //         }
+                $totalGlobal += $total;
+                $terminadosGlobal += $terminados;
+            }
 
-    //         $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
-    //         $fila["Total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+            $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 2) : 0;
+            $fila["Total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
 
-    //         $resultado[] = $fila;
-    //     }
+            $resultado[] = $fila;
+        }
 
-    //     return Excel::download(new InformeProyectoExport($resultado), 'informe-proyecto.xlsx');
-    // }
+        return Excel::download(new InformeProyectoExport($resultado), 'informe-proyecto.xlsx');
+    }
 
 
     //----------------------------------------------------------------------- nuevo toque minimos piso
