@@ -868,4 +868,71 @@ class ProyectosController extends Controller
             'data' => $resultado
         ]);
     }
+
+    // Alertar de proyectos sin movimientos ing
+    public function obrasSinMovimientosIng()
+    {
+        $festivos = Festivos::pluck('festivo_fecha')->toArray();
+        $hoy = Carbon::today();
+
+        $resultado = [];
+        $usuario = Auth::user();
+
+        // 🔹 Filtrar proyectos según el rol
+        $proyectos = Proyectos::where('estado', 1)
+            ->where(function ($query) use ($usuario) {
+                $userId = Auth::id();
+                if ($usuario->rol == "Ingeniero Obra") {
+                    $query->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')");
+                } else {
+                    $query->whereRaw("JSON_CONTAINS(encargado_id, '\"$userId\"')");
+                }
+            })
+            ->get();
+
+        foreach ($proyectos as $proyecto) {
+            $ultimoDetalle = $proyecto->detalles()
+                ->whereNotNull('fecha_fin')
+                ->orderByDesc('fecha_fin')
+                ->first();
+
+                info($proyecto);
+
+            if (!$ultimoDetalle) {
+                continue;
+            }
+
+            $ultimaFechaFin = Carbon::parse($ultimoDetalle->fecha_fin)->startOfDay();
+            $diasHabiles = 0;
+            $fechaTemp = $ultimaFechaFin->copy();
+
+            // Contar días hábiles desde la última fecha_fin hasta hoy
+            while ($fechaTemp->lt($hoy)) {
+                $fechaTemp->addDay();
+
+                // ✅ Omitir domingos y festivos
+                if (
+                    !$fechaTemp->isSunday() &&
+                    !in_array($fechaTemp->format('Y-m-d'), $festivos)
+                ) {
+                    $diasHabiles++;
+                }
+            }
+
+            // Si tiene 2 o más días hábiles de inactividad, lo agregamos
+            if ($diasHabiles >= 2) {
+                $resultado[] = [
+                    'proyecto_id'   => $proyecto->id,
+                    'descripcion'   => $proyecto->descripcion_proyecto,
+                    'ultima_fecha'  => $ultimaFechaFin->format('Y-m-d'),
+                    'dias_inactivo' => $diasHabiles,
+                ];
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $resultado
+        ]);
+    }
 }
