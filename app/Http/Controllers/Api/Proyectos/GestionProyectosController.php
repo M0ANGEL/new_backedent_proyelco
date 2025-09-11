@@ -309,6 +309,7 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+    /* ************************************************ESTADO EN BLANCO********************************************** */
     private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
     {
         $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
@@ -467,7 +468,9 @@ class GestionProyectosController extends Controller
         }
     }
 
-    //------------------------------------------------------------------------------------
+    /* ************************************************ESTADO EN BLANCO FIN********************************************** */
+
+    
     public function destroy($id)
     {
         $iniciarProyecto = Proyectos::find($id);
