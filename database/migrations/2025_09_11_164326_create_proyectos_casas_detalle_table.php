@@ -16,12 +16,12 @@ return new class extends Migration
         Schema::create('proyectos_casas_detalle', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable(); //usuario que confirma la activida
-            $table->unsignedBigInteger('proyecto_manzana_id'); //relacion con el proyecto padre de casas
+            $table->unsignedBigInteger('proyecto_casa_id'); //relacion con el proyecto padre de casas
             $table->string('manzana',3); // identificador
             $table->string('casa',3); // identificador
             $table->string('consecutivo_casa',10); // consecutivo para las casa nomenclaturas
             $table->string('piso',10); // piso de las casa
-            $table->string('estapa',10); // estapas
+            $table->string('etapa',10); // etapas
             $table->string('orden_proceso',2); // orden de los procesos
             $table->unsignedBigInteger('procesos_proyectos_id'); //relacion con los procesos
             $table->string('text_validacion')->nullable(); // orden de los procesos
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users');
-            $table->foreign('proyecto_manzana_id')->references('id')->on('proyectos_casas');
+            $table->foreign('proyecto_casa_id')->references('id')->on('proyectos_casas');
             $table->foreign('procesos_proyectos_id')->references('id')->on('procesos_proyectos');
 
         });
