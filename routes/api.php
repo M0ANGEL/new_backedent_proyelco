@@ -136,9 +136,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //gestion de encargado del proyecto
     Route::apiResource('gestion-proyectos', GestionProyectosController::class);
-    Route::get('gestion-proyectos-detalle/{id}', [GestionProyectosController::class, 'indexProgreso']);
+    Route::get('gestion-proyectos-detalle/{id}', [GestionProyectosController::class, 'indexProgreso']); //**--**//
     Route::post('gestion-iniciar-torre', [GestionProyectosController::class, 'IniciarTorre']);
-    Route::get('info-proyecto/{id}', [GestionProyectosController::class, 'infoProyecto']);
+    Route::get('info-proyecto/{id}', [GestionProyectosController::class, 'infoProyecto']); //**--**//
     Route::get('gestion-confirmar-apartamento/{id}', [GestionProyectosController::class, 'confirmarAptNuevaLogica']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
     Route::post('gestion-confirmar-validar', [VaidarProcesoController::class, 'validarProcesoNuevaLogica']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
