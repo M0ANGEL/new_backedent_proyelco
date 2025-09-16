@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
-use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\Festivos;
 use App\Models\NombreTorres;
+use App\Models\ProcesosProyectos;
+use App\Models\ProyectoCasa;
+use App\Models\ProyectoCasaDetalle;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 use Carbon\Carbon;
@@ -23,6 +25,8 @@ class ProyectosController extends Controller
 
     public function index()
     {
+
+        /**********************************APARTAMENTOS******************************** */
         // Traer proyectos con joins básicos
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
@@ -32,6 +36,7 @@ class ProyectosController extends Controller
                 'tipos_de_proyectos.nombre_tipo',
                 'clientes.emp_nombre'
             )
+            ->where('proyecto.estado',1)
             ->get();
 
         // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
@@ -83,9 +88,71 @@ class ProyectosController extends Controller
         // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
         $proyectos = $proyectos->sortByDesc('porcentaje')->values();
 
+        /************************************CASAS************************************ */
+        // Traer proyectos con joins básicos
+        $proyectos_casa = DB::table('proyectos_casas')
+            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+            ->select(
+                'proyectos_casas.*',
+                'tipos_de_proyectos.nombre_tipo',
+                'clientes.emp_nombre'
+            )
+            ->get();
+
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
+
+        foreach ($proyectos_casa as $proyecto) {
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        }
+
+        // 2️⃣ Obtener todos los usuarios de una sola consulta
+        $usuarios = DB::table('users')
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id'); // => [id => nombre]
+
+        // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+        $detalles = DB::table('proyectos_casas_detalle')
+            ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+            ->get()
+            ->groupBy('proyecto_casa_id');
+
+        // 4️⃣ Asignar nombres y cálculos a cada proyecto
+        foreach ($proyectos_casa as $proyecto) {
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Detalles del proyecto
+            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+            // Cálculo de atraso
+            $ejecutando = $detalleProyecto->where('estado', 1)->count();
+            $terminado = $detalleProyecto->where('estado', 2)->count();
+            $total = $ejecutando + $terminado;
+
+            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+
+            // Cálculo de avance
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $terminado;
+            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+        }
+
+        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+        $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
         return response()->json([
             'status' => 'success',
-            'data' => $proyectos
+            'data' => $proyectos,
+            'data_casas' => $proyectos_casa
         ]);
     }
 
@@ -147,9 +214,23 @@ class ProyectosController extends Controller
     public function store(Request $request)
     {
 
-        info($request->all());
         DB::beginTransaction();
         try {
+
+            //aqui validamos de primeor que si es casa los procesos sean de casa
+            if ($request->tipoProyecto_id == 2 && $request->procesos[0]['label'] == "fundida") {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error: Tipo de proyecto y tipo proyectos procesos no son compatibles, validar la igualdad.',
+                ], 404);
+            } else if ($request->tipoProyecto_id == 1 && $request->procesos[0]['label'] !== "fundida") {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error: Tipo de proyecto y tipo proyectos procesos no son compatibles, validar la igualdad.',
+                ], 404);
+            }
+
+
             if ($request->tipoProyecto_id == 1) {
                 $validator = Validator::make($request->all(), [
                     'estado' => ['required'],
@@ -177,7 +258,6 @@ class ProyectosController extends Controller
                     'encargado_id' => ['required', 'array'],
                     'ingeniero_id' => ['required', 'array'],
                     'nit' => ['required', 'string'],
-                    'activador_pordia_casa' => ['required'],
                     'procesos' => ['required', 'array'], //tiene numero de numCambioProceso vacio de error
                 ]);
             }
@@ -247,8 +327,6 @@ class ProyectosController extends Controller
                         }
                     }
                 }
-
-
 
                 // Datos base
                 $cant_pisos = (int)$request->cant_pisos;
@@ -395,6 +473,7 @@ class ProyectosController extends Controller
                     }
                 }
             } else {
+
                 $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
                     ->select('descripcion_proyecto')
                     ->first();
@@ -411,6 +490,160 @@ class ProyectosController extends Controller
                 }
 
                 //logica para casas para guardar data
+
+                $proyecto = new ProyectoCasa();
+                $proyecto->tipoProyecto_id = $request->tipoProyecto_id;
+                $proyecto->cliente_id = $cliente->id;
+                $proyecto->usuario_crea_id = Auth::id();
+                $proyecto->descripcion_proyecto = $request->descripcion_proyecto;
+                $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
+                $proyecto->codigo_proyecto = $request->codigo_proyecto;
+                $proyecto->activador_pordia_fundida = $request->activador_pordia_fundida;
+                $proyecto->activador_pordia = $request->activador_pordia_apt;
+
+                // Registrar usuarios de notificación solo si vienen en la solicitud
+                $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
+                $proyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
+                $proyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
+                $proyecto->save();
+
+
+                // Buscar procesos de fundida en la BD
+                $procesosFundida = ProcesosProyectos::whereIn('nombre_proceso', [
+                    'cimentacion',
+                    'muros primer piso',
+                    'losa entre pisos',
+                    'muros segundo piso',
+                    'cubierta superior',
+                ])->get()->keyBy('nombre_proceso'); // los indexa por nombre
+
+
+                // Lógica para el detallado de casas
+                $consecutivoGlobal = 1;
+
+                foreach ($request->manzanas as $manzanaIndex => $bloque) {
+                    $cantidadCasas = (int)$bloque['cantidadCasas'];
+
+                    for ($casa = 1; $casa <= $cantidadCasas; $casa++) {
+                        $consecutivo = "c-" . $consecutivoGlobal;
+                        $pisosCasa = $bloque['casas'][$casa - 1]['pisos'];
+
+                        // -------------------
+                        // 1. Procesos de Fundida (dinámicos según pisos)
+                        // -------------------
+                        $orden = 1;
+
+                        // cimentación (siempre en piso 1)
+                        if (isset($procesosFundida['cimentacion'])) {
+                            ProyectoCasaDetalle::create([
+                                'proyecto_casa_id' => $proyecto->id,
+                                'manzana' => $manzanaIndex + 1,
+                                'casa' => $casa,
+                                'consecutivo_casa' => $consecutivo,
+                                'piso' => 1,
+                                'orden_proceso' => $orden++,
+                                'etapa' => 1,
+                                'procesos_proyectos_id' => $procesosFundida['cimentacion']->id,
+                            ]);
+                        }
+
+                        // muros primer piso
+                        if (isset($procesosFundida['muros primer piso'])) {
+                            ProyectoCasaDetalle::create([
+                                'proyecto_casa_id' => $proyecto->id,
+                                'manzana' => $manzanaIndex + 1,
+                                'casa' => $casa,
+                                'consecutivo_casa' => $consecutivo,
+                                'piso' => 1,
+                                'orden_proceso' => $orden++,
+                                'etapa' => 1,
+                                'procesos_proyectos_id' => $procesosFundida['muros primer piso']->id,
+                            ]);
+                        }
+
+                        if ($pisosCasa > 1) {
+                            // losa entre pisos
+                            if (isset($procesosFundida['losa entre pisos'])) {
+                                ProyectoCasaDetalle::create([
+                                    'proyecto_casa_id' => $proyecto->id,
+                                    'manzana' => $manzanaIndex + 1,
+                                    'casa' => $casa,
+                                    'consecutivo_casa' => $consecutivo,
+                                    'piso' => 1,
+                                    'orden_proceso' => $orden++,
+                                    'etapa' => 1,
+                                    'procesos_proyectos_id' => $procesosFundida['losa entre pisos']->id,
+                                ]);
+                            }
+
+                            // muros segundo piso
+                            if (isset($procesosFundida['muros segundo piso'])) {
+                                ProyectoCasaDetalle::create([
+                                    'proyecto_casa_id' => $proyecto->id,
+                                    'manzana' => $manzanaIndex + 1,
+                                    'casa' => $casa,
+                                    'consecutivo_casa' => $consecutivo,
+                                    'piso' => 2,
+                                    'orden_proceso' => $orden++,
+                                    'etapa' => 1,
+                                    'procesos_proyectos_id' => $procesosFundida['muros segundo piso']->id,
+                                ]);
+                            }
+                        }
+
+                        // cubierta superior (último piso)
+                        if (isset($procesosFundida['cubierta superior'])) {
+                            ProyectoCasaDetalle::create([
+                                'proyecto_casa_id' => $proyecto->id,
+                                'manzana' => $manzanaIndex + 1,
+                                'casa' => $casa,
+                                'consecutivo_casa' => $consecutivo,
+                                'piso' => $pisosCasa,
+                                'orden_proceso' => $orden++,
+                                'etapa' => 1,
+                                'procesos_proyectos_id' => $procesosFundida['cubierta superior']->id,
+                            ]);
+                        }
+
+                        // -------------------
+                        // 2. Procesos normales (queda igual)
+                        // -------------------
+                        for ($piso = 1; $piso <= $pisosCasa; $piso++) {
+                            foreach ($request->procesos as $index => $proceso) {
+                                ProyectoCasaDetalle::create([
+                                    'proyecto_casa_id' => $proyecto->id,
+                                    'manzana' => $manzanaIndex + 1,
+                                    'casa' => $casa,
+                                    'consecutivo_casa' => $consecutivo,
+                                    'piso' => $piso,
+                                    'orden_proceso' => $index + 1,
+                                    'etapa' => 2,
+                                    'procesos_proyectos_id' => $proceso['value'],
+                                    'text_validacion' =>  $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null,
+                                ]);
+                            }
+                        }
+
+                        $consecutivoGlobal++;
+                    }
+                }
+
+
+
+
+                // // nombre de manzanas personalizado
+                // if (isset($request->bloques) && is_array($request->bloques)) {
+                //     foreach ($request->bloques as $index => $bloque) {
+                //         if (!empty($bloque['nombre'])) {
+                //             $nombreTorre = new NombreTorres();
+                //             $nombreTorre->proyecto_id = $proyecto_casas->id;
+                //             $nombreTorre->nombre_torre = $bloque['nombre'];
+                //             $nombreTorre->torre = $index + 1; // posición/orden
+                //             $nombreTorre->save();
+                //         }
+                //     }
+                // }
+
             }
 
             DB::commit(); // Confirmamos los cambios
