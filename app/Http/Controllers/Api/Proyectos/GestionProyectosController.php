@@ -269,18 +269,18 @@ class GestionProyectosController extends Controller
                 $resultado[$torre][$orden_proceso]['pisos'][$piso] = [];
             }
 
-            // 5. DETERMINAR ESTADO BLANCO (EB) - Solo para procesos dependientes (no Fundida)
-            $eb = false;
-            if ($orden_proceso != 1 && $item->estado == 0) {
-                $eb = $this->determinarEstadoBlanco(
-                    $resultado,
-                    $torre,
-                    $orden_proceso,
-                    $piso,
-                    $item->apartamento,
-                    $procesosConfig
-                );
-            }
+            // // 5. DETERMINAR ESTADO BLANCO (EB) - Solo para procesos dependientes (no Fundida)
+            // $eb = false;
+            // if ($orden_proceso != 1 && $item->estado == 0) {
+            //     $eb = $this->determinarEstadoBlanco(
+            //         $resultado,
+            //         $torre,
+            //         $orden_proceso,
+            //         $piso,
+            //         $item->apartamento,
+            //         $procesosConfig
+            //     );
+            // }
 
             // 6. AGREGAR APARTAMENTO AL RESULTADO
             $resultado[$torre][$orden_proceso]['pisos'][$piso][] = [
@@ -288,18 +288,18 @@ class GestionProyectosController extends Controller
                 'apartamento' => $item->apartamento,
                 'consecutivo' => $item->consecutivo,
                 'estado' => $item->estado,
-                'eb' => $eb, // Estado Blanco (depende de procesos anteriores)
+                // 'eb' => $eb, // Estado Blanco (depende de procesos anteriores)
             ];
 
             // 7. ACTUALIZAR CONTADORES
-            $this->actualizarContadores($resultado, $torreResumen, $torre, $orden_proceso, $item->estado);
+            // $this->actualizarContadores($resultado, $torreResumen, $torre, $orden_proceso, $item->estado);
 
             // 8. VERIFICAR SI TODO EL PISO ESTÁ COMPLETO
-            $this->verificarPisoCompleto($resultado, $torre, $orden_proceso, $piso);
+            // $this->verificarPisoCompleto($resultado, $torre, $orden_proceso, $piso);
         }
 
         // 9. CALCULAR PORCENTAJES FINALES
-        $this->calcularPorcentajes($resultado, $torreResumen);
+        // $this->calcularPorcentajes($resultado, $torreResumen);
 
         // 10. RETORNAR RESULTADO FINAL
         return response()->json([
@@ -309,66 +309,66 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-    private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
-    {
-        $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
+    // private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
+    // {
+    //     $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
 
-        // 1. Definir de qué proceso depende el actual
-        $dependencia = null;
-        if (in_array($orden_proceso, [2, 3])) { // Destapada y Prolongación dependen de Fundida
-            $dependencia = 1;
-        } elseif ($orden_proceso == 4) { // Alambrada depende de Destapada y Prolongación
-            $dependencia = 2;
-        } elseif ($orden_proceso == 5) { // Aparateada depende de Alambrada
-            $dependencia = 4;
-        } elseif ($orden_proceso == 6) { // Aparateada Fase 2 depende de Aparateada
-            $dependencia = 5;
-        } elseif ($orden_proceso == 7) { // Pruebas depende de Aparateada o Aparateada Fase 2
-            $dependencia = isset($resultado[$torre][6]) ? 6 : 5;
-        } elseif (in_array($orden_proceso, [8, 9])) { // Retie y Ritel dependen de Pruebas
-            $dependencia = 7;
-        } elseif ($orden_proceso == 10) { // Entrega depende de Retie y Ritel
-            $depRetie = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
-            $depRitel = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
-            return $depRetie && $depRitel;
-        }
+    //     // 1. Definir de qué proceso depende el actual
+    //     $dependencia = null;
+    //     if (in_array($orden_proceso, [2, 3])) { // Destapada y Prolongación dependen de Fundida
+    //         $dependencia = 1;
+    //     } elseif ($orden_proceso == 4) { // Alambrada depende de Destapada y Prolongación
+    //         $dependencia = 2;
+    //     } elseif ($orden_proceso == 5) { // Aparateada depende de Alambrada
+    //         $dependencia = 4;
+    //     } elseif ($orden_proceso == 6) { // Aparateada Fase 2 depende de Aparateada
+    //         $dependencia = 5;
+    //     } elseif ($orden_proceso == 7) { // Pruebas depende de Aparateada o Aparateada Fase 2
+    //         $dependencia = isset($resultado[$torre][6]) ? 6 : 5;
+    //     } elseif (in_array($orden_proceso, [8, 9])) { // Retie y Ritel dependen de Pruebas
+    //         $dependencia = 7;
+    //     } elseif ($orden_proceso == 10) { // Entrega depende de Retie y Ritel
+    //         $depRetie = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 8, $piso, $apartamento);
+    //         $depRitel = $this->verificarApartamentoCompletoEnProceso($resultado, $torre, 9, $piso, $apartamento);
+    //         return $depRetie && $depRitel;
+    //     }
 
-        if (!$dependencia) {
-            return false;
-        }
+    //     if (!$dependencia) {
+    //         return false;
+    //     }
 
-        // 2. Contar pisos del proceso que depende en estado 1, 2 o EB
-        $pisosConAvance = 0;
-        $pisosMinimos = $pisosRequeridos;
+    //     // 2. Contar pisos del proceso que depende en estado 1, 2 o EB
+    //     $pisosConAvance = 0;
+    //     $pisosMinimos = $pisosRequeridos;
 
-        $dependencias = is_array($dependencia) ? $dependencia : [$dependencia];
-        foreach ($dependencias as $dep) {
-            if (!isset($resultado[$torre][$dep]['pisos'])) continue;
+    //     $dependencias = is_array($dependencia) ? $dependencia : [$dependencia];
+    //     foreach ($dependencias as $dep) {
+    //         if (!isset($resultado[$torre][$dep]['pisos'])) continue;
 
-            foreach ($resultado[$torre][$dep]['pisos'] as $pisoDep => $apartamentos) {
-                $completo = true;
-                foreach ($apartamentos as $apt) {
-                    if (!in_array($apt['estado'], [1, 2]) && !$apt['eb']) {
-                        $completo = false;
-                        break;
-                    }
-                }
-                if ($completo) {
-                    $pisosConAvance++;
-                }
-            }
-        }
+    //         foreach ($resultado[$torre][$dep]['pisos'] as $pisoDep => $apartamentos) {
+    //             $completo = true;
+    //             foreach ($apartamentos as $apt) {
+    //                 if (!in_array($apt['estado'], [1, 2]) && !$apt['eb']) {
+    //                     $completo = false;
+    //                     break;
+    //                 }
+    //             }
+    //             if ($completo) {
+    //                 $pisosConAvance++;
+    //             }
+    //         }
+    //     }
 
-        // 3. Calcular cuántos pisos deben estar habilitados
-        $resultadoCalc = ($pisosConAvance - $pisosMinimos) + 1;
+    //     // 3. Calcular cuántos pisos deben estar habilitados
+    //     $resultadoCalc = ($pisosConAvance - $pisosMinimos) + 1;
 
-        // 4. Verificar si el piso actual está dentro de los que deben habilitarse
-        if ($piso <= $resultadoCalc) {
-            return true; // marcar como EB si el estado es 0
-        }
+    //     // 4. Verificar si el piso actual está dentro de los que deben habilitarse
+    //     if ($piso <= $resultadoCalc) {
+    //         return true; // marcar como EB si el estado es 0
+    //     }
 
-        return false;
-    }
+    //     return false;
+    // }
 
     //Verifica si un apartamento específico está completo (estado=2) en un proceso
     private function verificarApartamentoCompletoEnProceso($resultado, $torre, $ordenProceso, $piso, $apartamento)
