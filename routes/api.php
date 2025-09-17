@@ -243,4 +243,5 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //proyectos de casa gestion
     Route::get('info-proyecto-casa/{id}', [GestionProyectosCasasController::class, 'infoProyectoCasa']);
     Route::get('gestion-proyectos-detalle-casa/{id}', [GestionProyectosCasasController::class, 'indexProgresoCasa']);
+    Route::apiResource('gestion-proyectos-casas', GestionProyectosCasasController::class);
 });
