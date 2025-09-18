@@ -36,7 +36,7 @@ class ProyectosController extends Controller
                 'tipos_de_proyectos.nombre_tipo',
                 'clientes.emp_nombre'
             )
-            ->where('proyecto.estado',1)
+            ->where('proyecto.estado', 1)
             ->get();
 
         // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
@@ -283,7 +283,16 @@ class ProyectosController extends Controller
                 $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
                     ->select('descripcion_proyecto')
                     ->first();
+                $proyectoUnicoCasa = ProyectoCasa::where('codigo_proyecto', $request->codigo_proyecto)
+                    ->select('descripcion_proyecto')
+                    ->first();
                 if ($proyectoUnico) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
+                    ], 404);
+                }
+                if ($proyectoUnicoCasa) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
@@ -477,7 +486,16 @@ class ProyectosController extends Controller
                 $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
                     ->select('descripcion_proyecto')
                     ->first();
+                $proyectoUnicoCasa = ProyectoCasa::where('codigo_proyecto', $request->codigo_proyecto)
+                    ->select('descripcion_proyecto')
+                    ->first();
                 if ($proyectoUnico) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
+                    ], 404);
+                }
+                if ($proyectoUnicoCasa) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
@@ -619,6 +637,7 @@ class ProyectosController extends Controller
                                     'orden_proceso' => $index + 1,
                                     'etapa' => 2,
                                     'procesos_proyectos_id' => $proceso['value'],
+                                    'validacion' => $proceso['requiereValidacion'] === 'si' ? 1 : 0,
                                     'text_validacion' =>  $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null,
                                 ]);
                             }
@@ -631,14 +650,14 @@ class ProyectosController extends Controller
 
 
 
-                // // nombre de manzanas personalizado
+                // nombre de manzanas personalizado
                 // if (isset($request->bloques) && is_array($request->bloques)) {
                 //     foreach ($request->bloques as $index => $bloque) {
                 //         if (!empty($bloque['nombre'])) {
                 //             $nombreTorre = new NombreTorres();
                 //             $nombreTorre->proyecto_id = $proyecto_casas->id;
-                //             $nombreTorre->nombre_torre = $bloque['nombre'];
-                //             $nombreTorre->torre = $index + 1; // posición/orden
+                //             $nombreTorre->nombre_manazan = $bloque['nombre'];
+                //             $nombreTorre->manzana = $index + 1; // posición/orden
                 //             $nombreTorre->save();
                 //         }
                 //     }

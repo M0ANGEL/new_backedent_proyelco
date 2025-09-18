@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
+use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
@@ -244,4 +245,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('info-proyecto-casa/{id}', [GestionProyectosCasasController::class, 'infoProyectoCasa']);
     Route::get('gestion-proyectos-detalle-casa/{id}', [GestionProyectosCasasController::class, 'indexProgresoCasa']);
     Route::apiResource('gestion-proyectos-casas', GestionProyectosCasasController::class);
+
+    //confirmaciones
+    Route::get('gestion-confirmar-confirmarCasas/{id}', [GestionProyectosCasasController::class, 'confirmarCasas']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
+    Route::post('gestion-confirmar-validar-casa', [ValidarProcesoCasaController::class, 'validarProcesoCasas']);
+    Route::post('gestion-iniciar-manzana', [GestionProyectosCasasController::class, 'IniciarManzana']);
 });

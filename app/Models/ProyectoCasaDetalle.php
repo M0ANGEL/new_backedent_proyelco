@@ -29,4 +29,9 @@ class ProyectoCasaDetalle extends Model
         "fecha_validacion",
         "fecha_fin",
     ];
+
+    public function proceso()
+    {
+        return $this->belongsTo(ProcesosProyectos::class, 'procesos_proyectos_id', 'id');
+    }
 }
