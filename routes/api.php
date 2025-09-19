@@ -250,4 +250,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-confirmar-confirmarCasas/{id}', [GestionProyectosCasasController::class, 'confirmarCasas']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
     Route::post('gestion-confirmar-validar-casa', [ValidarProcesoCasaController::class, 'validarProcesoCasas']);
     Route::post('gestion-iniciar-manzana', [GestionProyectosCasasController::class, 'IniciarManzana']);
+    Route::post('casas-infoCasa', [GestionProyectosCasasController::class, 'infoCasa']);
+    Route::delete('activar-proyecto/{id}', [ProyectosController::class, 'destroyCasa']);
 });

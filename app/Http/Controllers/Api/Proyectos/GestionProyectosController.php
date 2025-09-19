@@ -22,6 +22,7 @@ class GestionProyectosController extends Controller
     //index ingenieros
     public function index()
     {
+        /**********************************APARTAMENTOS******************************** */
         // Traer proyectos con joins básicos
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
@@ -31,6 +32,7 @@ class GestionProyectosController extends Controller
                 $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
                 // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
             })
+            ->where('proyecto.estado',1)
             ->select(
                 'proyecto.*',
                 'tipos_de_proyectos.nombre_tipo',
@@ -87,9 +89,76 @@ class GestionProyectosController extends Controller
         // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
         $proyectos = $proyectos->sortByDesc('porcentaje')->values();
 
+        /************************************CASAS************************************ */
+        // Traer proyectos con joins básicos
+        $proyectos_casa = DB::table('proyectos_casas')
+            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+             ->where(function ($query) {
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(proyectos_casas.ingeniero_id, '\"$userId\"')");
+                // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+            })
+            ->select(
+                'proyectos_casas.*',
+                'tipos_de_proyectos.nombre_tipo',
+                'clientes.emp_nombre'
+            )
+            ->get();
+
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
+
+        foreach ($proyectos_casa as $proyecto) {
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        }
+
+        // 2️⃣ Obtener todos los usuarios de una sola consulta
+        $usuarios = DB::table('users')
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id'); // => [id => nombre]
+
+        // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+        $detalles = DB::table('proyectos_casas_detalle')
+            ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+            ->get()
+            ->groupBy('proyecto_casa_id');
+
+        // 4️⃣ Asignar nombres y cálculos a cada proyecto
+        foreach ($proyectos_casa as $proyecto) {
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+            // Detalles del proyecto
+            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+            // Cálculo de atraso
+            $ejecutando = $detalleProyecto->where('estado', 1)->count();
+            $terminado = $detalleProyecto->where('estado', 2)->count();
+            $total = $ejecutando + $terminado;
+
+            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+
+            // Cálculo de avance
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $terminado;
+            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+        }
+
+        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+        $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
         return response()->json([
             'status' => 'success',
-            'data' => $proyectos
+            'data' => $proyectos,
+            'data_casas' => $proyectos_casa
         ]);
     }
 
@@ -1478,7 +1547,6 @@ class GestionProyectosController extends Controller
     private function validarYHabilitarRetieYRitel($proyecto, $torre, $piso, $procesoNombre)
     {
         $aptMinimos = $proyecto->minimoApt;
-        info("#entro");
 
         // Obtener pisos requeridos
         $CambioProceso = DB::table('cambio_procesos_x_proyecto')
@@ -1491,7 +1559,6 @@ class GestionProyectosController extends Controller
 
 
         $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
-        info("cambio nuemro " . $pisosRequeridos);
 
         // Verificar si el proceso ya inició en piso 1
         $inicioProceso = DB::table('proyecto_detalle')
@@ -1506,7 +1573,6 @@ class GestionProyectosController extends Controller
 
 
         if ($yaIniciado) {
-            info("cumple");
             $nuevoPiso = $piso - ($pisosRequeridos - 1);
 
             $verValidacion = DB::table('proyecto_detalle')
@@ -1563,7 +1629,6 @@ class GestionProyectosController extends Controller
                 $this->habilitarPorConsecutivos($proyecto, $torre, $nuevoPiso, $procesoNombre, [$uno]);
             }
         } elseif ($piso >= $pisosRequeridos) {
-            info("no cumple pero se debe activar");
             // Verifica que se cumplan pisos suficientes con mínimo de aptos confirmados
             $pisosCumplen = ProyectosDetalle::select('piso')
                 ->where('torre', $torre)
@@ -1577,17 +1642,13 @@ class GestionProyectosController extends Controller
 
 
 
-            info("validacion exerna-1");
-            info("apt que cumplen: " . json_encode($pisosCumplen));
 
 
 
             if (count($pisosCumplen) < $pisosRequeridos) {
-                info("no cumplen por pisos ");
 
                 return;
             }
-            info("validacion exerna");
 
             // Validación externa antes de habilitar piso 1
             $detalle = DB::table('proyecto_detalle')
@@ -1603,7 +1664,6 @@ class GestionProyectosController extends Controller
                 return;
             }
 
-            info("validacion exerna superada");
 
 
             // Aptos confirmados del procesoNombre en piso 1

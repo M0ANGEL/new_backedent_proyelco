@@ -9,6 +9,7 @@ use App\Models\ProyectoCasaDetalle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+
 class ValidarProcesoCasaController extends Controller
 {
     public function validarProcesoCasas(Request $request)

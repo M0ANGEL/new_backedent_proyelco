@@ -7,6 +7,7 @@ use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\Festivos;
 use App\Models\NombreTorres;
+use App\Models\Nombrexmanzana;
 use App\Models\ProcesosProyectos;
 use App\Models\ProyectoCasa;
 use App\Models\ProyectoCasaDetalle;
@@ -36,7 +37,7 @@ class ProyectosController extends Controller
                 'tipos_de_proyectos.nombre_tipo',
                 'clientes.emp_nombre'
             )
-            ->where('proyecto.estado', 1)
+            // ->where('proyecto.estado', 1)
             ->get();
 
         // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
@@ -213,7 +214,6 @@ class ProyectosController extends Controller
 
     public function store(Request $request)
     {
-
         DB::beginTransaction();
         try {
 
@@ -498,7 +498,7 @@ class ProyectosController extends Controller
                 if ($proyectoUnicoCasa) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
+                        'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnicoCasa->descripcion_proyecto,
                     ], 404);
                 }
 
@@ -543,7 +543,7 @@ class ProyectosController extends Controller
                     $cantidadCasas = (int)$bloque['cantidadCasas'];
 
                     for ($casa = 1; $casa <= $cantidadCasas; $casa++) {
-                        $consecutivo = "c-" . $consecutivoGlobal;
+                        $consecutivo = "C-" . $consecutivoGlobal;
                         $pisosCasa = $bloque['casas'][$casa - 1]['pisos'];
 
                         // -------------------
@@ -628,41 +628,42 @@ class ProyectosController extends Controller
                         // -------------------
                         for ($piso = 1; $piso <= $pisosCasa; $piso++) {
                             foreach ($request->procesos as $index => $proceso) {
+                                $requiereValidacion = $proceso['requiereValidacion'] ?? 'no';
+                                $valor = $proceso['valor'] ?? null;
+
                                 ProyectoCasaDetalle::create([
-                                    'proyecto_casa_id' => $proyecto->id,
-                                    'manzana' => $manzanaIndex + 1,
-                                    'casa' => $casa,
-                                    'consecutivo_casa' => $consecutivo,
-                                    'piso' => $piso,
-                                    'orden_proceso' => $index + 1,
-                                    'etapa' => 2,
+                                    'proyecto_casa_id'   => $proyecto->id,
+                                    'manzana'            => $manzanaIndex + 1,
+                                    'casa'               => $casa,
+                                    'consecutivo_casa'   => $consecutivo,
+                                    'piso'               => $piso,
+                                    'orden_proceso'      => $index + 1,
+                                    'etapa'              => 2,
                                     'procesos_proyectos_id' => $proceso['value'],
-                                    'validacion' => $proceso['requiereValidacion'] === 'si' ? 1 : 0,
-                                    'text_validacion' =>  $proceso['requiereValidacion'] === 'si' ? $proceso['valor'] : null,
+                                    'validacion'         => $requiereValidacion === 'si' ? 1 : 0,
+                                    'text_validacion'    => $requiereValidacion === 'si' ? $valor : null,
                                 ]);
                             }
                         }
+
 
                         $consecutivoGlobal++;
                     }
                 }
 
 
-
-
                 // nombre de manzanas personalizado
-                // if (isset($request->bloques) && is_array($request->bloques)) {
-                //     foreach ($request->bloques as $index => $bloque) {
-                //         if (!empty($bloque['nombre'])) {
-                //             $nombreTorre = new NombreTorres();
-                //             $nombreTorre->proyecto_id = $proyecto_casas->id;
-                //             $nombreTorre->nombre_manazan = $bloque['nombre'];
-                //             $nombreTorre->manzana = $index + 1; // posición/orden
-                //             $nombreTorre->save();
-                //         }
-                //     }
-                // }
-
+                if (isset($request->manzanas) && is_array($request->manzanas)) {
+                    foreach ($request->manzanas as $index => $bloque) {
+                        if (!empty($bloque['nombre'])) {
+                            $nombreManzana = new Nombrexmanzana();
+                            $nombreManzana->proyectos_casas_id = $proyecto->id;
+                            $nombreManzana->nombre_manzana = $bloque['nombre'];
+                            $nombreManzana->manzana = $index + 1; // posición/orden
+                            $nombreManzana->save();
+                        }
+                    }
+                }
             }
 
             DB::commit(); // Confirmamos los cambios
@@ -795,6 +796,13 @@ class ProyectosController extends Controller
     {
         $categoria = Proyectos::find($id);
 
+        $categoria->estado = !$categoria->estado;
+        $categoria->update();
+    }
+
+    public function destroyCasa($id)
+    {
+        $categoria = ProyectoCasa::find($id);
         $categoria->estado = !$categoria->estado;
         $categoria->update();
     }
@@ -1094,7 +1102,6 @@ class ProyectosController extends Controller
                 ->where('piso', $piso)
                 ->update(['consecutivo' => $nuevo]);
 
-            info("✔️  $original → $nuevo");
         }
 
         return response()->json([
