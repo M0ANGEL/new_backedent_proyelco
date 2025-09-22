@@ -164,85 +164,86 @@ class ActivosController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'categoria_id' => ['required'],
-                'subcategoria_id' => ['required'],
-                'numero_activo' => ['required', 'string'],
-                'valor' => ['required', 'string'],
-                'condicion' => ['required'],
-                'ubicacion_actual' => ['required'],
-            ]);
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'categoria_id' => ['required'],
+            'subcategoria_id' => ['required'],
+            'numero_activo' => ['required', 'string'],
+            'valor' => ['required', 'string'],
+            'condicion' => ['required'],
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
 
-            // Validar que el numero de activo sea único
-            $proyectoUnico = Activo::where('numero_activo', $request->numero_activo)
-                ->where('id', '!=', $id)
-                ->first();
-            if ($proyectoUnico) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Error: Este numero de activo ya esta registrado',
-                ], 404);
-            }
-
-            // 👇 OJO: obtener el registro existente
-            $cliente = Activo::findOrFail($id);
-
-            // Actualizar campos
-            $cliente->numero_activo = $request->numero_activo;
-            $cliente->categoria_id = $request->categoria_id;
-            $cliente->subcategoria_id = $request->subcategoria_id;
-            $cliente->descripcion = $request->descripcion ?: "..";
-            $cliente->valor = $request->valor;
-            $cliente->fecha_compra = $request->origen_activo == 1
-                ? Carbon::parse($request->fecha_compra)->format('Y-m-d')
-                : null;
-            $cliente->fecha_aquiler = $request->origen_activo == 1
-                ? null
-                : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
-            $cliente->condicion = $request->condicion;
-            $cliente->ubicacion_actual_id = $request->ubicacion_actual;
-            $cliente->marca = $request->marca ?: null;
-            $cliente->serial = $request->serial ?: null;
-            $cliente->save();
-
-            // Manejo de imagen
-            if ($request->hasFile('file')) {
-                $request->validate([
-                    'file' => 'mimes:jpg,jpeg,png|max:2048'
-                ]);
-
-                // Eliminar anteriores (si existen)
-                $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
-                foreach ($oldFiles as $oldFile) {
-                    @unlink($oldFile);
-                }
-
-                // Guardar nueva
-                $extension = strtolower($request->file('file')->getClientOriginalExtension());
-                $request->file('file')->storeAs(
-                    'public/activos',
-                    $cliente->id . '.' . $extension
-                );
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $cliente
-            ], 200);
-        } catch (Exception $e) {
+        // Validar que el numero de activo sea único
+        $proyectoUnico = Activo::where('numero_activo', $request->numero_activo)
+            ->where('id', '!=', $id)
+            ->first();
+        if ($proyectoUnico) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
-                'code' => $e->getCode()
-            ], 500);
+                'message' => 'Error: Este numero de activo ya está registrado',
+            ], 404);
         }
+
+        // Obtener el registro existente
+        $cliente = Activo::findOrFail($id);
+
+        // Actualizar campos
+        $cliente->numero_activo = $request->numero_activo;
+        $cliente->categoria_id = $request->categoria_id;
+        $cliente->subcategoria_id = $request->subcategoria_id;
+        $cliente->descripcion = $request->descripcion ?: "..";
+        $cliente->valor = $request->valor;
+        $cliente->fecha_compra = $request->origen_activo == 1
+            ? Carbon::parse($request->fecha_compra)->format('Y-m-d')
+            : null;
+        $cliente->fecha_aquiler = $request->origen_activo == 1
+            ? null
+            : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
+        $cliente->condicion = $request->condicion;
+        $cliente->marca = $request->marca ?: null;
+        $cliente->serial = $request->serial ?: null;
+        $cliente->save();
+
+        // Manejo de imagen
+        if ($request->hasFile('file')) {
+            $request->validate([
+                'file' => 'mimes:jpg,jpeg,png|max:2048'
+            ]);
+
+            // Borrar imagen anterior
+            $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
+            foreach ($oldFiles as $oldFile) {
+                if (file_exists($oldFile)) {
+                    unlink($oldFile);
+                }
+            }
+
+            // Guardar nueva imagen
+            $extension = strtolower($request->file('file')->getClientOriginalExtension());
+            $request->file('file')->storeAs(
+                'public/activos',
+                $cliente->id . '.' . $extension
+            );
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $cliente
+        ], 200);
+    } catch (Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error: ' . $e->getMessage(),
+            'code' => $e->getCode()
+        ], 500);
     }
+}
+
 
     public function destroy($id)
     {
