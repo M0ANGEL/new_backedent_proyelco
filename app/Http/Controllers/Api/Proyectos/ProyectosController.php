@@ -512,13 +512,13 @@ class ProyectosController extends Controller
     public function infoCard()
     {
         $usuario = Auth::user();
-        // $activos = Activo::where(function ($query) {
-        //     $userId = Auth::id();
-        //     $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
-        // })
-        //     ->where('estado', 1)
-        //     ->where('aceptacion', 1)
-        //     ->count();
+        $activos = Activo::where(function ($query) {
+            $userId = Auth::id();
+            $query->whereRaw("JSON_CONTAINS(activo.usuarios_asignados, '\"$userId\"')");
+        })
+            ->where('estado', 1)
+            ->where('aceptacion', 1)
+            ->count();
 
         switch ($usuario->rol) {
             case 'Administrador':
@@ -538,7 +538,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        // 'activos_pendinetes' => $activos,
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -565,7 +565,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        // 'activos_pendinetes' => $activos,
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                         'proyectosInactivos' => $proyectosInactivos,
                         'proyectosTerminados' => $proyectosTerminados,
@@ -606,7 +606,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        // 'activos_pendinetes' => $activos,
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
@@ -644,7 +644,7 @@ class ProyectosController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'data'  => [
-                        // 'activos_pendinetes' => $activos,
+                        'activos_pendinetes' => $activos,
                         'proyectosActivos' => $proyectosActivos,
                     ],
 
