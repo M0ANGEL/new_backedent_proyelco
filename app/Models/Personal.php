@@ -9,14 +9,34 @@ class Personal extends Model
 {
     use HasFactory;
 
-    protected $table = "personal";
+    protected $table = "empleados_th";
 
     protected $fillable = [
-        'nombres',
-        'apellidos',
-        'telefono',
-        'cedula',
-        'cargo_id',
-        'estado'
+        'estado',
+        'identificacion',
+        'tipo_documento',
+        'nombre_completo',
+        'fecha_expedicion',
+        'estado_civil',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a',
+        'a'
+
     ];
 }

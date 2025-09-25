@@ -23,8 +23,10 @@ use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
+use App\Http\Controllers\Api\TalentoHumano\PersonalProyelco\PersonalProyelcoController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsersPerfilesController;
 use App\Http\Controllers\MenuController;
@@ -35,6 +37,7 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
+use App\Http\Controllers\AuthMarcacionController;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
@@ -49,8 +52,10 @@ use App\Models\ProyectosDetalle;
 |
  */
 
-// Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
-
+//manejo de login de app movile
+Route::get('Appupdate', [AuthMarcacionController::class, 'Appupdate']);
+Route::post('loginMarcacion', [AuthMarcacionController::class, 'loginMarcacion']);
+Route::post('loginMarcacionConfi', [AuthMarcacionController::class, 'loginMarcacionConfi']);
 
 Route::post('login', [AuthController::class, 'login']);
 Route::post('clear-sessions', [AuthController::class, 'clearSessions']);
@@ -143,7 +148,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-confirmar-validar', [VaidarProcesoController::class, 'validarProcesoNuevaLogica']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
     Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
-    Route::get('gestion-proyectos-encargados', [GestionProyectosController::class,'indexEncargadoObra']); 
+    Route::get('gestion-proyectos-encargados', [GestionProyectosController::class, 'indexEncargadoObra']);
 
     //cart dashboard
     Route::get('info-dashboard-card', [ProyectosController::class, 'infoCard']);
@@ -188,60 +193,73 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('dashboards/infoApt', [DashboardController::class, 'infoApt']);
 
     //descargas en excel
-    Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class,'ExportInformeExcelProyecto']);
+    Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class, 'ExportInformeExcelProyecto']);
 
     //activos fijos
     Route::apiResource('bodega-areas', BodegasController::class);
-    Route::get('bodega-areas-obras', [BodegasController::class,'obras']);
+    Route::get('bodega-areas-obras', [BodegasController::class, 'obras']);
     Route::apiResource('categorias-activos', CategoriaActivosController::class);
     Route::apiResource('subcategorias-activos', SubCategoriaActivosController::class);
-    Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class,'SubcategoriaFiltrado']);
+    Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class, 'SubcategoriaFiltrado']);
 
-    Route::apiResource('administar-activos', ActivosController::class); 
-    Route::get('administar-activosBaja', [ActivosController::class,'indexActivosBaja']); 
-    Route::get('usuariosAsignacion', [ActivosController::class,'usuariosAsignacion']);
+    Route::apiResource('administar-activos', ActivosController::class);
+    Route::get('administar-activosBaja', [ActivosController::class, 'indexActivosBaja']);
+    Route::get('usuariosAsignacion', [ActivosController::class, 'usuariosAsignacion']);
 
-    Route::get('mis-activos-pendientes', [MisActivosController::class,'index']); 
-    Route::get('mis-activos', [MisActivosController::class,'misActivos']); 
+    Route::get('mis-activos-pendientes', [MisActivosController::class, 'index']);
+    Route::get('mis-activos', [MisActivosController::class, 'misActivos']);
 
     //administar activos
-    Route::apiResource('administar-kardex-activos', KadexActivosController::class); 
-    Route::get('administar-activos-all', [KadexActivosController::class,'index']); 
-    Route::get('administar-activos-pendientes-all', [KadexActivosController::class,'activosPendientes']); 
+    Route::apiResource('administar-kardex-activos', KadexActivosController::class);
+    Route::get('administar-activos-all', [KadexActivosController::class, 'index']);
+    Route::get('administar-activos-pendientes-all', [KadexActivosController::class, 'activosPendientes']);
 
 
-    Route::get('administar-mis-activos', [KadexActivosController::class,'misActivos']); 
-    Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']);
-    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class,'aceptarActivo']); 
-    Route::post('activo-rechazarActivo', [KadexActivosController::class,'rechazarActivo']); 
-    Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+    Route::get('administar-mis-activos', [KadexActivosController::class, 'misActivos']);
+    Route::get('activo-pendientes', [KadexActivosController::class, 'activosSinConfirmar']);
+    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class, 'aceptarActivo']);
+    Route::post('activo-rechazarActivo', [KadexActivosController::class, 'rechazarActivo']);
+    Route::get('activo-informacion/{id}', [KadexActivosController::class, 'infoActivo']);
 
     //solicitar activo
-    Route::get('solicitar-activos', [KadexActivosController::class,'solicitarActivos']);   
-    Route::post('envio-solicitud-activo', [KadexActivosController::class,'envioSolicitudActivo']);   
-    Route::post('liberar-activos', [KadexActivosController::class,'liberarActivos']);   
+    Route::get('solicitar-activos', [KadexActivosController::class, 'solicitarActivos']);
+    Route::post('envio-solicitud-activo', [KadexActivosController::class, 'envioSolicitudActivo']);
+    Route::post('liberar-activos', [KadexActivosController::class, 'liberarActivos']);
 
 
 
     //kardex historico
-    Route::get('activos-historico', [KadexActivosController::class,'historico']); 
+    Route::get('activos-historico', [KadexActivosController::class, 'historico']);
 
     //nomenclaturas de proyes
-    Route::get('nomenclaturas/{id}',[ProyectosController::class,'nomenclaturas']);
-    Route::post('ActualizarNomenclaturas',[ProyectosController::class,'ActualizarNomenclaturas']);
+    Route::get('nomenclaturas/{id}', [ProyectosController::class, 'nomenclaturas']);
+    Route::post('ActualizarNomenclaturas', [ProyectosController::class, 'ActualizarNomenclaturas']);
 
     //mantenimiento activos
     Route::apiResource('administra-mantenimiento-activos', MantenimientoActivosController::class);
-    Route::get('activosBodegaPrincipal',[ MantenimientoActivosController::class,'activosBodegaPrincipal']);
+    Route::get('activosBodegaPrincipal', [MantenimientoActivosController::class, 'activosBodegaPrincipal']);
 
     //notificacions de obras isn movimientos mas de un dia
-    Route::get('obras-sin-movimientos',[ProyectosController::class,'obrasSinMovimientos']);
-    Route::get('obras-sin-movimientos-ing',[ProyectosController::class,'obrasSinMovimientosIng']);
+    Route::get('obras-sin-movimientos', [ProyectosController::class, 'obrasSinMovimientos']);
+    Route::get('obras-sin-movimientos-ing', [ProyectosController::class, 'obrasSinMovimientosIng']);
 
 
 
 
+    //talento humano
+    Route::apiResource('administar-th', PersonalProyelcoController::class);
+    Route::get('paises-th', [PersonalProyelcoController::class, 'paises']);
+    Route::get('ciudades-th/{id}', [PersonalProyelcoController::class, 'ciudades']);
+    Route::get('cargos-th', [PersonalProyelcoController::class, 'cargos']);
 
-    
 
+    //telefonos app mobile
+    Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
+    Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
+    Route::post('/registrar-sede', [AuthMarcacionController::class, 'registarUbicacionObra']);
+    Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
+
+    //marcacion
+    Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
+    Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
 });
