@@ -31,6 +31,8 @@ return new class extends Migration
             $table->string('direccion')->nullable();
             $table->string('correo')->nullable();
             $table->unsignedBigInteger('cargo_id');
+            $table->unsignedBigInteger('user_id');
+            $table->string("minimo",5);
             $table->string("salario")->default(0);
             $table->string("valor_hora")->default(0);
             $table->timestamps();
@@ -39,6 +41,7 @@ return new class extends Migration
             $table->foreign('pais_residencia_id')->references('id')->on('pais_th');
             $table->foreign('ciudad_resudencia_id')->references('id')->on('ciudad_th');
             $table->foreign('cargo_id')->references('id')->on('cargos_th');
+            $table->foreign('user_id')->references('id')->on('users');
         });
     }
 

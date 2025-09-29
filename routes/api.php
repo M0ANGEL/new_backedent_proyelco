@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
 use App\Http\Controllers\AuthMarcacionController;
+use App\Http\Controllers\ContratistasController;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
@@ -262,4 +263,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //marcacion
     Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
     Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
+
+    //contratista
+    Route::apiResource('administar-contratistas',ContratistasController::class);
+    Route::get('contratistas',[ContratistasController::class,'ContratistasActivos']);
+
+    //personal no proyelco
+    Route::apiResource('personal-no-proyelco',PersonalController::class);
+    Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
 });
