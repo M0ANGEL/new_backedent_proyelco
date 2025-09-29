@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ControlAsistenciasController extends Controller
@@ -33,6 +34,9 @@ class ControlAsistenciasController extends Controller
                 ->where('estado', 1)
                 ->first(); // Usar first() en lugar de get() para obtener un solo registro
 
+
+            // Log::info((array) $empleado);
+
             // Si el empleado no existe o no está activo
             if (!$empleado) {
                 return response()->json([
@@ -52,8 +56,8 @@ class ControlAsistenciasController extends Controller
                 ->where('identificacion', $empleado->identificacion)
                 ->whereDate('fecha_ingreso', $fechaActual)
                 ->orderBy('fecha_ingreso', 'desc')
+                ->orderBy('id', 'desc')
                 ->first();
-
 
             if ($ultimaAsistencia) {
                 // Si ya tiene registro de entrada pero no tiene fecha de salida
@@ -178,6 +182,10 @@ class ControlAsistenciasController extends Controller
                 ->where('estado', 1)
                 ->first();
 
+            Log::info((array) $empleado);
+
+
+
             if (!$empleado) {
                 return response()->json([
                     'status' => 'error',
@@ -195,9 +203,13 @@ class ControlAsistenciasController extends Controller
                     ->table('asistencias_th')
                     ->where('empleado_id', $empleado->empleado_id)
                     ->where('tipo_empleado', $empleado->tipo_empleado)
+                    ->where('tipo_empleado', $empleado->tipo_empleado)
                     ->whereDate('fecha_ingreso', $fechaActual)
                     ->whereNull('fecha_salida')
                     ->first();
+
+                Log::info((array) $entradaPendiente);
+
 
                 if ($entradaPendiente) {
                     return response()->json([
