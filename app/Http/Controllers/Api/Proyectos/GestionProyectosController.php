@@ -20,6 +20,79 @@ use Maatwebsite\Excel\Facades\Excel;
 class GestionProyectosController extends Controller
 {
     //index ingenieros
+    // public function index()
+    // {
+    //     // Traer proyectos con joins básicos
+    //     $proyectos = DB::table('proyecto')
+    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
+    //         ->where(function ($query) {
+    //             $userId = Auth::id();
+    //             $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+    //             // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+    //         })
+    //         ->select(
+    //             'proyecto.*',
+    //             'tipos_de_proyectos.nombre_tipo',
+    //             'clientes.emp_nombre'
+    //         )
+    //         ->get();
+
+    //     // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+    //     $encargadoIdsGlobal = [];
+    //     $ingenieroIdsGlobal = [];
+
+    //     foreach ($proyectos as $proyecto) {
+    //         $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+    //         $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+    //     }
+
+    //     // 2️⃣ Obtener todos los usuarios de una sola consulta
+    //     $usuarios = DB::table('users')
+    //         ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+    //         ->pluck('nombre', 'id'); // => [id => nombre]
+
+    //     // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+    //     $detalles = DB::table('proyecto_detalle')
+    //         ->whereIn('proyecto_id', $proyectos->pluck('id'))
+    //         ->get()
+    //         ->groupBy('proyecto_id');
+
+    //     // 4️⃣ Asignar nombres y cálculos a cada proyecto
+    //     foreach ($proyectos as $proyecto) {
+    //         // Encargados
+    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+    //         $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+    //         // Ingenieros
+    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+    //         $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+    //         // Detalles del proyecto
+    //         $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+    //         // Cálculo de atraso
+    //         $ejecutando = $detalleProyecto->where('estado', 1)->count();
+    //         $terminado = $detalleProyecto->where('estado', 2)->count();
+    //         $total = $ejecutando + $terminado;
+
+    //         $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+
+    //         // Cálculo de avance
+    //         $totalApartamentos = $detalleProyecto->count();
+    //         $apartamentosRealizados = $terminado;
+    //         $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+    //     }
+
+    //     // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+    //     $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $proyectos
+    //     ]);
+    // }
+
     public function index()
     {
         // Traer proyectos con joins básicos
@@ -29,7 +102,7 @@ class GestionProyectosController extends Controller
             ->where(function ($query) {
                 $userId = Auth::id();
                 $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
-                // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+                // ->orWhereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')"); // si en algún momento quieres incluir encargados
             })
             ->select(
                 'proyecto.*',
@@ -62,26 +135,39 @@ class GestionProyectosController extends Controller
         foreach ($proyectos as $proyecto) {
             // Encargados
             $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-            $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+            $proyecto->nombresEncargados = collect($encargadoIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
 
             // Ingenieros
             $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-            $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+            $proyecto->nombresIngenieros = collect($ingenieroIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
 
             // Detalles del proyecto
             $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Cálculo de atraso
-            $ejecutando = $detalleProyecto->where('estado', 1)->count();
-            $terminado = $detalleProyecto->where('estado', 2)->count();
-            $total = $ejecutando + $terminado;
+            // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
+            $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
+            $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
+            $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
+            $totalAtraso = $ejecutando + $terminado;
 
-            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+            $proyecto->porcentaje = $totalAtraso > 0
+                ? round(($ejecutando / $totalAtraso) * 100, 2)
+                : 0;
 
-            // Cálculo de avance
+            // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
             $totalApartamentos = $detalleProyecto->count();
-            $apartamentosRealizados = $terminado;
-            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+
+            // (Opcional) Mostrar serial de avance tipo "X/Y"
+            $proyecto->serial_avance = $apartamentosRealizados . '/' . $totalApartamentos;
         }
 
         // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
@@ -92,80 +178,168 @@ class GestionProyectosController extends Controller
             'data' => $proyectos
         ]);
     }
+
 
     //index encargados de obras
+    // public function indexEncargadoObra()
+    // {
+    //     // Traer proyectos con joins básicos
+    //     $proyectos = DB::table('proyecto')
+    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
+    //         ->where(function ($query) {
+    //             $userId = Auth::id();
+    //             $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
+    //         })
+    //         ->select(
+    //             'proyecto.*',
+    //             'tipos_de_proyectos.nombre_tipo',
+    //             'clientes.emp_nombre'
+    //         )
+    //         ->get();
+
+    //     // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+    //     $encargadoIdsGlobal = [];
+    //     $ingenieroIdsGlobal = [];
+
+    //     foreach ($proyectos as $proyecto) {
+    //         $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+    //         $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+    //     }
+
+    //     // 2️⃣ Obtener todos los usuarios de una sola consulta
+    //     $usuarios = DB::table('users')
+    //         ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+    //         ->pluck('nombre', 'id'); // => [id => nombre]
+
+    //     // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+    //     $detalles = DB::table('proyecto_detalle')
+    //         ->whereIn('proyecto_id', $proyectos->pluck('id'))
+    //         ->get()
+    //         ->groupBy('proyecto_id');
+
+    //     // 4️⃣ Asignar nombres y cálculos a cada proyecto
+    //     foreach ($proyectos as $proyecto) {
+    //         // Encargados
+    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+    //         $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+    //         // Ingenieros
+    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+    //         $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
+
+    //         // Detalles del proyecto
+    //         $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+    //         // Cálculo de atraso
+    //         $ejecutando = $detalleProyecto->where('estado', 1)->count();
+    //         $terminado = $detalleProyecto->where('estado', 2)->count();
+    //         $total = $ejecutando + $terminado;
+
+    //         $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+
+    //         // Cálculo de avance
+    //         $totalApartamentos = $detalleProyecto->count();
+    //         $apartamentosRealizados = $terminado;
+    //         $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+    //     }
+
+    //     // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+    //     $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $proyectos
+    //     ]);
+    // }
+
     public function indexEncargadoObra()
-    {
-        // Traer proyectos con joins básicos
-        $proyectos = DB::table('proyecto')
-            ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-            ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
-            ->where(function ($query) {
-                $userId = Auth::id();
-                $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
-            })
-            ->select(
-                'proyecto.*',
-                'tipos_de_proyectos.nombre_tipo',
-                'clientes.emp_nombre'
-            )
-            ->get();
+{
+    // Traer proyectos con joins básicos
+    $proyectos = DB::table('proyecto')
+        ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+        ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
+        ->where(function ($query) {
+            $userId = Auth::id();
+            $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
+        })
+        ->select(
+            'proyecto.*',
+            'tipos_de_proyectos.nombre_tipo',
+            'clientes.emp_nombre'
+        )
+        ->get();
 
-        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
-        $encargadoIdsGlobal = [];
-        $ingenieroIdsGlobal = [];
+    // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+    $encargadoIdsGlobal = [];
+    $ingenieroIdsGlobal = [];
 
-        foreach ($proyectos as $proyecto) {
-            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
-            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
-        }
-
-        // 2️⃣ Obtener todos los usuarios de una sola consulta
-        $usuarios = DB::table('users')
-            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
-            ->pluck('nombre', 'id'); // => [id => nombre]
-
-        // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
-        $detalles = DB::table('proyecto_detalle')
-            ->whereIn('proyecto_id', $proyectos->pluck('id'))
-            ->get()
-            ->groupBy('proyecto_id');
-
-        // 4️⃣ Asignar nombres y cálculos a cada proyecto
-        foreach ($proyectos as $proyecto) {
-            // Encargados
-            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-            $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-            // Ingenieros
-            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-            $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-            // Detalles del proyecto
-            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
-
-            // Cálculo de atraso
-            $ejecutando = $detalleProyecto->where('estado', 1)->count();
-            $terminado = $detalleProyecto->where('estado', 2)->count();
-            $total = $ejecutando + $terminado;
-
-            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
-
-            // Cálculo de avance
-            $totalApartamentos = $detalleProyecto->count();
-            $apartamentosRealizados = $terminado;
-            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
-        }
-
-        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
-        $proyectos = $proyectos->sortByDesc('porcentaje')->values();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $proyectos
-        ]);
+    foreach ($proyectos as $proyecto) {
+        $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+        $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
     }
 
+    // 2️⃣ Obtener todos los usuarios de una sola consulta
+    $usuarios = DB::table('users')
+        ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+        ->pluck('nombre', 'id'); // => [id => nombre]
+
+    // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+    $detalles = DB::table('proyecto_detalle')
+        ->whereIn('proyecto_id', $proyectos->pluck('id'))
+        ->get()
+        ->groupBy('proyecto_id');
+
+    // 4️⃣ Asignar nombres y cálculos a cada proyecto
+    foreach ($proyectos as $proyecto) {
+        // Encargados
+        $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+        $proyecto->nombresEncargados = collect($encargadoIds)
+            ->map(fn($id) => $usuarios[$id] ?? null)
+            ->filter();
+
+        // Ingenieros
+        $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+        $proyecto->nombresIngenieros = collect($ingenieroIds)
+            ->map(fn($id) => $usuarios[$id] ?? null)
+            ->filter();
+
+        // Detalles del proyecto
+        $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+        // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
+        $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
+        $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
+        $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
+        $totalAtraso = $ejecutando + $terminado;
+
+        $proyecto->porcentaje = $totalAtraso > 0
+            ? round(($ejecutando / $totalAtraso) * 100, 2)
+            : 0;
+
+        // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
+        $totalApartamentos = $detalleProyecto->count();
+        $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+
+        $proyecto->avance = $totalApartamentos > 0
+            ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+            : 0;
+
+        // (Opcional) Serial de avance tipo "realizados/total"
+        $proyecto->serial_avance = $apartamentosRealizados . '/' . $totalApartamentos;
+    }
+
+    // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+    $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $proyectos
+    ]);
+}
+
+
+    //retonro de datos detallados del proyecto y sus %
     public function indexProgreso(Request $request)
     {
         // 1. CONFIGURACIÓN DE PROCESOS - Obtiene cuántos pisos se requieren completar para cada proceso
@@ -425,47 +599,183 @@ class GestionProyectosController extends Controller
     }
 
     //Calcula porcentajes de avance y atraso para procesos y torres
+    // private function calcularPorcentajes(&$resultado, &$torreResumen)
+    // {
+    //     // Porcentajes por proceso
+    //     foreach ($resultado as $torre => &$procesos) {
+    //         foreach ($procesos as $orden_proceso => &$proceso) {
+    //             if ($orden_proceso === 'nombre_torre') continue;
+
+    //             // Proceso Fundida (1) no lleva porcentajes
+    //             if ($orden_proceso == 1) {
+    //                 $proceso['porcentaje_atraso'] = 0;
+    //                 $proceso['porcentaje_avance'] = 0;
+    //                 continue;
+    //             }
+
+    //             $total_atraso = $proceso['apartamentos_atraso'];
+    //             $total_realizados = $proceso['apartamentos_realizados'];
+    //             $denominador = $total_atraso + $total_realizados;
+
+    //             // % Atraso = (Atrasos / Total iniciados) * 100
+    //             $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+
+    //             // % Avance = (Realizados / Total apartamentos) * 100
+    //             $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
+    //                 round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
+    //         }
+    //     }
+
+    //     // Porcentajes por torre
+    //     foreach ($torreResumen as $torre => &$datos) {
+    //         $total_atraso = $datos['total_atraso'];
+    //         $total_realizados = $datos['total_realizados'];
+    //         $denominador = $total_atraso + $total_realizados;
+
+    //         $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
+    //         $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
+    //         $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
+
+    //         unset($datos['pisos_unicos']); // Eliminar campo auxiliar
+    //     }
+    // }
+    //Calcula porcentajes de avance y atraso para procesos y torres
+    // private function calcularPorcentajes(&$resultado, &$torreResumen)
+    // {
+    //     // --- Porcentajes por proceso ---
+    //     foreach ($resultado as $torre => &$procesos) {
+    //         foreach ($procesos as $orden_proceso => &$proceso) {
+    //             if ($orden_proceso === 'nombre_torre') continue;
+
+    //             $total_atraso      = $proceso['apartamentos_atraso'];     // estado = 1
+    //             $total_realizados  = $proceso['apartamentos_realizados']; // estado = 2
+    //             $total_apartamentos = $proceso['total_apartamentos'];     // estados 0,1,2
+
+    //             // % ATRASO (se excluye proceso 1)
+    //             if ($orden_proceso == 1) {
+    //                 $proceso['porcentaje_atraso'] = 0;
+    //             } else {
+    //                 $denominador = $total_atraso + $total_realizados;
+    //                 $proceso['porcentaje_atraso'] = $denominador > 0
+    //                     ? round(($total_atraso / $denominador) * 100, 2)
+    //                     : 0;
+    //             }
+
+    //             // % AVANCE (se incluyen todos)
+    //             $proceso['porcentaje_avance'] = $total_apartamentos > 0
+    //                 ? round(($total_realizados / $total_apartamentos) * 100, 2)
+    //                 : 0;
+    //         }
+    //     }
+
+    //     // --- Porcentajes por torre ---
+    //     foreach ($torreResumen as $torre => &$datos) {
+    //         $total_atraso     = 0;
+    //         $total_realizados = 0;
+    //         $total_apartamentos = 0;
+
+    //         foreach ($resultado[$torre] as $op => $proc) {
+    //             if ($op === 'nombre_torre') continue;
+
+    //             $total_realizados += $proc['apartamentos_realizados'];
+    //             $total_apartamentos += $proc['total_apartamentos'];
+
+    //             if ($op != 1) { // excluir proceso 1 para atraso
+    //                 $total_atraso += $proc['apartamentos_atraso'];
+    //             }
+    //         }
+
+    //         $denominador = $total_atraso + $total_realizados;
+
+    //         // % ATRASO TORRE (excluye proceso 1)
+    //         $datos['porcentaje_atraso'] = $denominador > 0
+    //             ? round(($total_atraso / $denominador) * 100, 2)
+    //             : 0;
+
+    //         // % AVANCE TORRE (incluye todos)
+    //         $datos['porcentaje_avance'] = $total_apartamentos > 0
+    //             ? round(($total_realizados / $total_apartamentos) * 100, 2)
+    //             : 0;
+
+    //         $datos['serial_avance'] = $total_realizados . '/' . $total_apartamentos;
+    //         $datos['total_pisos'] = count($datos['pisos_unicos']);
+
+    //         unset($datos['pisos_unicos']); // Eliminar campo auxiliar
+    //     }
+    // }
+
+    //Calcula porcentajes de avance y atraso para procesos y torres
     private function calcularPorcentajes(&$resultado, &$torreResumen)
     {
-        // Porcentajes por proceso
+        // --- Porcentajes por proceso ---
         foreach ($resultado as $torre => &$procesos) {
             foreach ($procesos as $orden_proceso => &$proceso) {
                 if ($orden_proceso === 'nombre_torre') continue;
 
-                // Proceso Fundida (1) no lleva porcentajes
+                $total_atraso      = $proceso['apartamentos_atraso'];     // estado = 1
+                $total_realizados  = $proceso['apartamentos_realizados']; // estado = 2
+                $total_apartamentos = $proceso['total_apartamentos'];     // estados 0,1,2
+
+                // % ATRASO (se excluye proceso 1)
                 if ($orden_proceso == 1) {
                     $proceso['porcentaje_atraso'] = 0;
-                    $proceso['porcentaje_avance'] = 0;
-                    continue;
+                } else {
+                    $den = $total_atraso + $total_realizados;
+                    $proceso['porcentaje_atraso'] = $den > 0 ? round(($total_atraso / $den) * 100, 2) : 0;
                 }
 
-                $total_atraso = $proceso['apartamentos_atraso'];
-                $total_realizados = $proceso['apartamentos_realizados'];
-                $denominador = $total_atraso + $total_realizados;
-
-                // % Atraso = (Atrasos / Total iniciados) * 100
-                $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
-
-                // % Avance = (Realizados / Total apartamentos) * 100
-                $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
-                    round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
+                // % AVANCE (incluye todos los procesos)
+                $proceso['porcentaje_avance'] = $total_apartamentos > 0
+                    ? round(($total_realizados / $total_apartamentos) * 100, 2)
+                    : 0;
             }
         }
 
-        // Porcentajes por torre
+        // --- Porcentajes por torre ---
         foreach ($torreResumen as $torre => &$datos) {
-            $total_atraso = $datos['total_atraso'];
-            $total_realizados = $datos['total_realizados'];
-            $denominador = $total_atraso + $total_realizados;
+            // Para atraso: sumar solo estados de procesos != 1
+            $total_atraso_excl = 0;           // suma estado=1 (excluye op=1)
+            $total_realizados_excl = 0;       // suma estado=2 (excluye op=1, para el denominador del atraso)
 
-            $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
-            $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
-            $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+            // Para avance: incluir todos los procesos
+            $total_realizados_all = 0;        // suma estado=2 (incluye op=1)
+            $total_apartamentos_all = 0;      // total aptos (incluye op=1)
+
+            foreach ($resultado[$torre] as $op => $proc) {
+                if ($op === 'nombre_torre') continue;
+
+                // avance (incluye todo)
+                $total_realizados_all += $proc['apartamentos_realizados'];
+                $total_apartamentos_all += $proc['total_apartamentos'];
+
+                // atraso (excluir proceso 1)
+                if ($op != 1) {
+                    $total_atraso_excl += $proc['apartamentos_atraso'];
+                    $total_realizados_excl += $proc['apartamentos_realizados'];
+                }
+            }
+
+            // Atraso torre: estado1 / (estado1 + estado2) — ambos excluyen op=1
+            $denAtraso = $total_atraso_excl + $total_realizados_excl;
+            $datos['porcentaje_atraso'] = $denAtraso > 0
+                ? round(($total_atraso_excl / $denAtraso) * 100, 2)
+                : 0;
+
+            // Avance torre: estado2 (incluye todo) / total aptos (incluye todo)
+            $datos['porcentaje_avance'] = $total_apartamentos_all > 0
+                ? round(($total_realizados_all / $total_apartamentos_all) * 100, 2)
+                : 0;
+
+            $datos['serial_avance'] = $total_realizados_all . '/' . $total_apartamentos_all;
             $datos['total_pisos'] = count($datos['pisos_unicos']);
 
             unset($datos['pisos_unicos']); // Eliminar campo auxiliar
         }
     }
+
+
+
 
     //------------------------------------------------------------------------------------
     public function destroy($id)
