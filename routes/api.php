@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
 use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
+use App\Http\Controllers\Api\TalentoHumano\FichaObra\FichaObraController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
 use App\Http\Controllers\Api\TalentoHumano\PersonalProyelco\PersonalProyelcoController;
 use App\Http\Controllers\Api\UserController;
@@ -271,4 +272,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //personal no proyelco
     Route::apiResource('personal-no-proyelco',PersonalController::class);
     Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
+
+
+    //Crear ficha
+    Route::apiResource('ficha-obra',FichaObraController::class);
 });
