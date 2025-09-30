@@ -1190,7 +1190,6 @@ class GestionProyectosController extends Controller
             ]);
     }
 
-
     private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoOrigen, $procesoDestino)
     {
         $aptMinimos = $proyecto->minimoApt;

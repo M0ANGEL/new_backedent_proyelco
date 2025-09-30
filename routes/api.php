@@ -252,4 +252,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-iniciar-manzana', [GestionProyectosCasasController::class, 'IniciarManzana']);
     Route::post('casas-infoCasa', [GestionProyectosCasasController::class, 'infoCasa']);
     Route::delete('activar-proyecto/{id}', [ProyectosController::class, 'destroyCasa']);
+
+    //reporte detallado
+    Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 });
+
