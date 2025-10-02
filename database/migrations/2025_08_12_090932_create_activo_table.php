@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id'); //relacion con usuario que crea el activo
             $table->string("descripcion");
             $table->string("valor")->default(0);
-            $table->tinyInteger('condicion'); //1 bueno 2 malo 3 en reparacion
+            $table->tinyInteger('condicion'); //1 bueno 2 reparado 3 en malo
             $table->string("marca",50)->nullable();
             $table->string("serial",100)->nullable();
             $table->tinyInteger('estado')->default(1); //1 activo 0 inactivo 2 de baja 
