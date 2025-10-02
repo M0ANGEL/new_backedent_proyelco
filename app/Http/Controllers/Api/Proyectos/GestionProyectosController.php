@@ -105,7 +105,7 @@ class GestionProyectosController extends Controller
                 $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
                 // ->orWhereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')"); // si en algún momento quieres incluir encargados
             })
-            ->where('proyecto.estado',1)
+            ->where('proyecto.estado', 1)
             ->select(
                 'proyecto.*',
                 'tipos_de_proyectos.nombre_tipo',
@@ -180,7 +180,7 @@ class GestionProyectosController extends Controller
         $proyectos_casa = DB::table('proyectos_casas')
             ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
-             ->where(function ($query) {
+            ->where(function ($query) {
                 $userId = Auth::id();
                 $query->whereRaw("JSON_CONTAINS(proyectos_casas.ingeniero_id, '\"$userId\"')");
                 // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
@@ -267,9 +267,9 @@ class GestionProyectosController extends Controller
             )
             ->get();
 
-    // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
-    $encargadoIdsGlobal = [];
-    $ingenieroIdsGlobal = [];
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
 
         foreach ($proyectos as $proyecto) {
             $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
@@ -1734,166 +1734,4 @@ class GestionProyectosController extends Controller
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
     }
-
-
-    //futuro en caso tal retie y ritel 
-/*     private function confirmarPruebas($proyecto, $torre, $orden_proceso, $piso)
-    {
-        $aptMinimos = $proyecto->minimoApt;
-
-        // Obtener todos los aptos del piso para este proceso
-        $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
-            ->where('orden_proceso', $orden_proceso)
-            ->where('proyecto_id', $proyecto->id)
-            ->where('piso', $piso)
-            ->get();
-
-        // Filtrar solo los que están confirmados (estado == 2)
-        $confirmados = $aptosDelPiso->filter(fn($apt) => $apt->estado == 2);
-
-        // Validar si al menos se cumple el mínimo requerido
-        $confirmarInicioProceso = $confirmados->count() >= $aptMinimos;
-
-        if ($confirmarInicioProceso) {
-            // Validar y habilitar procesos dependientes
-            $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'retie');
-            $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'ritel');
-        }
-    }
-
-
-    private function validarYHabilitarRetieYRitel($proyecto, $torre, $piso, $procesoNombre)
-    {
-        $aptMinimos = $proyecto->minimoApt;
-
-        // Obtener pisos requeridos
-        $CambioProceso = DB::table('cambio_procesos_x_proyecto')
-            ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
-            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-            ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
-            ->select('cambio_procesos_x_proyecto.*')
-            ->first();
-
-
-
-        $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
-
-        // Verificar si el proceso ya inició en piso 1
-        $inicioProceso = DB::table('proyecto_detalle')
-            ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-            ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-            ->where('proyecto_detalle.torre', $torre)
-            ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-            ->where('proyecto_detalle.piso', 1)
-            ->get();
-
-        $yaIniciado = $inicioProceso->isNotEmpty() && $inicioProceso->contains(fn($apt) => $apt->estado != 0);
-
-
-        if ($yaIniciado) {
-            $nuevoPiso = $piso - ($pisosRequeridos - 1);
-
-            $verValidacion = DB::table('proyecto_detalle')
-                ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
-                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-                ->where('proyecto_detalle.torre', $torre)
-                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-                ->where('proyecto_detalle.piso', $nuevoPiso)
-                ->select('proyecto_detalle.*')
-                ->get();
-
-            $todosPendientes = $verValidacion->every(fn($apt) => $apt->validacion == 1 && $apt->estado_validacion == 0);
-
-            if ($todosPendientes) {
-                return;
-            }
-
-            // Aplicar lógica de mínimos para habilitar
-            $aptosConfirmados = ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyecto->id)
-                ->where('piso', $piso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-                ->where('estado', 2)
-                ->pluck('consecutivo')
-                ->toArray();
-
-            $pendientesDestino = ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyecto->id)
-                ->where('piso', $nuevoPiso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-                ->where('estado', 0)
-                ->pluck('consecutivo')
-                ->toArray();
-
-            $pisoActualizado = $piso - $nuevoPiso;
-            $transformados = array_map(fn($apt) => (int)$apt - ($pisoActualizado * 100), $aptosConfirmados);
-
-            $aptosHabilitar = array_intersect($transformados, $pendientesDestino);
-
-            $yaHabilitados = ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyecto->id)
-                ->where('piso', $nuevoPiso)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-                ->where('estado', 1)
-                ->pluck('consecutivo')
-                ->toArray();
-
-            if ((count($yaHabilitados) + count($aptosHabilitar)) < $aptMinimos) {
-                return;
-            } elseif ((count($yaHabilitados) + count($aptosHabilitar)) == $aptMinimos) {
-                $this->habilitarPorConsecutivos($proyecto, $torre, $nuevoPiso, $procesoNombre, $aptosHabilitar);
-            } else {
-                $uno = reset($aptosHabilitar);
-                $this->habilitarPorConsecutivos($proyecto, $torre, $nuevoPiso, $procesoNombre, [$uno]);
-            }
-        } elseif ($piso >= $pisosRequeridos) {
-            // Verifica que se cumplan pisos suficientes con mínimo de aptos confirmados
-            $pisosCumplen = ProyectosDetalle::select('piso')
-                ->where('torre', $torre)
-                ->where('proyecto_id', $proyecto->id)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ["pruebas"]))
-                ->where('estado', 2)
-                ->groupBy('piso')
-                ->havingRaw('COUNT(*) >= ?', [$aptMinimos])
-                ->pluck('piso')
-                ->toArray();
-
-
-
-
-
-
-            if (count($pisosCumplen) < $pisosRequeridos) {
-
-                return;
-            }
-
-            // Validación externa antes de habilitar piso 1
-            $detalle = DB::table('proyecto_detalle')
-                ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-                ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-                ->where('proyecto_detalle.torre', $torre)
-                ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-                ->where('proyecto_detalle.piso', 1)
-                ->select('proyecto_detalle.*')
-                ->first();
-
-            if ($detalle && $detalle->validacion == 1 && $detalle->estado_validacion == 0) {
-                return;
-            }
-
-
-
-            // Aptos confirmados del procesoNombre en piso 1
-            $aptosConfirmados = ProyectosDetalle::where('torre', $torre)
-                ->where('proyecto_id', $proyecto->id)
-                ->where('piso', 1)
-                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-                ->where('estado', 2)
-                ->pluck('consecutivo')
-                ->toArray();
-
-            $this->habilitarPorConsecutivos($proyecto, $torre, 1, $procesoNombre, $aptosConfirmados);
-        }
-    } */
 }

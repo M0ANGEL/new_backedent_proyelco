@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
+use App\Models\AnulacionApt;
 use App\Models\ProcesosProyectos;
 use App\Models\ProyectoCasa;
 use App\Models\ProyectoCasaDetalle;
@@ -289,41 +290,6 @@ class GestionProyectosCasasController extends Controller
         }
     }
 
-    // private function procesarEtapa1($info, $proyecto)
-    // {
-    //     $manzana = $info->manzana;
-    //     $orden_proceso = $info->orden_proceso;
-    //     $piso = $info->piso;
-    //     $etapa = $info->etapa;
-    //     $casa = $info->casa;
-
-    //     // Buscar el siguiente proceso en la misma etapa
-    //     $siguiente = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //         ->where('manzana', $manzana)
-    //         ->where('etapa', $etapa)
-    //         ->where('casa', $casa)
-    //         ->where('orden_proceso', $orden_proceso + 1)
-    //         ->first();
-
-    //     if ($siguiente) {
-    //         // Habilitar el siguiente proceso
-    //         if ($siguiente->estado == ProcesoEstados::PENDIENTE) {
-    //             $siguiente->estado = ProcesoEstados::HABILITADO;
-    //             $siguiente->fecha_habilitado = now();
-    //             $siguiente->save();
-
-    //             $this->logProceso('Proceso habilitado en etapa 1', [
-    //                 'proceso_id' => $siguiente->id,
-    //                 'orden_proceso' => $siguiente->orden_proceso
-    //             ]);
-    //         }
-    //     } else {
-    //         // Último proceso de etapa 1, habilitar primeros procesos de etapa 2
-    //         $this->habilitarInicioEtapa2($proyecto, $manzana, $casa);
-    //     }
-    // }
-
-
     private function procesarEtapa1($info, $proyecto)
     {
         $manzana = $info->manzana;
@@ -450,29 +416,6 @@ class GestionProyectosCasasController extends Controller
     }
 
 
-    // private function habilitarInicioEtapa2($proyecto, $manzana, $casa)
-    // {
-    //     $siguientesEtapa = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //         ->where('manzana', $manzana)
-    //         ->where('etapa', 2)
-    //         ->where('casa', $casa)
-    //         ->where('piso', 1)
-    //         ->whereIn('orden_proceso', [1, 2])
-    //         ->get();
-
-    //     foreach ($siguientesEtapa as $proceso) {
-    //         if ($proceso->estado == ProcesoEstados::PENDIENTE) {
-    //             $proceso->estado = ProcesoEstados::HABILITADO;
-    //             $proceso->fecha_habilitado = now();
-    //             $proceso->save();
-
-    //             $this->logProceso('Proceso habilitado al iniciar etapa 2', [
-    //                 'proceso_id' => $proceso->id,
-    //                 'orden_proceso' => $proceso->orden_proceso
-    //             ]);
-    //         }
-    //     }
-    // }
 
     private function procesarEtapa2($info, $proyecto)
     {
@@ -785,117 +728,210 @@ class GestionProyectosCasasController extends Controller
 
     /* ============================================================================================================ */
 
-public function InformeDetalladoProyectosCasas($id)
-{
-    $proyectoId = $id;
+    public function InformeDetalladoProyectosCasas($id)
+    {
+        $proyectoId = $id;
 
-    if (!$proyectoId) {
-        return response()->json([
-            'success' => false,
-            'message' => 'ID de proyecto no proporcionado.',
-        ], 400);
-    }
-
-    // Obtener listado de nombres de manzana
-    $torresConNombre = DB::table('nombrexmanzana')
-        ->where('proyectos_casas_id', $proyectoId)
-        ->pluck('nombre_manzana', 'manzana')
-        ->toArray();
-
-    // Traer detalles con piso real
-    $detalles = DB::table('proyectos_casas_detalle')
-        ->join('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-        ->select(
-            'proyectos_casas_detalle.manzana',
-            'proyectos_casas_detalle.estado',
-            'proyectos_casas_detalle.etapa',
-            'proyectos_casas_detalle.piso',
-            'procesos_proyectos.nombre_proceso as proceso',
-            'proyectos_casas_detalle.orden_proceso as orden'
-        )
-        ->where('proyectos_casas_detalle.proyecto_casa_id', $proyectoId)
-        ->get();
-
-    if ($detalles->isEmpty()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'No se encontraron detalles para el proyecto.',
-        ], 404);
-    }
-
-    // Agrupar por etapa + proceso + orden + piso
-    $procesos = $detalles->groupBy(function ($item) {
-        return $item->etapa . '||' . $item->proceso . '||' . $item->orden . '||' . $item->piso;
-    });
-
-    // Lista de manzanas
-    $manzanas = $detalles->pluck('manzana')->unique()->sort()->values()->map(function ($codigoManzana) use ($torresConNombre) {
-        return [
-            'codigo' => $codigoManzana,
-            'nombre' => $torresConNombre[$codigoManzana] ?? "manzana {$codigoManzana}"
-        ];
-    });
-
-    $resultado = [];
-
-    foreach ($procesos as $key => $itemsProceso) {
-        [$etapa, $proceso, $orden, $piso] = explode('||', $key);
-
-        $fila = [
-            'proceso' => $proceso,
-            'etapa'   => (int)$etapa,
-            'piso'    => (int)$piso,
-            'orden'   => (int)$orden,
-        ];
-
-        $totalGlobal = 0;
-        $terminadosGlobal = 0;
-
-        foreach ($manzanas as $manzana) {
-            $codigo = $manzana['codigo'];
-            $nombre = $manzana['nombre'];
-
-            $filtrados = $itemsProceso->where('manzana', $codigo);
-            $total = $filtrados->count();
-            $terminados = $filtrados->where('estado', 2)->count();
-
-            $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 1) : 0;
-
-            $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
-
-            $totalGlobal += $total;
-            $terminadosGlobal += $terminados;
+        if (!$proyectoId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID de proyecto no proporcionado.',
+            ], 400);
         }
 
-        $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 1) : 0;
-        $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+        // Obtener listado de nombres de manzana
+        $torresConNombre = DB::table('nombrexmanzana')
+            ->where('proyectos_casas_id', $proyectoId)
+            ->pluck('nombre_manzana', 'manzana')
+            ->toArray();
 
-        $resultado[] = $fila;
+        // Traer detalles con piso real
+        $detalles = DB::table('proyectos_casas_detalle')
+            ->join('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+            ->select(
+                'proyectos_casas_detalle.manzana',
+                'proyectos_casas_detalle.estado',
+                'proyectos_casas_detalle.etapa',
+                'proyectos_casas_detalle.piso',
+                'procesos_proyectos.nombre_proceso as proceso',
+                'proyectos_casas_detalle.orden_proceso as orden'
+            )
+            ->where('proyectos_casas_detalle.proyecto_casa_id', $proyectoId)
+            ->get();
+
+        if ($detalles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron detalles para el proyecto.',
+            ], 404);
+        }
+
+        // Agrupar por etapa + proceso + orden + piso
+        $procesos = $detalles->groupBy(function ($item) {
+            return $item->etapa . '||' . $item->proceso . '||' . $item->orden . '||' . $item->piso;
+        });
+
+        // Lista de manzanas
+        $manzanas = $detalles->pluck('manzana')->unique()->sort()->values()->map(function ($codigoManzana) use ($torresConNombre) {
+            return [
+                'codigo' => $codigoManzana,
+                'nombre' => $torresConNombre[$codigoManzana] ?? "manzana {$codigoManzana}"
+            ];
+        });
+
+        $resultado = [];
+
+        foreach ($procesos as $key => $itemsProceso) {
+            [$etapa, $proceso, $orden, $piso] = explode('||', $key);
+
+            $fila = [
+                'proceso' => $proceso,
+                'etapa'   => (int)$etapa,
+                'piso'    => (int)$piso,
+                'orden'   => (int)$orden,
+            ];
+
+            $totalGlobal = 0;
+            $terminadosGlobal = 0;
+
+            foreach ($manzanas as $manzana) {
+                $codigo = $manzana['codigo'];
+                $nombre = $manzana['nombre'];
+
+                $filtrados = $itemsProceso->where('manzana', $codigo);
+                $total = $filtrados->count();
+                $terminados = $filtrados->where('estado', 2)->count();
+
+                $porcentaje = $total > 0 ? round(($terminados / $total) * 100, 1) : 0;
+
+                $fila[$nombre] = "{$terminados}/{$total} ({$porcentaje}%)";
+
+                $totalGlobal += $total;
+                $terminadosGlobal += $terminados;
+            }
+
+            $porcentajeGlobal = $totalGlobal > 0 ? round(($terminadosGlobal / $totalGlobal) * 100, 1) : 0;
+            $fila["total"] = "{$terminadosGlobal}/{$totalGlobal} ({$porcentajeGlobal}%)";
+
+            $resultado[] = $fila;
+        }
+
+        // Ordenar: primero etapa, luego orden, luego piso
+        $resultado = collect($resultado)->sortBy([
+            ['etapa', 'asc'],
+            ['orden', 'asc'],
+            ['piso', 'asc'],
+        ])->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'manzanas' => $manzanas->pluck('nombre'),
+                'reporte' => $resultado,
+                'proyecto_id' => $proyectoId
+            ]
+        ]);
     }
 
-    // Ordenar: primero etapa, luego orden, luego piso
-    $resultado = collect($resultado)->sortBy([
-        ['etapa', 'asc'],
-        ['orden', 'asc'],
-        ['piso', 'asc'],
-    ])->values()->all();
 
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'manzanas' => $manzanas->pluck('nombre'),
-            'reporte' => $resultado,
-            'proyecto_id' => $proyectoId
-        ]
-    ]);
-}
+    public function CambioEstadosCasas(Request $request)
+    {
+        DB::beginTransaction();
 
+        try {
+            $info = ProyectoCasaDetalle::findOrFail($request->casa);
 
+            $idsAfectados = [];
+            $procesosAfectados = [];
 
+            if ($info->etapa == 1) {
+                // 🔹 Caso 1: si es etapa 1 → anular todos los procesos en etapa 1 (todos los pisos)
+                $etapa1 = ProyectoCasaDetalle::where('proyecto_casa_id', $info->proyecto_casa_id)
+                    ->where('manzana', $info->manzana)
+                    ->where('casa', $info->casa)
+                    ->where('etapa', 1)
+                    ->where('estado', 2)
+                    ->get();
 
+                foreach ($etapa1 as $apt) {
+                    $apt->estado = 1;
+                    $apt->fecha_habilitado = now();
+                    $apt->fecha_fin = null;
+                    $apt->user_id = null;
+                    $apt->update();
 
+                    $idsAfectados[] = $apt->id;
+                    $procesosAfectados[] = $apt;
+                }
 
+                // 🔹 Después, anular también todos los procesos en etapa 2 (todos los pisos)
+                $etapa2 = ProyectoCasaDetalle::where('proyecto_casa_id', $info->proyecto_casa_id)
+                    ->where('manzana', $info->manzana)
+                    ->where('casa', $info->casa)
+                    ->where('etapa', 2)
+                    ->where('estado', 2)
+                    ->get();
 
+                foreach ($etapa2 as $apt) {
+                    $apt->estado = 1;
+                    $apt->fecha_habilitado = now();
+                    $apt->fecha_fin = null;
+                    $apt->user_id = null;
+                    $apt->update();
 
+                    $idsAfectados[] = $apt->id;
+                    $procesosAfectados[] = $apt;
+                }
+            } elseif ($info->etapa == 2) {
+                // 🔹 Caso 2: si es etapa 2 → anular todos los procesos de ese piso desde el actual hasta los siguientes
+                $procesosEtapa2 = ProyectoCasaDetalle::where('proyecto_casa_id', $info->proyecto_casa_id)
+                    ->where('manzana', $info->manzana)
+                    ->where('casa', $info->casa)
+                    ->where('piso', $info->piso) // se respeta el piso
+                    ->where('etapa', 2)
+                    ->where('estado', 2)
+                    ->where('orden_proceso', '>=', $info->orden_proceso)
+                    ->get();
 
+                foreach ($procesosEtapa2 as $apt) {
+                    $apt->estado = 1;
+                    $apt->fecha_habilitado = now();
+                    $apt->fecha_fin = null;
+                    $apt->user_id = null;
+                    $apt->update();
+
+                    $idsAfectados[] = $apt->id;
+                    $procesosAfectados[] = $apt;
+                }
+            }
+
+            // 🔹 Guardar log de anulación
+            if (!empty($idsAfectados)) {
+                $LogCambioEstadoApt = new AnulacionApt();
+                $LogCambioEstadoApt->motivo = "Casas: " . $request->detalle;
+                $LogCambioEstadoApt->piso = (int) $info->piso;
+                $LogCambioEstadoApt->apt = $request->casa;
+                $LogCambioEstadoApt->fecha_confirmo = $info->fecha_fin;
+                $LogCambioEstadoApt->userConfirmo_id = $info->user_id;
+                $LogCambioEstadoApt->user_id = Auth::id();
+                $LogCambioEstadoApt->proyecto_id = $info->proyecto_casa_id;
+                $LogCambioEstadoApt->apt_afectados = json_encode($idsAfectados);
+                $LogCambioEstadoApt->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => $procesosAfectados // devolvemos procesos completos
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al confirmar apartamento',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
