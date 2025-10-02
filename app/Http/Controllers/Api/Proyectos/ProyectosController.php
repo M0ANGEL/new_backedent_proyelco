@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\Festivos;
@@ -1346,8 +1347,6 @@ class ProyectosController extends Controller
                 ->whereNotNull('fecha_fin')
                 ->orderByDesc('fecha_fin')
                 ->first();
-
-            info($proyecto);
 
             if (!$ultimoDetalle) {
                 continue;
