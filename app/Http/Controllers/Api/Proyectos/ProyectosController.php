@@ -169,7 +169,7 @@ class ProyectosController extends Controller
 
         /**********************************APARTAMENTOS******************************** */
         // Traer proyectos con joins básicos
-        $proyectos = DB::table('proyecto')
+       $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
             ->select(
@@ -177,7 +177,6 @@ class ProyectosController extends Controller
                 'tipos_de_proyectos.nombre_tipo',
                 'clientes.emp_nombre'
             )
-            // ->where('proyecto.estado', 1)
             ->get();
 
         // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
@@ -284,21 +283,26 @@ class ProyectosController extends Controller
             // Detalles del proyecto
             $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Cálculo de atraso
-            $ejecutando = $detalleProyecto->where('estado', 1)->count();
-            $terminado = $detalleProyecto->where('estado', 2)->count();
-            $total = $ejecutando + $terminado;
-
-            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
-
-            // Cálculo de avance
+            // 🔹 Avance: estado=2 (todas etapas) / total (todas etapas)
             $totalApartamentos = $detalleProyecto->count();
-            $apartamentosRealizados = $terminado;
-            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+
+            // 🔹 Atraso: estado=1 etapa=2 / (estado=1 etapa=2 + estado=2 etapa=2)
+            $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
+            $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
+            $denAtraso = $estado1_etapa2 + $estado2_etapa2;
+
+            $proyecto->porcentaje = $denAtraso > 0
+                ? round(($estado1_etapa2 / $denAtraso) * 100, 2)
+                : 0;
         }
 
         // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
         $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
 
         return response()->json([
             'status' => 'success',
@@ -668,8 +672,8 @@ class ProyectosController extends Controller
                 $proyecto->descripcion_proyecto = $request->descripcion_proyecto;
                 $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
                 $proyecto->codigo_proyecto = $request->codigo_proyecto;
-                $proyecto->activador_pordia_fundida = $request->activador_pordia_fundida;
-                $proyecto->activador_pordia = $request->activador_pordia_apt;
+                $proyecto->activador_pordia_fundida = 1;
+                $proyecto->activador_pordia = 1;
 
                 // Registrar usuarios de notificación solo si vienen en la solicitud
                 $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
@@ -1253,7 +1257,6 @@ class ProyectosController extends Controller
                 ->where('torre', $torre)
                 ->where('piso', $piso)
                 ->update(['consecutivo' => $nuevo]);
-
         }
 
         return response()->json([

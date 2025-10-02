@@ -44,140 +44,334 @@ class GestionProyectosCasasController extends Controller
         ]);
     }
 
+    // public function indexProgresoCasa(Request $request)
+    // {
+    //     // 1. CONFIGURACIÓN DE PROCESOS
+    //     $procesosConfig = DB::table('proyectos_casas_detalle')
+    //         ->join('cambio_procesos_x_proyecto', function ($join) {
+    //             $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyectos_casas_detalle.proyecto_casa_id')
+    //                 ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyectos_casas_detalle.procesos_proyectos_id');
+    //         })
+    //         ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
+    //         ->select(
+    //             'proyectos_casas_detalle.orden_proceso',
+    //             'proyectos_casas_detalle.procesos_proyectos_id',
+    //             'proyectos_casas_detalle.proyecto_casa_id',
+    //             'cambio_procesos_x_proyecto.numero as pisos_requeridos'
+    //         )
+    //         ->get()
+    //         ->keyBy('orden_proceso');
+
+    //     // 2. NOMBRES DE MANZANAS
+    //     $manzanaConNombre = DB::table('nombrexmanzana')
+    //         ->where('proyectos_casas_id', $request->id)
+    //         ->pluck('nombre_manzana', 'manzana')
+    //         ->toArray();
+
+    //     // 3. DETALLE DEL PROYECTO
+    //     $proyecProyectoCasaDetalle = DB::connection('mysql')
+    //         ->table('proyectos_casas_detalle')
+    //         ->leftJoin('users', 'proyectos_casas_detalle.user_id', '=', 'users.id')
+    //         ->leftJoin('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+    //         ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
+    //         ->select(
+    //             'proyectos_casas_detalle.manzana',
+    //             'proyectos_casas_detalle.casa',
+    //             'proyectos_casas_detalle.id',
+    //             'proyectos_casas_detalle.validacion',
+    //             'proyectos_casas_detalle.estado_validacion',
+    //             'proyectos_casas_detalle.consecutivo_casa',
+    //             'proyectos_casas_detalle.orden_proceso',
+    //             'proyectos_casas_detalle.piso',
+    //             'proyectos_casas_detalle.etapa', // NUEVO CAMPO
+    //             'proyectos_casas_detalle.text_validacion',
+    //             'proyectos_casas_detalle.estado',
+    //             'procesos_proyectos.nombre_proceso',
+    //             'users.nombre as nombre'
+    //         )
+    //         ->orderBy('proyectos_casas_detalle.manzana')
+    //         ->orderBy('proyectos_casas_detalle.casa')
+    //         ->orderBy('proyectos_casas_detalle.piso')
+    //         ->orderBy('proyectos_casas_detalle.orden_proceso')
+    //         ->get();
+
+    //     $resultado = [];
+    //     $manzanaResumen = [];
+
+    //     foreach ($proyecProyectoCasaDetalle as $item) {
+    //         $manzana = $item->manzana;
+    //         $casa = $item->casa;
+    //         $piso = $item->piso;
+    //         $orden_proceso = $item->orden_proceso;
+    //         $etapa = $item->etapa ?? 'Sin Etapa'; // valor por defecto si no tiene etapa
+
+    //         // Inicializar manzana
+    //         if (!isset($resultado[$manzana])) {
+    //             $resultado[$manzana] = [];
+    //         }
+
+    //         // Resumen por manzana
+    //         if (!isset($manzanaResumen[$manzana])) {
+    //             $manzanaResumen[$manzana] = [
+    //                 'nombre_manzana' => $manzanaConNombre[$manzana] ?? $manzana,
+    //                 'total_atraso' => 0,
+    //                 'total_realizados' => 0,
+    //                 'porcentaje_atraso' => 0,
+    //                 'porcentaje_avance' => 0,
+    //                 'serial_avance' => '0/0',
+    //             ];
+    //         }
+
+    //         // Inicializar casa
+    //         if (!isset($resultado[$manzana][$casa])) {
+    //             $resultado[$manzana][$casa] = [
+    //                 'consecutivo' => $item->consecutivo_casa,
+    //                 'pisos' => []
+    //             ];
+    //         }
+
+    //         // Inicializar piso
+    //         if (!isset($resultado[$manzana][$casa]['pisos'][$piso])) {
+    //             $resultado[$manzana][$casa]['pisos'][$piso] = [];
+    //         }
+
+    //         // Inicializar etapa
+    //         if (!isset($resultado[$manzana][$casa]['pisos'][$piso][$etapa])) {
+    //             $resultado[$manzana][$casa]['pisos'][$piso][$etapa] = [];
+    //         }
+
+    //         // Inicializar proceso dentro de la etapa
+    //         $resultado[$manzana][$casa]['pisos'][$piso][$etapa][$orden_proceso] = [
+    //             'id' => $item->id,
+    //             'nombre_proceso' => $item->nombre_proceso,
+    //             'estado' => $item->estado,
+    //             'validacion' => $item->validacion,
+    //             'estado_validacion' => $item->estado_validacion,
+    //             'text_validacion' => $item->text_validacion,
+    //             'usuario' => $item->nombre,
+    //         ];
+
+    //         // Contadores para resumen
+    //         if ($item->estado == 2) {
+    //             $manzanaResumen[$manzana]['total_realizados']++;
+    //         } elseif ($item->estado == 0) {
+    //             $manzanaResumen[$manzana]['total_atraso']++;
+    //         }
+    //     }
+
+    //     // Calcular % por manzana
+    //     foreach ($manzanaResumen as $manzana => &$resumen) {
+    //         $totalCasas = $resumen['total_atraso'] + $resumen['total_realizados'];
+    //         if ($totalCasas > 0) {
+    //             $resumen['porcentaje_avance'] =
+    //                 round(($resumen['total_realizados'] / $totalCasas) * 100, 2);
+    //             $resumen['porcentaje_atraso'] =
+    //                 round(($resumen['total_atraso'] / $totalCasas) * 100, 2);
+    //             $resumen['serial_avance'] =
+    //                 "{$resumen['total_realizados']}/{$totalCasas}";
+    //         }
+    //     }
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $resultado,       // manzana → casas → pisos → etapas → procesos
+    //         'manzanaResumen' => $manzanaResumen
+    //     ]);
+    // }
+
     public function indexProgresoCasa(Request $request)
-    {
-        // 1. CONFIGURACIÓN DE PROCESOS
-        $procesosConfig = DB::table('proyectos_casas_detalle')
-            ->join('cambio_procesos_x_proyecto', function ($join) {
-                $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyectos_casas_detalle.proyecto_casa_id')
-                    ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyectos_casas_detalle.procesos_proyectos_id');
-            })
-            ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
-            ->select(
-                'proyectos_casas_detalle.orden_proceso',
-                'proyectos_casas_detalle.procesos_proyectos_id',
-                'proyectos_casas_detalle.proyecto_casa_id',
-                'cambio_procesos_x_proyecto.numero as pisos_requeridos'
-            )
-            ->get()
-            ->keyBy('orden_proceso');
+{
+    // 1. CONFIGURACIÓN DE PROCESOS
+    $procesosConfig = DB::table('proyectos_casas_detalle')
+        ->join('cambio_procesos_x_proyecto', function ($join) {
+            $join->on('cambio_procesos_x_proyecto.proyecto_id', '=', 'proyectos_casas_detalle.proyecto_casa_id')
+                ->on('cambio_procesos_x_proyecto.proceso', '=', 'proyectos_casas_detalle.procesos_proyectos_id');
+        })
+        ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
+        ->select(
+            'proyectos_casas_detalle.orden_proceso',
+            'proyectos_casas_detalle.procesos_proyectos_id',
+            'proyectos_casas_detalle.proyecto_casa_id',
+            'cambio_procesos_x_proyecto.numero as pisos_requeridos'
+        )
+        ->get()
+        ->keyBy('orden_proceso');
 
-        // 2. NOMBRES DE MANZANAS
-        $manzanaConNombre = DB::table('nombrexmanzana')
-            ->where('proyectos_casas_id', $request->id)
-            ->pluck('nombre_manzana', 'manzana')
-            ->toArray();
+    // 2. NOMBRES DE MANZANAS
+    $manzanaConNombre = DB::table('nombrexmanzana')
+        ->where('proyectos_casas_id', $request->id)
+        ->pluck('nombre_manzana', 'manzana')
+        ->toArray();
 
-        // 3. DETALLE DEL PROYECTO
-        $proyecProyectoCasaDetalle = DB::connection('mysql')
-            ->table('proyectos_casas_detalle')
-            ->leftJoin('users', 'proyectos_casas_detalle.user_id', '=', 'users.id')
-            ->leftJoin('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-            ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
-            ->select(
-                'proyectos_casas_detalle.manzana',
-                'proyectos_casas_detalle.casa',
-                'proyectos_casas_detalle.id',
-                'proyectos_casas_detalle.validacion',
-                'proyectos_casas_detalle.estado_validacion',
-                'proyectos_casas_detalle.consecutivo_casa',
-                'proyectos_casas_detalle.orden_proceso',
-                'proyectos_casas_detalle.piso',
-                'proyectos_casas_detalle.etapa', // NUEVO CAMPO
-                'proyectos_casas_detalle.text_validacion',
-                'proyectos_casas_detalle.estado',
-                'procesos_proyectos.nombre_proceso',
-                'users.nombre as nombre'
-            )
-            ->orderBy('proyectos_casas_detalle.manzana')
-            ->orderBy('proyectos_casas_detalle.casa')
-            ->orderBy('proyectos_casas_detalle.piso')
-            ->orderBy('proyectos_casas_detalle.orden_proceso')
-            ->get();
+    // 3. DETALLE DEL PROYECTO
+    $proyecProyectoCasaDetalle = DB::connection('mysql')
+        ->table('proyectos_casas_detalle')
+        ->leftJoin('users', 'proyectos_casas_detalle.user_id', '=', 'users.id')
+        ->leftJoin('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
+        ->where('proyectos_casas_detalle.proyecto_casa_id', $request->id)
+        ->select(
+            'proyectos_casas_detalle.manzana',
+            'proyectos_casas_detalle.casa',
+            'proyectos_casas_detalle.id',
+            'proyectos_casas_detalle.validacion',
+            'proyectos_casas_detalle.estado_validacion',
+            'proyectos_casas_detalle.consecutivo_casa',
+            'proyectos_casas_detalle.orden_proceso',
+            'proyectos_casas_detalle.piso',
+            'proyectos_casas_detalle.etapa',
+            'proyectos_casas_detalle.text_validacion',
+            'proyectos_casas_detalle.estado',
+            'procesos_proyectos.nombre_proceso',
+            'users.nombre as nombre'
+        )
+        ->orderBy('proyectos_casas_detalle.manzana')
+        ->orderBy('proyectos_casas_detalle.casa')
+        ->orderBy('proyectos_casas_detalle.piso')
+        ->orderBy('proyectos_casas_detalle.orden_proceso')
+        ->get();
 
-        $resultado = [];
-        $manzanaResumen = [];
+    $resultado = [];
+    $manzanaResumen = [];
+    $casaResumen = [];
 
-        foreach ($proyecProyectoCasaDetalle as $item) {
-            $manzana = $item->manzana;
-            $casa = $item->casa;
-            $piso = $item->piso;
-            $orden_proceso = $item->orden_proceso;
-            $etapa = $item->etapa ?? 'Sin Etapa'; // valor por defecto si no tiene etapa
+    foreach ($proyecProyectoCasaDetalle as $item) {
+        $manzana = $item->manzana;
+        $casa = $item->casa;
+        $piso = $item->piso;
+        $orden_proceso = $item->orden_proceso;
+        $etapa = $item->etapa ?? 'Sin Etapa';
 
-            // Inicializar manzana
-            if (!isset($resultado[$manzana])) {
-                $resultado[$manzana] = [];
-            }
+        // -------------------------------
+        // Inicializar estructuras
+        // -------------------------------
+        if (!isset($resultado[$manzana])) {
+            $resultado[$manzana] = [];
+        }
 
-            // Resumen por manzana
-            if (!isset($manzanaResumen[$manzana])) {
-                $manzanaResumen[$manzana] = [
-                    'nombre_manzana' => $manzanaConNombre[$manzana] ?? $manzana,
-                    'total_atraso' => 0,
-                    'total_realizados' => 0,
-                    'porcentaje_atraso' => 0,
-                    'porcentaje_avance' => 0,
-                    'serial_avance' => '0/0',
-                ];
-            }
-
-            // Inicializar casa
-            if (!isset($resultado[$manzana][$casa])) {
-                $resultado[$manzana][$casa] = [
-                    'consecutivo' => $item->consecutivo_casa,
-                    'pisos' => []
-                ];
-            }
-
-            // Inicializar piso
-            if (!isset($resultado[$manzana][$casa]['pisos'][$piso])) {
-                $resultado[$manzana][$casa]['pisos'][$piso] = [];
-            }
-
-            // Inicializar etapa
-            if (!isset($resultado[$manzana][$casa]['pisos'][$piso][$etapa])) {
-                $resultado[$manzana][$casa]['pisos'][$piso][$etapa] = [];
-            }
-
-            // Inicializar proceso dentro de la etapa
-            $resultado[$manzana][$casa]['pisos'][$piso][$etapa][$orden_proceso] = [
-                'id' => $item->id,
-                'nombre_proceso' => $item->nombre_proceso,
-                'estado' => $item->estado,
-                'validacion' => $item->validacion,
-                'estado_validacion' => $item->estado_validacion,
-                'text_validacion' => $item->text_validacion,
-                'usuario' => $item->nombre,
+        if (!isset($resultado[$manzana][$casa])) {
+            $resultado[$manzana][$casa] = [
+                'consecutivo' => $item->consecutivo_casa,
+                'pisos' => []
             ];
-
-            // Contadores para resumen
-            if ($item->estado == 2) {
-                $manzanaResumen[$manzana]['total_realizados']++;
-            } elseif ($item->estado == 0) {
-                $manzanaResumen[$manzana]['total_atraso']++;
-            }
         }
 
-        // Calcular % por manzana
-        foreach ($manzanaResumen as $manzana => &$resumen) {
-            $totalCasas = $resumen['total_atraso'] + $resumen['total_realizados'];
-            if ($totalCasas > 0) {
-                $resumen['porcentaje_avance'] =
-                    round(($resumen['total_realizados'] / $totalCasas) * 100, 2);
-                $resumen['porcentaje_atraso'] =
-                    round(($resumen['total_atraso'] / $totalCasas) * 100, 2);
-                $resumen['serial_avance'] =
-                    "{$resumen['total_realizados']}/{$totalCasas}";
-            }
+        if (!isset($resultado[$manzana][$casa]['pisos'][$piso])) {
+            $resultado[$manzana][$casa]['pisos'][$piso] = [];
         }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $resultado,       // manzana → casas → pisos → etapas → procesos
-            'manzanaResumen' => $manzanaResumen
-        ]);
+        if (!isset($resultado[$manzana][$casa]['pisos'][$piso][$etapa])) {
+            $resultado[$manzana][$casa]['pisos'][$piso][$etapa] = [];
+        }
+
+        $resultado[$manzana][$casa]['pisos'][$piso][$etapa][$orden_proceso] = [
+            'id' => $item->id,
+            'nombre_proceso' => $item->nombre_proceso,
+            'estado' => $item->estado,
+            'validacion' => $item->validacion,
+            'estado_validacion' => $item->estado_validacion,
+            'text_validacion' => $item->text_validacion,
+            'usuario' => $item->nombre,
+        ];
+
+        // -------------------------------
+        // Inicializar resumen por manzana
+        // -------------------------------
+        if (!isset($manzanaResumen[$manzana])) {
+            $manzanaResumen[$manzana] = [
+                'nombre_manzana' => $manzanaConNombre[$manzana] ?? $manzana,
+                'total_realizados' => 0,
+                'total_estado1_e2' => 0,
+                'total_estado2_e2' => 0,
+                'total_general' => 0,
+                'porcentaje_atraso' => 0,
+                'porcentaje_avance' => 0,
+                'serial_avance' => '0/0',
+            ];
+        }
+
+        // -------------------------------
+        // Inicializar resumen por casa
+        // -------------------------------
+        $casaKey = $manzana . '-' . $casa;
+        if (!isset($casaResumen[$casaKey])) {
+            $casaResumen[$casaKey] = [
+                'manzana' => $manzanaConNombre[$manzana] ?? $manzana,
+                'casa' => $casa,
+                'consecutivo' => $item->consecutivo_casa,
+                'total_realizados' => 0,
+                'total_estado1_e2' => 0,
+                'total_estado2_e2' => 0,
+                'total_general' => 0,
+                'porcentaje_atraso' => 0,
+                'porcentaje_avance' => 0,
+                'serial_avance' => '0/0',
+            ];
+        }
+
+        // -------------------------------
+        // Contadores (manzana y casa)
+        // -------------------------------
+        $manzanaResumen[$manzana]['total_general']++;
+        $casaResumen[$casaKey]['total_general']++;
+
+        if ($item->estado == 2) {
+            $manzanaResumen[$manzana]['total_realizados']++;
+            $casaResumen[$casaKey]['total_realizados']++;
+
+            if ($item->etapa == 2) {
+                $manzanaResumen[$manzana]['total_estado2_e2']++;
+                $casaResumen[$casaKey]['total_estado2_e2']++;
+            }
+        } elseif ($item->estado == 1 && $item->etapa == 2) {
+            $manzanaResumen[$manzana]['total_estado1_e2']++;
+            $casaResumen[$casaKey]['total_estado1_e2']++;
+        }
     }
+
+    // -------------------------------
+    // Calcular % por manzana
+    // -------------------------------
+    foreach ($manzanaResumen as $manzana => &$resumen) {
+        if ($resumen['total_general'] > 0) {
+            $resumen['porcentaje_avance'] =
+                round(($resumen['total_realizados'] / $resumen['total_general']) * 100, 2);
+            $resumen['serial_avance'] =
+                "{$resumen['total_realizados']}/{$resumen['total_general']}";
+        }
+
+        $denAtraso = $resumen['total_estado1_e2'] + $resumen['total_estado2_e2'];
+        if ($denAtraso > 0) {
+            $resumen['porcentaje_atraso'] =
+                round(($resumen['total_estado1_e2'] / $denAtraso) * 100, 2);
+        }
+    }
+
+    // -------------------------------
+    // Calcular % por casa
+    // -------------------------------
+    foreach ($casaResumen as $casaKey => &$resumen) {
+        if ($resumen['total_general'] > 0) {
+            $resumen['porcentaje_avance'] =
+                round(($resumen['total_realizados'] / $resumen['total_general']) * 100, 2);
+            $resumen['serial_avance'] =
+                "{$resumen['total_realizados']}/{$resumen['total_general']}";
+        }
+
+        $denAtraso = $resumen['total_estado1_e2'] + $resumen['total_estado2_e2'];
+        if ($denAtraso > 0) {
+            $resumen['porcentaje_atraso'] =
+                round(($resumen['total_estado1_e2'] / $denAtraso) * 100, 2);
+        }
+    }
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $resultado,           // detalle manzana → casas → pisos → etapas → procesos
+        'manzanaResumen' => $manzanaResumen, // resumen por manzana
+        'casaResumen' => $casaResumen   // resumen por casa
+    ]);
+}
+
 
     public function destroy($id)
     {
@@ -833,7 +1027,7 @@ class GestionProyectosCasasController extends Controller
         ]);
     }
 
- 
+
     public function CambioEstadosCasas(Request $request)
     {
         DB::beginTransaction();
@@ -850,11 +1044,12 @@ class GestionProyectosCasasController extends Controller
                     ->where('manzana', $info->manzana)
                     ->where('casa', $info->casa)
                     ->where('etapa', 1)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
+                    ->where('orden_proceso', '>=', $info->orden_proceso)
                     ->get();
 
                 foreach ($etapa1 as $apt) {
-                    $apt->estado = 1;
+                    $apt->estado = 0;
                     $apt->fecha_habilitado = now();
                     $apt->fecha_fin = null;
                     $apt->user_id = null;
@@ -864,16 +1059,19 @@ class GestionProyectosCasasController extends Controller
                     $procesosAfectados[] = $apt;
                 }
 
+
+
+
                 // 🔹 Después, anular también todos los procesos en etapa 2 (todos los pisos)
                 $etapa2 = ProyectoCasaDetalle::where('proyecto_casa_id', $info->proyecto_casa_id)
                     ->where('manzana', $info->manzana)
                     ->where('casa', $info->casa)
                     ->where('etapa', 2)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
                     ->get();
 
                 foreach ($etapa2 as $apt) {
-                    $apt->estado = 1;
+                    $apt->estado = 0;
                     $apt->fecha_habilitado = now();
                     $apt->fecha_fin = null;
                     $apt->user_id = null;
@@ -889,12 +1087,12 @@ class GestionProyectosCasasController extends Controller
                     ->where('casa', $info->casa)
                     ->where('piso', $info->piso) // se respeta el piso
                     ->where('etapa', 2)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
                     ->where('orden_proceso', '>=', $info->orden_proceso)
                     ->get();
 
                 foreach ($procesosEtapa2 as $apt) {
-                    $apt->estado = 1;
+                    $apt->estado = 0;
                     $apt->fecha_habilitado = now();
                     $apt->fecha_fin = null;
                     $apt->user_id = null;
@@ -918,6 +1116,12 @@ class GestionProyectosCasasController extends Controller
                 $LogCambioEstadoApt->apt_afectados = json_encode($idsAfectados);
                 $LogCambioEstadoApt->save();
             }
+
+            $info->estado = 1;
+            $info->fecha_habilitado = now();
+            $info->fecha_fin = null;
+            $info->user_id = null;
+            $info->update();
 
             DB::commit();
 
