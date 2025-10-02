@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activo;
 use App\Models\CambioProcesoProyectos;
 use App\Models\Clientes;
 use App\Models\Festivos;
