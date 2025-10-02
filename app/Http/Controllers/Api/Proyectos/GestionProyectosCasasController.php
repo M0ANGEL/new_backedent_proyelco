@@ -1044,7 +1044,7 @@ class GestionProyectosCasasController extends Controller
                     ->where('manzana', $info->manzana)
                     ->where('casa', $info->casa)
                     ->where('etapa', 1)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
                     ->where('orden_proceso', '>=', $info->orden_proceso)
                     ->get();
 
@@ -1067,7 +1067,7 @@ class GestionProyectosCasasController extends Controller
                     ->where('manzana', $info->manzana)
                     ->where('casa', $info->casa)
                     ->where('etapa', 2)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
                     ->get();
 
                 foreach ($etapa2 as $apt) {
@@ -1087,7 +1087,7 @@ class GestionProyectosCasasController extends Controller
                     ->where('casa', $info->casa)
                     ->where('piso', $info->piso) // se respeta el piso
                     ->where('etapa', 2)
-                    ->where('estado', 2)
+                    ->whereIn('estado', [1,2])
                     ->where('orden_proceso', '>=', $info->orden_proceso)
                     ->get();
 
