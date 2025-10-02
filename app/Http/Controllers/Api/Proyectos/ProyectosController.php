@@ -672,8 +672,8 @@ class ProyectosController extends Controller
                 $proyecto->descripcion_proyecto = $request->descripcion_proyecto;
                 $proyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
                 $proyecto->codigo_proyecto = $request->codigo_proyecto;
-                $proyecto->activador_pordia_fundida = $request->activador_pordia_fundida;
-                $proyecto->activador_pordia = $request->activador_pordia_apt;
+                $proyecto->activador_pordia_fundida = 1;
+                $proyecto->activador_pordia = 1;
 
                 // Registrar usuarios de notificación solo si vienen en la solicitud
                 $proyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
