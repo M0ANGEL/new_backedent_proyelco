@@ -17,11 +17,13 @@ use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
+use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
 use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
+use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
@@ -143,7 +145,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-confirmar-validar', [VaidarProcesoController::class, 'validarProcesoNuevaLogica']);
     Route::get('InformeDetalladoProyectos/{id}', [GestionProyectosController::class, 'InformeDetalladoProyectos']);
     Route::post('CambioEstadosApt-anulacion', [GestionProyectosController::class, 'CambioEstadosApt']);
-    Route::get('gestion-proyectos-encargados', [GestionProyectosController::class,'indexEncargadoObra']); 
+    Route::get('gestion-proyectos-encargados', [GestionProyectosController::class, 'indexEncargadoObra']);
 
     //cart dashboard
     Route::get('info-dashboard-card', [ProyectosController::class, 'infoCard']);
@@ -188,60 +190,72 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('dashboards/infoApt', [DashboardController::class, 'infoApt']);
 
     //descargas en excel
-    Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class,'ExportInformeExcelProyecto']);
+    Route::get('informe-proyecto-excel/{id}', [GestionProyectosController::class, 'ExportInformeExcelProyecto']);
 
     //activos fijos
     Route::apiResource('bodega-areas', BodegasController::class);
-    Route::get('bodega-areas-obras', [BodegasController::class,'obras']);
+    Route::get('bodega-areas-obras', [BodegasController::class, 'obras']);
     Route::apiResource('categorias-activos', CategoriaActivosController::class);
     Route::apiResource('subcategorias-activos', SubCategoriaActivosController::class);
-    Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class,'SubcategoriaFiltrado']);
+    Route::get('categoria-subcategoria-activos/{id}', [SubCategoriaActivosController::class, 'SubcategoriaFiltrado']);
 
-    Route::apiResource('administar-activos', ActivosController::class); 
-    Route::get('administar-activosBaja', [ActivosController::class,'indexActivosBaja']); 
-    Route::get('usuariosAsignacion', [ActivosController::class,'usuariosAsignacion']);
+    Route::apiResource('administar-activos', ActivosController::class);
+    Route::get('administar-activosBaja', [ActivosController::class, 'indexActivosBaja']);
+    Route::get('usuariosAsignacion', [ActivosController::class, 'usuariosAsignacion']);
 
-    Route::get('mis-activos-pendientes', [MisActivosController::class,'index']); 
-    Route::get('mis-activos', [MisActivosController::class,'misActivos']); 
+    Route::get('mis-activos-pendientes', [MisActivosController::class, 'index']);
+    Route::get('mis-activos', [MisActivosController::class, 'misActivos']);
 
     //administar activos
-    Route::apiResource('administar-kardex-activos', KadexActivosController::class); 
-    Route::get('administar-activos-all', [KadexActivosController::class,'index']); 
-    Route::get('administar-activos-pendientes-all', [KadexActivosController::class,'activosPendientes']); 
+    Route::apiResource('administar-kardex-activos', KadexActivosController::class);
+    Route::get('administar-activos-all', [KadexActivosController::class, 'index']);
+    Route::get('administar-activos-pendientes-all', [KadexActivosController::class, 'activosPendientes']);
 
 
-    Route::get('administar-mis-activos', [KadexActivosController::class,'misActivos']); 
-    Route::get('activo-pendientes', [KadexActivosController::class,'activosSinConfirmar']);
-    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class,'aceptarActivo']); 
-    Route::post('activo-rechazarActivo', [KadexActivosController::class,'rechazarActivo']); 
-    Route::get('activo-informacion/{id}', [KadexActivosController::class,'infoActivo']); 
+    Route::get('administar-mis-activos', [KadexActivosController::class, 'misActivos']);
+    Route::get('activo-pendientes', [KadexActivosController::class, 'activosSinConfirmar']);
+    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class, 'aceptarActivo']);
+    Route::post('activo-rechazarActivo', [KadexActivosController::class, 'rechazarActivo']);
+    Route::get('activo-informacion/{id}', [KadexActivosController::class, 'infoActivo']);
 
     //solicitar activo
-    Route::get('solicitar-activos', [KadexActivosController::class,'solicitarActivos']);   
-    Route::post('envio-solicitud-activo', [KadexActivosController::class,'envioSolicitudActivo']);   
-    Route::post('liberar-activos', [KadexActivosController::class,'liberarActivos']);   
+    Route::get('solicitar-activos', [KadexActivosController::class, 'solicitarActivos']);
+    Route::post('envio-solicitud-activo', [KadexActivosController::class, 'envioSolicitudActivo']);
+    Route::post('liberar-activos', [KadexActivosController::class, 'liberarActivos']);
 
 
 
     //kardex historico
-    Route::get('activos-historico', [KadexActivosController::class,'historico']); 
+    Route::get('activos-historico', [KadexActivosController::class, 'historico']);
 
     //nomenclaturas de proyes
-    Route::get('nomenclaturas/{id}',[ProyectosController::class,'nomenclaturas']);
-    Route::post('ActualizarNomenclaturas',[ProyectosController::class,'ActualizarNomenclaturas']);
+    Route::get('nomenclaturas/{id}', [ProyectosController::class, 'nomenclaturas']);
+    Route::post('ActualizarNomenclaturas', [ProyectosController::class, 'ActualizarNomenclaturas']);
 
     //mantenimiento activos
     Route::apiResource('administra-mantenimiento-activos', MantenimientoActivosController::class);
-    Route::get('activosBodegaPrincipal',[ MantenimientoActivosController::class,'activosBodegaPrincipal']);
+    Route::get('activosBodegaPrincipal', [MantenimientoActivosController::class, 'activosBodegaPrincipal']);
 
     //notificacions de obras isn movimientos mas de un dia
-    Route::get('obras-sin-movimientos',[ProyectosController::class,'obrasSinMovimientos']);
-    Route::get('obras-sin-movimientos-ing',[ProyectosController::class,'obrasSinMovimientosIng']);
+    Route::get('obras-sin-movimientos', [ProyectosController::class, 'obrasSinMovimientos']);
+    Route::get('obras-sin-movimientos-ing', [ProyectosController::class, 'obrasSinMovimientosIng']);
 
 
+    //proyectos de casa gestion
+    Route::get('info-proyecto-casa/{id}', [GestionProyectosCasasController::class, 'infoProyectoCasa']);
+    Route::get('gestion-proyectos-detalle-casa/{id}', [GestionProyectosCasasController::class, 'indexProgresoCasa']);
+    Route::apiResource('gestion-proyectos-casas', GestionProyectosCasasController::class);
+
+    //confirmaciones
+    Route::get('gestion-confirmar-confirmarCasas/{id}', [GestionProyectosCasasController::class, 'confirmarCasas']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
+    Route::post('gestion-confirmar-validar-casa', [ValidarProcesoCasaController::class, 'validarProcesoCasas']);
+    Route::post('gestion-iniciar-manzana', [GestionProyectosCasasController::class, 'IniciarManzana']);
+    Route::post('casas-infoCasa', [GestionProyectosCasasController::class, 'infoCasa']);
+    Route::delete('activar-proyecto/{id}', [ProyectosController::class, 'destroyCasa']);
+    Route::post('CambioEstadosCasas-anulacion', [GestionProyectosCasasController::class, 'CambioEstadosCasas']);
 
 
-
-    
-
+    //reporte detallado
+    Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 });
+
