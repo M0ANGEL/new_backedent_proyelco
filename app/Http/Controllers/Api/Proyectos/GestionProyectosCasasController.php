@@ -833,7 +833,7 @@ class GestionProyectosCasasController extends Controller
         ]);
     }
 
-
+ 
     public function CambioEstadosCasas(Request $request)
     {
         DB::beginTransaction();
