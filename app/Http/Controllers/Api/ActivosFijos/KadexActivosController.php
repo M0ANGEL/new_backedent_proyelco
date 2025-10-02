@@ -154,57 +154,6 @@ class KadexActivosController extends Controller
         return response()->json(KadexActivosModel::find($id), 200);
     }
 
-    // public function update(Request $request, $id)
-    // {
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'categoria_id' => ['required'],
-    //             'subcategoria_id' => ['required'],
-    //             'numero_activo' => ['required', 'string'],
-    //             'valor' => ['required', 'string'],
-    //             'condicion' => ['required'],
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json(['errors' => $validator->errors()], 400);
-    //         }
-
-    //         // validar que el codigo del proyecto no este usado por otro
-    //         $proyectoUnico = KadexActivosModel::where('numero_activo', $request->numero_activo)
-    //             ->where('id', '!=', $id)
-    //             ->first();
-    //         if ($proyectoUnico) {
-    //             return response()->json([
-    //                 'status' => 'error',
-    //                 'message' => 'Error: Este numero de activo ya esta registrado:   ',
-    //             ], 404);
-    //         }
-
-    //         $cliente = new KadexActivosModel();
-    //         $cliente->numero_activo = $request->numero_activo;
-    //         $cliente->categoria_id = $request->categoria_id;
-    //         $cliente->subcategoria_id = $request->subcategoria_id;
-    //         $cliente->descripcion = $request->descripcion ? $request->descripcion : "..";
-    //         $cliente->valor = $request->valor;
-    //         $cliente->fecha_fin_garantia = Carbon::parse($request->fecha_fin_garantia)->format('Y-m-d');
-    //         $cliente->condicion = $request->condicion;
-    //         $cliente->marca = $request->marca ? $request->marca : null;
-    //         $cliente->serial = $request->serial ? $request->serial : null;
-    //         $cliente->save(); // se guarda para obtener el ID
-
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'data' => $cliente
-    //         ], 200);
-    //     } catch (Exception $e) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'Error: ' . $e->getMessage(),
-    //             'code' => $e->getCode()
-    //         ], 500);
-    //     }
-    // }
-
     public function activosPendientes()
     {
         $clientes = DB::connection('mysql')
@@ -466,9 +415,18 @@ class KadexActivosController extends Controller
                 'activo.numero_activo',
                 'activo.valor',
                 'activo.condicion',
+                'activo.descripcion',
             )
             ->orderBy('id', 'asc')
             ->get();
+
+        foreach ($clientes as $proyecto) {
+            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+
+            $proyecto->usuariosAsignados = DB::table('users')
+                ->whereIn('id', $encargadoIds)
+                ->pluck('nombre');
+        }
 
         return response()->json([
             'status' => 'success',
@@ -650,5 +608,4 @@ class KadexActivosController extends Controller
             ], 500);
         }
     }
-
 }
