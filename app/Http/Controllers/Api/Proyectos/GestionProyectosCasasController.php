@@ -634,7 +634,6 @@ class GestionProyectosCasasController extends Controller
                 break;
 
             case TiposProceso::PRUEBAS:
-                info("entro a pruebas");
                 $this->confirmarPruebas($proyecto, $info);
                 break;
 
@@ -799,10 +798,6 @@ class GestionProyectosCasasController extends Controller
 
     private function confirmarPruebas($proyecto, $info)
     {
-        info("proyecto");
-        info($proyecto);
-        info("info");
-        info($info);
         $aptosDelPiso = ProyectoCasaDetalle::where('manzana', $info->manzana)
             ->where('orden_proceso', $info->orden_proceso)
             ->where('proyecto_casa_id', $proyecto->id)
@@ -812,8 +807,6 @@ class GestionProyectosCasasController extends Controller
             ->first();
 
         if ($aptosDelPiso->estado == ProcesoEstados::CONFIRMADO) {
-            info("se trata de habilitar retie y ritel");
-
             $this->validarYHabilitarRetieYRitel($proyecto, $info, TiposProceso::RETIE);
             $this->validarYHabilitarRetieYRitel($proyecto, $info, TiposProceso::RITEL);
         }
@@ -821,9 +814,6 @@ class GestionProyectosCasasController extends Controller
 
     private function validarYHabilitarRetieYRitel($proyecto, $info, $procesoNombre)
     {
-        info($proyecto);
-        info($info);
-        info($procesoNombre);
         $verValidacion = DB::table('proyectos_casas_detalle')
             ->join('procesos_proyectos', 'proyectos_casas_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [strtolower($procesoNombre)])

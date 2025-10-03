@@ -257,5 +257,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
+
+    //unida de medida
+    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']);
 });
 
