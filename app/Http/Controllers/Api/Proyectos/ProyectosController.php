@@ -1374,7 +1374,7 @@ class ProyectosController extends Controller
         $proceso = strtolower($request->proceso);
         $proyectos = $request->proyecto ?? [];
         $usuario = Auth::user();
-        if ($usuario->rol == ["Directora Proyectos", "Administrador"]) {
+        if (in_array($usuario->rol, ["Directora Proyectos", "Administrador"])) {
             // ==============================
             // DETALLE APARTAMENTOS ADMIN 
             // ==============================
@@ -1441,7 +1441,7 @@ class ProyectosController extends Controller
 
 
 
-        if ($usuario->rol == ["Directora Proyectos", "Administrador"]) {
+        if (in_array($usuario->rol, ["Directora Proyectos", "Administrador"])) {
             // ==============================
             // DETALLE CASAS
             // ==============================
