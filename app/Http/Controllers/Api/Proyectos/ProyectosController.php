@@ -170,7 +170,7 @@ class ProyectosController extends Controller
 
         /**********************************APARTAMENTOS******************************** */
         // Traer proyectos con joins básicos
-       $proyectos = DB::table('proyecto')
+        $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
             ->select(
@@ -1108,10 +1108,11 @@ class ProyectosController extends Controller
             default:
                 return response()->json([
                     'status' => 'success',
-                    'mensagge' => 'ROl no encontrados',
+                    'data'  => [
+                        'activos_pendinetes' => $activos,
+                    ],
 
                 ], 200);
-                break;
         }
     }
 
