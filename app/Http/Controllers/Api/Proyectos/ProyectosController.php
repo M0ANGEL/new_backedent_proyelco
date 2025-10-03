@@ -1627,7 +1627,7 @@ class ProyectosController extends Controller
             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
             ->select(
                 'clientes.emp_nombre as cliente',
-                'proyectos_casas.descripcion_proyecto as proyecto',
+                'proyectos_casas.descripcion_proyecto as proyecto', 
                 DB::raw("SUM(CASE WHEN proyectos_casas_detalle.estado = 2 THEN 1 ELSE 0 END) as completados")
             )
             ->groupBy('clientes.emp_nombre', 'proyectos_casas.descripcion_proyecto')
