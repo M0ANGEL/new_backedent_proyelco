@@ -128,6 +128,7 @@ class ProyectosController extends Controller
         // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
         $detalles = DB::table('proyectos_casas_detalle')
             ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+            ->select('id','estado')
             ->get()
             ->groupBy('proyecto_casa_id');
 
