@@ -25,157 +25,11 @@ use Illuminate\Support\Facades\Validator;
 class ProyectosController extends Controller
 {
 
-    // public function index()
-    // {
-
-    //     /**********************************APARTAMENTOS******************************** */
-    //     // Traer proyectos con joins básicos
-    //     $proyectos = DB::table('proyecto')
-    //         ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
-    //         ->select(
-    //             'proyecto.*',
-    //             'tipos_de_proyectos.nombre_tipo',
-    //             'clientes.emp_nombre'
-    //         )
-    //         ->get();
-
-    //     // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
-    //     $encargadoIdsGlobal = [];
-    //     $ingenieroIdsGlobal = [];
-
-    //     foreach ($proyectos as $proyecto) {
-    //         $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
-    //         $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
-    //     }
-
-    //     // 2️⃣ Obtener todos los usuarios de una sola consulta
-    //     $usuarios = DB::table('users')
-    //         ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
-    //         ->pluck('nombre', 'id'); // => [id => nombre]
-
-    //     // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
-    //     $detalles = DB::table('proyecto_detalle')
-    //         ->whereIn('proyecto_id', $proyectos->pluck('id'))
-    //         ->get()
-    //         ->groupBy('proyecto_id');
-
-    //     // 4️⃣ Asignar nombres y cálculos a cada proyecto
-    //     foreach ($proyectos as $proyecto) {
-    //         // Encargados
-    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-    //         $proyecto->nombresEncargados = collect($encargadoIds)
-    //             ->map(fn($id) => $usuarios[$id] ?? null)
-    //             ->filter();
-
-    //         // Ingenieros
-    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-    //         $proyecto->nombresIngenieros = collect($ingenieroIds)
-    //             ->map(fn($id) => $usuarios[$id] ?? null)
-    //             ->filter();
-
-    //         // Detalles del proyecto
-    //         $detalleProyecto = $detalles[$proyecto->id] ?? collect();
-
-    //         // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
-    //         $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
-    //         $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
-    //         $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
-    //         $totalAtraso = $ejecutando + $terminado;
-
-    //         $proyecto->porcentaje = $totalAtraso > 0
-    //             ? round(($ejecutando / $totalAtraso) * 100, 2)
-    //             : 0;
-
-    //         // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
-    //         $totalApartamentos = $detalleProyecto->count();
-    //         $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
-
-    //         $proyecto->avance = $totalApartamentos > 0
-    //             ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
-    //             : 0;
-    //     }
-
-    //     // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
-    //     $proyectos = $proyectos->sortByDesc('porcentaje')->values();
-
-    //     /************************************CASAS************************************ */
-    //     // Traer proyectos con joins básicos
-    //     $proyectos_casa = DB::table('proyectos_casas')
-    //         ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-    //         ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
-    //         ->select(
-    //             'proyectos_casas.*',
-    //             'tipos_de_proyectos.nombre_tipo',
-    //             'clientes.emp_nombre'
-    //         )
-    //         ->get();
-
-    //     // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
-    //     $encargadoIdsGlobal = [];
-    //     $ingenieroIdsGlobal = [];
-
-    //     foreach ($proyectos_casa as $proyecto) {
-    //         $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
-    //         $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
-    //     }
-
-    //     // 2️⃣ Obtener todos los usuarios de una sola consulta
-    //     $usuarios = DB::table('users')
-    //         ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
-    //         ->pluck('nombre', 'id'); // => [id => nombre]
-
-    //     // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
-    //     $detalles = DB::table('proyectos_casas_detalle')
-    //         ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
-    //         ->get()
-    //         ->groupBy('proyecto_casa_id');
-
-    //     // 4️⃣ Asignar nombres y cálculos a cada proyecto
-    //     foreach ($proyectos_casa as $proyecto) {
-    //         // Encargados
-    //         $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
-    //         $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-    //         // Ingenieros
-    //         $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
-    //         $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
-
-    //         // Detalles del proyecto
-    //         $detalleProyecto = $detalles[$proyecto->id] ?? collect();
-
-    //         // 🔹 Avance: estado=2 (todas etapas) / total (todas etapas)
-    //         $totalApartamentos = $detalleProyecto->count();
-    //         $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
-    //         $proyecto->avance = $totalApartamentos > 0
-    //             ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
-    //             : 0;
-
-    //         // 🔹 Atraso: estado=1 etapa=2 / (estado=1 etapa=2 + estado=2 etapa=2)
-    //         $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
-    //         $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
-    //         $denAtraso = $estado1_etapa2 + $estado2_etapa2;
-
-    //         $proyecto->porcentaje = $denAtraso > 0
-    //             ? round(($estado1_etapa2 / $denAtraso) * 100, 2)
-    //             : 0;
-    //     }
-
-    //     // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
-    //     $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
-
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $proyectos,
-    //         'data_casas' => $proyectos_casa
-    //     ]);
-    // }
-
     public function index()
     {
-        /********************************** APARTAMENTOS **********************************/
-        // Obtener proyectos con joins básicos
+
+        /**********************************APARTAMENTOS******************************** */
+        // Traer proyectos con joins básicos
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
@@ -186,107 +40,138 @@ class ProyectosController extends Controller
             )
             ->get();
 
-        // Recolectar IDs de encargados e ingenieros (una sola pasada)
-        $encargadoIdsGlobal = $proyectos->flatMap(fn($p) => json_decode($p->encargado_id, true) ?? []);
-        $ingenieroIdsGlobal = $proyectos->flatMap(fn($p) => json_decode($p->ingeniero_id, true) ?? []);
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
 
-        // Obtener usuarios de una sola consulta
+        foreach ($proyectos as $proyecto) {
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        }
+
+        // 2️⃣ Obtener todos los usuarios de una sola consulta
         $usuarios = DB::table('users')
-            ->whereIn('id', array_unique($encargadoIdsGlobal->merge($ingenieroIdsGlobal)->toArray()))
-            ->pluck('nombre', 'id');
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id'); // => [id => nombre]
 
-        // Obtener todos los detalles de los proyectos
+        // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
         $detalles = DB::table('proyecto_detalle')
             ->whereIn('proyecto_id', $proyectos->pluck('id'))
             ->get()
             ->groupBy('proyecto_id');
 
-        // Procesar proyectos
-        $proyectos->transform(function ($proyecto) use ($usuarios, $detalles) {
-            $encargadoIds = collect(json_decode($proyecto->encargado_id, true) ?? []);
-            $ingenieroIds = collect(json_decode($proyecto->ingeniero_id, true) ?? []);
+        // 4️⃣ Asignar nombres y cálculos a cada proyecto
+        foreach ($proyectos as $proyecto) {
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
 
-            $proyecto->nombresEncargados = $encargadoIds->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
-            $proyecto->nombresIngenieros = $ingenieroIds->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
 
+            // Detalles del proyecto
             $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Cálculo de ATRASO (excluyendo orden_proceso = 1)
-            $detallesAtraso = $detalleProyecto->where('orden_proceso', '!=', 1);
-            $ejecutando = $detallesAtraso->where('estado', 1)->count();
-            $terminado = $detallesAtraso->where('estado', 2)->count();
+            // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
+            $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
+            $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
+            $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
             $totalAtraso = $ejecutando + $terminado;
-            $proyecto->porcentaje = $totalAtraso > 0 ? round(($ejecutando / $totalAtraso) * 100, 2) : 0;
 
-            // Cálculo de AVANCE
-            $total = $detalleProyecto->count();
-            $realizados = $detalleProyecto->where('estado', 2)->count();
-            $proyecto->avance = $total > 0 ? round(($realizados / $total) * 100, 2) : 0;
+            $proyecto->porcentaje = $totalAtraso > 0
+                ? round(($ejecutando / $totalAtraso) * 100, 2)
+                : 0;
 
-            return $proyecto;
-        });
+            // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
 
-        // Ordenar por atraso
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+        }
+
+        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
         $proyectos = $proyectos->sortByDesc('porcentaje')->values();
 
+        /************************************CASAS************************************ */
+        // // Traer proyectos con joins básicos
+        // $proyectos_casa = DB::table('proyectos_casas')
+        //     ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+        //     ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+        //     ->select(
+        //         'proyectos_casas.*',
+        //         'tipos_de_proyectos.nombre_tipo',
+        //         'clientes.emp_nombre'
+        //     )
+        //     ->get();
 
-        /************************************ CASAS ************************************/
-        $proyectos_casa = DB::table('proyectos_casas')
-            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
-            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
-            ->select(
-                'proyectos_casas.*',
-                'tipos_de_proyectos.nombre_tipo',
-                'clientes.emp_nombre'
-            )
-            ->get();
+        // // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        // $encargadoIdsGlobal = [];
+        // $ingenieroIdsGlobal = [];
 
-        // Recolectar IDs
-        $encargadoIdsGlobal = $proyectos_casa->flatMap(fn($p) => json_decode($p->encargado_id, true) ?? []);
-        $ingenieroIdsGlobal = $proyectos_casa->flatMap(fn($p) => json_decode($p->ingeniero_id, true) ?? []);
+        // foreach ($proyectos_casa as $proyecto) {
+        //     $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+        //     $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        // }
 
-        $usuarios = DB::table('users')
-            ->whereIn('id', array_unique($encargadoIdsGlobal->merge($ingenieroIdsGlobal)->toArray()))
-            ->pluck('nombre', 'id');
+        // // 2️⃣ Obtener todos los usuarios de una sola consulta
+        // $usuarios = DB::table('users')
+        //     ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+        //     ->pluck('nombre', 'id'); // => [id => nombre]
 
-        // Obtener detalles
-        $detalles = DB::table('proyectos_casas_detalle')
-            ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
-            ->get()
-            ->groupBy('proyecto_casa_id');
+        // // 3️⃣ Obtener todos los detalles de los proyectos en una sola consulta
+        // $detalles = DB::table('proyectos_casas_detalle')
+        //     ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+        //     ->get()
+        //     ->groupBy('proyecto_casa_id');
 
-        // Procesar proyectos de casas
-        $proyectos_casa->transform(function ($proyecto) use ($usuarios, $detalles) {
-            $encargadoIds = collect(json_decode($proyecto->encargado_id, true) ?? []);
-            $ingenieroIds = collect(json_decode($proyecto->ingeniero_id, true) ?? []);
+        // // 4️⃣ Asignar nombres y cálculos a cada proyecto
+        // foreach ($proyectos_casa as $proyecto) {
+        //     // Encargados
+        //     $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+        //     $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
 
-            $proyecto->nombresEncargados = $encargadoIds->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
-            $proyecto->nombresIngenieros = $ingenieroIds->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
+        //     // Ingenieros
+        //     $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+        //     $proyecto->nombresIngenieros = collect($ingenieroIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
 
-            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+        //     // Detalles del proyecto
+        //     $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Avance
-            $total = $detalleProyecto->count();
-            $realizados = $detalleProyecto->where('estado', 2)->count();
-            $proyecto->avance = $total > 0 ? round(($realizados / $total) * 100, 2) : 0;
+        //     // 🔹 Avance: estado=2 (todas etapas) / total (todas etapas)
+        //     $totalApartamentos = $detalleProyecto->count();
+        //     $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+        //     $proyecto->avance = $totalApartamentos > 0
+        //         ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+        //         : 0;
 
-            // Atraso (etapa = 2)
-            $estado1 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
-            $estado2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
-            $den = $estado1 + $estado2;
-            $proyecto->porcentaje = $den > 0 ? round(($estado1 / $den) * 100, 2) : 0;
+        //     // 🔹 Atraso: estado=1 etapa=2 / (estado=1 etapa=2 + estado=2 etapa=2)
+        //     $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
+        //     $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
+        //     $denAtraso = $estado1_etapa2 + $estado2_etapa2;
 
-            return $proyecto;
-        });
+        //     $proyecto->porcentaje = $denAtraso > 0
+        //         ? round(($estado1_etapa2 / $denAtraso) * 100, 2)
+        //         : 0;
+        // }
 
-        $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+        // // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+        // $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
 
         return response()->json([
             'status' => 'success',
             'data' => $proyectos,
-            'data_casas' => $proyectos_casa
+            'data_casas' => []
         ]);
     }
+
 
 
     public function usuariosProyectos()
