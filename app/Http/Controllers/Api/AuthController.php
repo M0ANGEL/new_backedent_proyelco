@@ -21,7 +21,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
 
-         Log::info('Intento de login', $request->all());
+        Log::info('Intento de login', $request->all());
         $credentials = $request->validate([
             'username' => 'required',
             'password' => 'required',
