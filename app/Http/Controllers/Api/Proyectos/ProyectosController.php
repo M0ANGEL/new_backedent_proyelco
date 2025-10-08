@@ -175,88 +175,133 @@ class ProyectosController extends Controller
 
     public function index()
 {
-    // 🔹 Procesar ambos tipos de proyectos
-    $proyectos = $this->procesarProyectos('proyecto', 'proyecto_detalle', 'proyecto_id');
-    $proyectos_casa = $this->procesarProyectos('proyectos_casas', 'proyectos_casas_detalle', 'proyecto_casa_id', true);
+    /********************************** APARTAMENTOS *********************************/
+    // Traer proyectos con joins y solo columnas necesarias
+    $proyectos = DB::table('proyecto as p')
+        ->join('tipos_de_proyectos as t', 'p.tipoProyecto_id', '=', 't.id')
+        ->join('clientes as c', 'p.cliente_id', '=', 'c.id')
+        ->select(
+            'p.id',
+            'p.descripcion_proyecto',
+            'p.encargado_id',
+            'p.ingeniero_id',
+            'p.fecha_inicio',
+            'p.estado',
+            't.nombre_tipo',
+            'c.emp_nombre'
+        )
+        ->get();
+
+    // Obtener IDs de encargados e ingenieros de una sola pasada
+    $encargadoIds = $proyectos->pluck('encargado_id')->filter()->unique();
+    $ingenieroIds = $proyectos->pluck('ingeniero_id')->filter()->unique();
+    $usuarioIds = $encargadoIds->merge($ingenieroIds)->unique();
+
+    // Obtener nombres de usuarios solo una vez
+    $usuarios = DB::table('users')
+        ->whereIn('id', $usuarioIds)
+        ->pluck('nombre', 'id');
+
+    // Obtener detalles agrupados por proyecto
+    $detalles = DB::table('proyecto_detalle')
+        ->whereIn('proyecto_id', $proyectos->pluck('id'))
+        ->select('proyecto_id', 'estado', 'orden_proceso')
+        ->get()
+        ->groupBy('proyecto_id');
+
+    // Procesar cálculos en memoria (optimizado)
+    foreach ($proyectos as $proyecto) {
+        $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+        // 🔹 Encargado / Ingeniero
+        $proyecto->nombresEncargados = $usuarios[$proyecto->encargado_id] ?? 'Sin asignar';
+        $proyecto->nombresIngenieros = $usuarios[$proyecto->ingeniero_id] ?? 'Sin asignar';
+
+        // 🔹 Atraso (excluyendo orden_proceso = 1)
+        $detallesAtraso = $detalleProyecto->where('orden_proceso', '!=', 1);
+        $ejecutando = $detallesAtraso->where('estado', 1)->count();
+        $terminado = $detallesAtraso->where('estado', 2)->count();
+        $totalAtraso = $ejecutando + $terminado;
+
+        $proyecto->porcentaje = $totalAtraso > 0
+            ? round(($ejecutando / $totalAtraso) * 100, 2)
+            : 0;
+
+        // 🔹 Avance (todos los procesos)
+        $total = $detalleProyecto->count();
+        $realizados = $detalleProyecto->where('estado', 2)->count();
+        $proyecto->avance = $total > 0
+            ? round(($realizados / $total) * 100, 2)
+            : 0;
+    }
+
+    $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+
+    /************************************ CASAS ************************************/
+    $proyectos_casa = DB::table('proyectos_casas as pc')
+        ->join('tipos_de_proyectos as t', 'pc.tipoProyecto_id', '=', 't.id')
+        ->join('clientes as c', 'pc.cliente_id', '=', 'c.id')
+        ->select(
+            'pc.id',
+            'pc.descripcion_proyecto',
+            'pc.encargado_id',
+            'pc.ingeniero_id',
+            'pc.fecha_inicio',
+            'pc.estado',
+            't.nombre_tipo',
+            'c.emp_nombre'
+        )
+        ->get();
+
+    // Obtener IDs globales (solo una vez)
+    $encargadoIds = $proyectos_casa->pluck('encargado_id')->filter()->unique();
+    $ingenieroIds = $proyectos_casa->pluck('ingeniero_id')->filter()->unique();
+    $usuarioIds = $encargadoIds->merge($ingenieroIds)->unique();
+
+    $usuarios = DB::table('users')
+        ->whereIn('id', $usuarioIds)
+        ->pluck('nombre', 'id');
+
+    // Obtener detalles una sola vez
+    $detallesCasas = DB::table('proyectos_casas_detalle')
+        ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+        ->select('proyecto_casa_id', 'estado', 'etapa')
+        ->get()
+        ->groupBy('proyecto_casa_id');
+
+    foreach ($proyectos_casa as $proyecto) {
+        $detalleProyecto = $detallesCasas[$proyecto->id] ?? collect();
+
+        $proyecto->nombresEncargados = $usuarios[$proyecto->encargado_id] ?? 'Sin asignar';
+        $proyecto->nombresIngenieros = $usuarios[$proyecto->ingeniero_id] ?? 'Sin asignar';
+
+        // 🔹 Avance total
+        $total = $detalleProyecto->count();
+        $realizados = $detalleProyecto->where('estado', 2)->count();
+        $proyecto->avance = $total > 0
+            ? round(($realizados / $total) * 100, 2)
+            : 0;
+
+        // 🔹 Atraso (solo etapa = 2)
+        $etapa2 = $detalleProyecto->where('etapa', 2);
+        $estado1 = $etapa2->where('estado', 1)->count();
+        $estado2 = $etapa2->where('estado', 2)->count();
+        $den = $estado1 + $estado2;
+
+        $proyecto->porcentaje = $den > 0
+            ? round(($estado1 / $den) * 100, 2)
+            : 0;
+    }
+
+    $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
 
     return response()->json([
         'status' => 'success',
         'data' => $proyectos,
-        'data_casas' => $proyectos_casa
+        'data_casas' => $proyectos_casa,
     ]);
-}
-
-/**
- * 🔧 Procesa proyectos (apartamentos o casas) con cálculo de avance y atraso.
- */
-private function procesarProyectos(string $tabla, string $tablaDetalle, string $columnaRelacion, bool $esCasa = false)
-{
-    // 1️⃣ Traer proyectos con joins básicos
-    $proyectos = DB::table($tabla)
-        ->join('tipos_de_proyectos', "$tabla.tipoProyecto_id", '=', 'tipos_de_proyectos.id')
-        ->join('clientes', "$tabla.cliente_id", '=', 'clientes.id')
-        ->select(
-            "$tabla.*",
-            'tipos_de_proyectos.nombre_tipo',
-            'clientes.emp_nombre'
-        )
-        ->get();
-
-    if ($proyectos->isEmpty()) return collect();
-
-    // 2️⃣ Extraer IDs de encargados e ingenieros (en un solo paso)
-    $idsUsuarios = $proyectos->flatMap(function ($p) {
-        return array_merge(
-            json_decode($p->encargado_id, true) ?? [],
-            json_decode($p->ingeniero_id, true) ?? []
-        );
-    })->unique()->values()->all();
-
-    // 3️⃣ Obtener los usuarios de una sola consulta
-    $usuarios = DB::table('users')->whereIn('id', $idsUsuarios)->pluck('nombre', 'id');
-
-    // 4️⃣ Obtener todos los detalles de proyectos en una sola consulta
-    $detalles = DB::table($tablaDetalle)
-        ->whereIn($columnaRelacion, $proyectos->pluck('id'))
-        ->select($columnaRelacion, 'estado', DB::raw('COALESCE(etapa, 0) as etapa'), DB::raw('COALESCE(orden_proceso, 0) as orden_proceso'))
-        ->get()
-        ->groupBy($columnaRelacion);
-
-    // 5️⃣ Calcular avance y atraso
-    $proyectos = $proyectos->map(function ($p) use ($usuarios, $detalles, $columnaRelacion, $esCasa) {
-        $detalleProyecto = $detalles[$p->id] ?? collect();
-
-        // Encargados e Ingenieros
-        $p->nombresEncargados = collect(json_decode($p->encargado_id, true) ?? [])
-            ->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
-
-        $p->nombresIngenieros = collect(json_decode($p->ingeniero_id, true) ?? [])
-            ->map(fn($id) => $usuarios[$id] ?? null)->filter()->values();
-
-        // 🔹 Calcular avance
-        $total = $detalleProyecto->count();
-        $realizados = $detalleProyecto->where('estado', 2)->count();
-        $p->avance = $total > 0 ? round(($realizados / $total) * 100, 2) : 0;
-
-        // 🔹 Calcular atraso (diferente fórmula para casas o apartamentos)
-        if ($esCasa) {
-            $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
-            $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
-            $denAtraso = $estado1_etapa2 + $estado2_etapa2;
-            $p->porcentaje = $denAtraso > 0 ? round(($estado1_etapa2 / $denAtraso) * 100, 2) : 0;
-        } else {
-            $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
-            $ejecutando = $detallesAtraso->where('estado', 1)->count();
-            $terminado = $detallesAtraso->where('estado', 2)->count();
-            $totalAtraso = $ejecutando + $terminado;
-            $p->porcentaje = $totalAtraso > 0 ? round(($ejecutando / $totalAtraso) * 100, 2) : 0;
-        }
-
-        return $p;
-    });
-
-    // 6️⃣ Ordenar por atraso descendente
-    return $proyectos->sortByDesc('porcentaje')->values();
 }
 
 
