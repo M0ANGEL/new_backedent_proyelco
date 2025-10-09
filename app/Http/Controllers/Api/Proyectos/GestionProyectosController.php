@@ -19,9 +19,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class GestionProyectosController extends Controller
 {
-    //index ingenieros
     public function index()
     {
+        /**********************************APARTAMENTOS******************************** */
         // Traer proyectos con joins básicos
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
@@ -29,7 +29,7 @@ class GestionProyectosController extends Controller
             ->where(function ($query) {
                 $userId = Auth::id();
                 $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
-                // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+                // ->orWhereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')"); // si en algún momento quieres incluir encargados
             })
             ->select(
                 'proyecto.*',
@@ -62,6 +62,84 @@ class GestionProyectosController extends Controller
         foreach ($proyectos as $proyecto) {
             // Encargados
             $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
+
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
+
+            // Detalles del proyecto
+            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+            // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
+            $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
+            $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
+            $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
+            $totalAtraso = $ejecutando + $terminado;
+
+            $proyecto->porcentaje = $totalAtraso > 0
+                ? round(($ejecutando / $totalAtraso) * 100, 2)
+                : 0;
+
+            // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+
+            // (Opcional) Mostrar serial de avance tipo "X/Y"
+            $proyecto->serial_avance = $apartamentosRealizados . '/' . $totalApartamentos;
+        }
+
+        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+        $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+        /************************************CASAS************************************ */
+
+        $proyectos_casa = DB::table('proyectos_casas')
+            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+            ->where(function ($query) {
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(proyectos_casas.ingeniero_id, '\"$userId\"')");
+            })
+            ->select(
+                'proyectos_casas.*',
+                'tipos_de_proyectos.nombre_tipo',
+                'clientes.emp_nombre'
+            )
+            ->get();
+
+        // 1️⃣ Recolectar todos los IDs de encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
+
+        foreach ($proyectos_casa as $proyecto) {
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        }
+
+        // 2️⃣ Obtener todos los usuarios en una sola consulta
+        $usuarios = DB::table('users')
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id'); // => [id => nombre]
+
+        // 3️⃣ Obtener todos los detalles de los proyectos
+        $detalles = DB::table('proyectos_casas_detalle')
+            ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+            ->get()
+            ->groupBy('proyecto_casa_id');
+
+        // 4️⃣ Asignar nombres y cálculos a cada proyecto
+        foreach ($proyectos_casa as $proyecto) {
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
             $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
 
             // Ingenieros
@@ -71,32 +149,40 @@ class GestionProyectosController extends Controller
             // Detalles del proyecto
             $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Cálculo de atraso
-            $ejecutando = $detalleProyecto->where('estado', 1)->count();
-            $terminado = $detalleProyecto->where('estado', 2)->count();
-            $total = $ejecutando + $terminado;
-
-            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
-
-            // Cálculo de avance
+            // 🔹 Avance: estado=2 (todas etapas) / total (todas etapas)
             $totalApartamentos = $detalleProyecto->count();
-            $apartamentosRealizados = $terminado;
-            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+
+            // 🔹 Atraso: estado=1 etapa=2 / (estado=1 etapa=2 + estado=2 etapa=2)
+            $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
+            $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
+            $denAtraso = $estado1_etapa2 + $estado2_etapa2;
+
+            $proyecto->porcentaje = $denAtraso > 0
+                ? round(($estado1_etapa2 / $denAtraso) * 100, 2)
+                : 0;
         }
 
         // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
-        $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+        $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
 
         return response()->json([
             'status' => 'success',
-            'data' => $proyectos
+            'data' => $proyectos,
+            'data_casas' => $proyectos_casa
         ]);
     }
 
-    //index encargados de obras
     public function indexEncargadoObra()
     {
-        // Traer proyectos con joins básicos
+        $userId = Auth::id();
+
+        /**********************************APARTAMENTOS******************************** */
+        // Traer proyectos con joins básicos filtrados por encargado
         $proyectos = DB::table('proyecto')
             ->join('tipos_de_proyectos', 'proyecto.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
@@ -135,6 +221,82 @@ class GestionProyectosController extends Controller
         foreach ($proyectos as $proyecto) {
             // Encargados
             $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
+            $proyecto->nombresEncargados = collect($encargadoIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
+
+            // Ingenieros
+            $ingenieroIds = json_decode($proyecto->ingeniero_id, true) ?? [];
+            $proyecto->nombresIngenieros = collect($ingenieroIds)
+                ->map(fn($id) => $usuarios[$id] ?? null)
+                ->filter();
+
+            // Detalles del proyecto
+            $detalleProyecto = $detalles[$proyecto->id] ?? collect();
+
+            // 🔹 Cálculo de ATRASO (excluyendo orden_proceso = 1)
+            $detallesAtraso = $detalleProyecto->filter(fn($d) => $d->orden_proceso != 1);
+            $ejecutando = $detallesAtraso->where('estado', 1)->count(); // atraso
+            $terminado = $detallesAtraso->where('estado', 2)->count();  // realizados
+            $totalAtraso = $ejecutando + $terminado;
+
+            $proyecto->porcentaje = $totalAtraso > 0
+                ? round(($ejecutando / $totalAtraso) * 100, 2)
+                : 0;
+
+            // 🔹 Cálculo de AVANCE (incluyendo TODOS los procesos)
+            $totalApartamentos = $detalleProyecto->count();
+            $apartamentosRealizados = $detalleProyecto->where('estado', 2)->count();
+
+            $proyecto->avance = $totalApartamentos > 0
+                ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2)
+                : 0;
+
+            // (Opcional) Serial de avance tipo "realizados/total"
+            $proyecto->serial_avance = $apartamentosRealizados . '/' . $totalApartamentos;
+        }
+
+        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
+        $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+
+        /************************************CASAS************************************ */
+        $proyectos_casa = DB::table('proyectos_casas')
+            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+            ->where(function ($query) use ($userId) {
+                $query->whereRaw("JSON_CONTAINS(proyectos_casas.encargado_id, '\"$userId\"')");
+            })
+            ->select(
+                'proyectos_casas.*',
+                'tipos_de_proyectos.nombre_tipo',
+                'clientes.emp_nombre'
+            )
+            ->get();
+
+        // 🔹 Recolectar encargados e ingenieros
+        $encargadoIdsGlobal = [];
+        $ingenieroIdsGlobal = [];
+
+        foreach ($proyectos_casa as $proyecto) {
+            $encargadoIdsGlobal = array_merge($encargadoIdsGlobal, json_decode($proyecto->encargado_id, true) ?? []);
+            $ingenieroIdsGlobal = array_merge($ingenieroIdsGlobal, json_decode($proyecto->ingeniero_id, true) ?? []);
+        }
+
+        // 🔹 Obtener usuarios
+        $usuarios = DB::table('users')
+            ->whereIn('id', array_unique(array_merge($encargadoIdsGlobal, $ingenieroIdsGlobal)))
+            ->pluck('nombre', 'id');
+
+        // 🔹 Obtener detalles de proyectos
+        $detalles = DB::table('proyectos_casas_detalle')
+            ->whereIn('proyecto_casa_id', $proyectos_casa->pluck('id'))
+            ->get()
+            ->groupBy('proyecto_casa_id');
+
+        // 🔹 Cálculos por proyecto
+        foreach ($proyectos_casa as $proyecto) {
+            // Encargados
+            $encargadoIds = json_decode($proyecto->encargado_id, true) ?? [];
             $proyecto->nombresEncargados = collect($encargadoIds)->map(fn($id) => $usuarios[$id] ?? null)->filter();
 
             // Ingenieros
@@ -144,27 +306,34 @@ class GestionProyectosController extends Controller
             // Detalles del proyecto
             $detalleProyecto = $detalles[$proyecto->id] ?? collect();
 
-            // Cálculo de atraso
-            $ejecutando = $detalleProyecto->where('estado', 1)->count();
-            $terminado = $detalleProyecto->where('estado', 2)->count();
-            $total = $ejecutando + $terminado;
+            // 🔹 Avance: estado=2 (todas etapas) / total (todas etapas)
+            $totalCasas = $detalleProyecto->count();
+            $casasRealizadas = $detalleProyecto->where('estado', 2)->count();
+            $proyecto->avance = $totalCasas > 0
+                ? round(($casasRealizadas / $totalCasas) * 100, 2)
+                : 0;
 
-            $proyecto->porcentaje = $total > 0 ? round(($ejecutando / $total) * 100, 2) : 0;
+            // 🔹 Atraso: estado=1 etapa=2 / (estado=1 etapa=2 + estado=2 etapa=2)
+            $estado1_etapa2 = $detalleProyecto->where('estado', 1)->where('etapa', 2)->count();
+            $estado2_etapa2 = $detalleProyecto->where('estado', 2)->where('etapa', 2)->count();
+            $denAtraso = $estado1_etapa2 + $estado2_etapa2;
 
-            // Cálculo de avance
-            $totalApartamentos = $detalleProyecto->count();
-            $apartamentosRealizados = $terminado;
-            $proyecto->avance = $totalApartamentos > 0 ? round(($apartamentosRealizados / $totalApartamentos) * 100, 2) : 0;
+            $proyecto->porcentaje = $denAtraso > 0
+                ? round(($estado1_etapa2 / $denAtraso) * 100, 2)
+                : 0;
         }
 
-        // 5️⃣ Ordenar por atraso (porcentaje) de mayor a menor
-        $proyectos = $proyectos->sortByDesc('porcentaje')->values();
+        // 🔹 Ordenar por atraso (de mayor a menor)
+        $proyectos_casa = $proyectos_casa->sortByDesc('porcentaje')->values();
+
 
         return response()->json([
             'status' => 'success',
-            'data' => $proyectos
+            'data' => $proyectos,
+            'data_casas' => $proyectos_casa
         ]);
     }
+
 
     public function indexProgreso(Request $request)
     {
@@ -309,6 +478,7 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+    /* ************************************************ESTADO EN BLANCO********************************************** */
     private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
     {
         $pisosRequeridos = $procesosConfig[$orden_proceso]->pisos_requeridos ?? 0;
@@ -427,47 +597,75 @@ class GestionProyectosController extends Controller
     //Calcula porcentajes de avance y atraso para procesos y torres
     private function calcularPorcentajes(&$resultado, &$torreResumen)
     {
-        // Porcentajes por proceso
+        // --- Porcentajes por proceso ---
         foreach ($resultado as $torre => &$procesos) {
             foreach ($procesos as $orden_proceso => &$proceso) {
                 if ($orden_proceso === 'nombre_torre') continue;
 
-                // Proceso Fundida (1) no lleva porcentajes
+                $total_atraso      = $proceso['apartamentos_atraso'];     // estado = 1
+                $total_realizados  = $proceso['apartamentos_realizados']; // estado = 2
+                $total_apartamentos = $proceso['total_apartamentos'];     // estados 0,1,2
+
+                // % ATRASO (se excluye proceso 1)
                 if ($orden_proceso == 1) {
                     $proceso['porcentaje_atraso'] = 0;
-                    $proceso['porcentaje_avance'] = 0;
-                    continue;
+                } else {
+                    $den = $total_atraso + $total_realizados;
+                    $proceso['porcentaje_atraso'] = $den > 0 ? round(($total_atraso / $den) * 100, 2) : 0;
                 }
 
-                $total_atraso = $proceso['apartamentos_atraso'];
-                $total_realizados = $proceso['apartamentos_realizados'];
-                $denominador = $total_atraso + $total_realizados;
-
-                // % Atraso = (Atrasos / Total iniciados) * 100
-                $proceso['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
-
-                // % Avance = (Realizados / Total apartamentos) * 100
-                $proceso['porcentaje_avance'] = $proceso['total_apartamentos'] > 0 ?
-                    round(($total_realizados / $proceso['total_apartamentos']) * 100, 2) : 0;
+                // % AVANCE (incluye todos los procesos)
+                $proceso['porcentaje_avance'] = $total_apartamentos > 0
+                    ? round(($total_realizados / $total_apartamentos) * 100, 2)
+                    : 0;
             }
         }
 
-        // Porcentajes por torre
+        // --- Porcentajes por torre ---
         foreach ($torreResumen as $torre => &$datos) {
-            $total_atraso = $datos['total_atraso'];
-            $total_realizados = $datos['total_realizados'];
-            $denominador = $total_atraso + $total_realizados;
+            // Para atraso: sumar solo estados de procesos != 1
+            $total_atraso_excl = 0;           // suma estado=1 (excluye op=1)
+            $total_realizados_excl = 0;       // suma estado=2 (excluye op=1, para el denominador del atraso)
 
-            $datos['porcentaje_atraso'] = $denominador > 0 ? round(($total_atraso / $denominador) * 100, 2) : 0;
-            $datos['porcentaje_avance'] = $denominador > 0 ? round(($total_realizados / $denominador) * 100, 2) : 0;
-            $datos['serial_avance'] = $total_realizados . '/' . $denominador;
+            // Para avance: incluir todos los procesos
+            $total_realizados_all = 0;        // suma estado=2 (incluye op=1)
+            $total_apartamentos_all = 0;      // total aptos (incluye op=1)
+
+            foreach ($resultado[$torre] as $op => $proc) {
+                if ($op === 'nombre_torre') continue;
+
+                // avance (incluye todo)
+                $total_realizados_all += $proc['apartamentos_realizados'];
+                $total_apartamentos_all += $proc['total_apartamentos'];
+
+                // atraso (excluir proceso 1)
+                if ($op != 1) {
+                    $total_atraso_excl += $proc['apartamentos_atraso'];
+                    $total_realizados_excl += $proc['apartamentos_realizados'];
+                }
+            }
+
+            // Atraso torre: estado1 / (estado1 + estado2) — ambos excluyen op=1
+            $denAtraso = $total_atraso_excl + $total_realizados_excl;
+            $datos['porcentaje_atraso'] = $denAtraso > 0
+                ? round(($total_atraso_excl / $denAtraso) * 100, 2)
+                : 0;
+
+            // Avance torre: estado2 (incluye todo) / total aptos (incluye todo)
+            $datos['porcentaje_avance'] = $total_apartamentos_all > 0
+                ? round(($total_realizados_all / $total_apartamentos_all) * 100, 2)
+                : 0;
+
+            $datos['serial_avance'] = $total_realizados_all . '/' . $total_apartamentos_all;
             $datos['total_pisos'] = count($datos['pisos_unicos']);
 
             unset($datos['pisos_unicos']); // Eliminar campo auxiliar
         }
     }
 
-    //------------------------------------------------------------------------------------
+    /* ************************************************ESTADO EN BLANCO FIN********************************************** */
+
+
     public function destroy($id)
     {
         $iniciarProyecto = Proyectos::find($id);
@@ -529,374 +727,6 @@ class GestionProyectosController extends Controller
             'success' => true,
             'data' => $info
         ]);
-    }
-
-    // confirmar con secuencia de desfase
-    public function confirmarApt($id)
-    {
-        DB::beginTransaction();
-        //inicio de flujo
-
-        try {
-
-            //buscamos el detalle del proyeto para ese piso
-            $info = ProyectosDetalle::findOrFail($id);
-
-
-            $numeroCambio = $info->orden_proceso + "1";
-            //buscamos los cambio de piso para proceso, el numero minimo de pisos que debe cumplir el proecso anterior
-            $CambioProcesoProyectos = CambioProcesoProyectos::where('proyecto_id', $info->proyecto_id)
-                ->where('proceso', $numeroCambio)->first();
-
-            //vemos si ese piso ya esta confirmado, si lo esta se envia mensaje de error
-            if ($info->estado == 2) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Este apartamento ya está confirmado'
-                ], 400);
-            }
-
-            //definimos datos numericos
-            $torre = $info->torre;
-            $orden_proceso = (int) $info->orden_proceso;
-            $piso = (int) $info->piso;
-
-            //buscamos el proyecto padre
-            $proyecto = Proyectos::findOrFail($info->proyecto_id);
-            $pisosPorProceso = $CambioProcesoProyectos ? (int) $CambioProcesoProyectos->numero : 0;
-            $aptMinimos = (int) $proyecto->minimoApt; //pisos minimos para tomarlo como completo
-
-
-
-
-            if ($orden_proceso === 1) {
-                // Confirmar el apartamento sin reglas si es proceso 1
-                $info->estado = 2;
-                $info->fecha_fin = now();
-                $info->user_id = Auth::id();
-                $info->save();
-            } else {
-
-                // Verificar si el mismo apartamento esta confirmado en el proceso anterior
-                $verPisoAnteriorConfirmado = ProyectosDetalle::where('torre', $torre)
-                    ->where('orden_proceso', $orden_proceso - 1)
-                    ->where('proyecto_id', $proyecto->id)
-                    ->where('consecutivo', $info->consecutivo)
-                    ->where('piso', $piso)
-                    ->first();
-
-
-                // Confirmar el apartamento si el mismo apartamento esta confirmado en proceso anterior estado=2
-                if ($verPisoAnteriorConfirmado->estado == "2") {
-                    $info->estado = 2;
-                    $info->fecha_fin = now();
-                    $info->user_id = Auth::id();
-                    $info->save();
-                } else {
-                    // si no esta confirmado no se confirma, se envia mensaje de error
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'El apartamento no puede ser confirmado por que el apartamento en proceso anterior no esta confirmado'
-                    ], 400);
-                }
-            }
-
-            // Verificar si todos los aptos de este piso ya están confirmados
-            $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
-                ->where('orden_proceso', $orden_proceso)
-                ->where('proyecto_id', $proyecto->id)
-                ->where('piso', $piso)
-                ->get();
-
-            //validar que todo los apt de ese piso esten confirmados
-
-            // $todosConfirmados = $aptosDelPiso->every(fn($apt) => $apt->estado == 2);
-            $numAptos = $aptosDelPiso->count(); // Total de aptos
-            $confirmados = $aptosDelPiso->where('estado', 2)->count(); // Confirmados
-            $esValido = $confirmados >= $aptMinimos;
-
-
-            //si estan confirmado todo los apartamentos de ese piso sigue la logica, del resto termina aqui.
-            if ($esValido) {
-
-                if ($orden_proceso === 1) {
-                    // Si es el primer proceso (no depende de ningún proceso anterior)
-                    ProyectosDetalle::where('torre', $torre)
-                        ->where('orden_proceso', $orden_proceso)
-                        ->where('piso', $piso + 1)
-                        ->where('proyecto_id', $proyecto->id)
-                        ->where('estado', 0)
-                        ->update(['estado' => 1, 'fecha_habilitado' => now()]);
-
-                    // Validación que el proyecto siguiente ya esta activo, es decir piso 1 iniciado estado diferente a 0
-                    $InicioProceso = ProyectosDetalle::where('torre', $torre)
-                        ->where('orden_proceso', $orden_proceso + 1)
-                        ->where('proyecto_id', $proyecto->id)
-                        ->where('piso', 1)
-                        ->get();
-
-
-                    $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != 0);
-
-
-                    //si ya fue iniciado, habilitamos piso de acuerdo al orden de la secuanecia
-                    if ($confirmarInicioProceso == true) {
-                        // calculo del piso que se debe validar
-                        $nuevoPisoParaActivar = $piso - ($pisosPorProceso - 1);
-
-                        // solo para procesos con validacion
-                        $vervalidacionPiso = ProyectosDetalle::where('torre', $torre)
-                            ->where('orden_proceso', $orden_proceso + 1)
-                            ->where('proyecto_id', $proyecto->id)
-                            ->where('piso', $nuevoPisoParaActivar)
-                            // ->where('consecutivo', $info->consecutivo)
-                            ->get();
-
-                        // Verificar que TODOS estén en estado validación = 1 y estado_validacion = 0
-                        $todosPendientes = $vervalidacionPiso->every(function ($apt) {
-                            return $apt->validacion == 1 && $apt->estado_validacion == 0;
-                        });
-
-                        if ($todosPendientes) {
-                            DB::commit();
-                            return response()->json([
-                                'success' => true,
-                                'message' => 'Todos los apartamentos del piso están validados y pendientes por habilitación.',
-                            ]);
-                        }
-                        ProyectosDetalle::where('torre', $torre)
-                            ->where('orden_proceso', $orden_proceso + 1)
-                            ->where('proyecto_id', $proyecto->id)
-                            ->where('piso', $nuevoPisoParaActivar)
-                            ->where('estado', 0)
-                            ->update([
-                                'estado' => 1,
-                                'fecha_habilitado' => now(),
-                            ]);
-                    } else {
-                        // si no esta inicializado, se debe revisar si el proceso actual cumple con lso requisitos del minimo de pisos para que el proceso pueda ser incializado
-                        if ($piso >= $pisosPorProceso) {
-                            $nuevoProceso = $orden_proceso + 1;
-
-                            // Se revisa si el prcceso siguiente que se peinsa habilitar necesita validacion
-                            $procesoActual = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $nuevoProceso)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->first();
-
-                            // si necesita validacion pero no esta validadio no hacer nada
-                            if ($procesoActual->validacion == 1 && $procesoActual->estado_validacion == 0) {
-                                DB::commit();
-                                return response()->json([
-                                    'success' => true,
-                                ]);
-                            }
-
-                            // revisar si hay proceso siguiente, para evitar bug
-                            $existeSiguienteProceso = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $nuevoProceso)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->exists();
-
-                            // Validación que el piso anterior no este en estado 0 (bug)
-                            $InicioProceso = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->where('piso', $piso - 1)
-                                ->get();
-
-                            // si todo los apt estan en estado diferente a 0 esto sera true
-                            $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != 0);
-
-
-                            // si es true, entramos al IF
-                            if ($existeSiguienteProceso) {
-                                // Activar los apt del piso del siguiente proceso
-                                if ($InicioProceso) {
-                                    ProyectosDetalle::where('torre', $torre)
-                                        ->where('orden_proceso', $nuevoProceso)
-                                        ->where('proyecto_id', $proyecto->id)
-                                        ->where('piso', 1)
-                                        ->where('estado', 0)
-                                        ->update([
-                                            'estado' => 1,
-                                            'fecha_habilitado' => now(),
-                                        ]);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // si no es proceso 1, debe cumplir ciertas validaciones
-                    // buscamos proceso siguiente, si tiene datos es por que hay mas procesos
-                    $InicioProceso = ProyectosDetalle::where('torre', $torre)
-                        ->where('orden_proceso', $orden_proceso + 1)
-                        ->where('proyecto_id', $proyecto->id)
-                        ->where('piso', 1)
-                        ->get();
-
-                    // hay mas procesos segiur logica, si no hay mas, no hacer nada, se valida si el array esta vacio no hay mas procesos
-                    if ($InicioProceso->isNotEmpty()) {
-                        // validamos si el proceso sigueiente ya tiene el primer piso con estados de los apt distintos a 0, significa que ya se inicio
-                        $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado != "0");
-
-                        //esta iniciado el proceso siguiente?
-                        if ($confirmarInicioProceso == true) {
-
-                            $nuevoPisoParaActivar = $piso - ($pisosPorProceso - 1);
-
-                            // se busca si el prococeso siguiente ya tiene confirmado el apt, estado diferente a 0
-                            $BusquedaConfirmacionDEValdiacion = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso + 1)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->where('piso', $nuevoPisoParaActivar)
-                                // ->where('estado', 1)
-                                ->first();
-
-                            // se compara, si la validaion esta confirmada sigue su flujo, si no no hacer nada
-                            if ($BusquedaConfirmacionDEValdiacion->validacion == 1 && $BusquedaConfirmacionDEValdiacion->estado_validacion == 0) {
-                                DB::commit();
-                                return response()->json([
-                                    'success' => true,
-                                ]);
-                            }
-
-                            ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso + 1)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->where('piso', $nuevoPisoParaActivar)
-                                ->where('estado', 0)
-                                ->update([
-                                    'estado' => 1,
-                                    'fecha_habilitado' => now(),
-                                ]);
-                        } else {
-
-                            // Se valida que el proceso actual tenga confirmado los pisos de pisosPorProceso, si lo esta, iniciar proceso siguiente
-                            // $InicioProceso = ProyectosDetalle::where('torre', $torre)
-                            //     ->where('orden_proceso', $orden_proceso)
-                            //     ->where('proyecto_id', $proyecto->id)
-                            //     ->whereIn('piso', range(1, $pisosPorProceso))
-                            //     ->get();
-
-                            // $confirmarInicioProceso = $InicioProceso->isNotEmpty() && $InicioProceso->every(fn($apt) => $apt->estado == "2");
-
-
-                            //logica nuerva de acuerdo a minimo de apt
-                            $InicioProceso = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->whereIn('piso', range(1, $pisosPorProceso))
-                                ->get();
-
-                            // Agrupar por piso
-                            $pisos = $InicioProceso->groupBy('piso');
-
-                            // Verificar si se cumplen todos los pisos
-                            $confirmarInicioProceso = $pisos->count() == $pisosPorProceso &&
-                                $pisos->every(function ($aptosDelPiso) use ($aptMinimos) {
-                                    return $aptosDelPiso->where('estado', 2)->count() >= $aptMinimos;
-                                });
-
-                            //si el proceso actual cumple con los pisos re pisosPorPrceos en estado 2, activar
-                            if ($confirmarInicioProceso == true) {
-                                // Verificar si el proceso siguiente ya puede comenzar
-                                $nuevoProceso = $orden_proceso + 1;
-
-                                $existeSiguienteProceso = ProyectosDetalle::where('torre', $torre)
-                                    ->where('orden_proceso', $nuevoProceso)
-                                    ->where('proyecto_id', $proyecto->id)
-                                    ->exists();
-
-                                // Validación manual para revisar si neceita validacion
-                                $procesoActual = ProyectosDetalle::where('torre', $torre)
-                                    ->where('orden_proceso', $orden_proceso + 1)
-                                    ->where('proyecto_id', $proyecto->id)
-                                    ->first();
-
-                                // si requiere validacion no hacer nada, estos se validan por otra funcion
-                                if ($procesoActual->validacion == 1 && $procesoActual->estado_validacion == 0) {
-                                    DB::commit();
-
-                                    return response()->json([
-                                        'success' => true,
-                                    ]);
-                                } else {
-                                    // si no necesita validacion validar el piso 1 todo los apt pasarlos a estado 1, habilitado
-                                    if ($existeSiguienteProceso) {
-                                        // Activar el primer piso del siguiente proceso
-                                        ProyectosDetalle::where('torre', $torre)
-                                            ->where('orden_proceso', $nuevoProceso)
-                                            ->where('proyecto_id', $proyecto->id)
-                                            ->where('piso', 1)
-                                            ->where('estado', 0)
-                                            ->update([
-                                                'estado' => 1,
-                                                'fecha_habilitado' => now(),
-                                            ]);
-                                    }
-                                }
-                            }
-
-
-                            //buscamos los cambio de piso para proceso
-                            $CambioProcesoProyectosActivador = CambioProcesoProyectos::where('proyecto_id', $info->proyecto_id)
-                                ->where('proceso', $info->orden_proceso)->first();
-                            // activador manual en caso de que aplique el bug
-                            $pisoDeActivador = $piso + $CambioProcesoProyectosActivador->numero;
-
-                            // se trata de manejar bug, se valida si el activador del piso = pisoDeActivador del proceso anteriro fue activado, si lo es activar manual
-                            $EstadoActivador = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso - 1)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->where('piso', $pisoDeActivador)
-                                ->get();
-
-
-
-                            // se trata de manejar bug, se valida si el piso siguiente del mismo proceso fue activado, si lo es activar manual
-                            $EstadoSiguienteInactivo = ProyectosDetalle::where('torre', $torre)
-                                ->where('orden_proceso', $orden_proceso)
-                                ->where('proyecto_id', $proyecto->id)
-                                ->where('piso', $piso + 1)
-                                ->get();
-
-
-
-
-                            $confirmarActivarPisoSiguiente = $EstadoActivador->isNotEmpty() && $EstadoActivador->every(fn($apt) => $apt->estado == 2);
-                            $pisoSiguienteNoActivo = $EstadoSiguienteInactivo->isNotEmpty() && $EstadoSiguienteInactivo->every(fn($apt) => $apt->estado == 0);
-
-
-                            if ($confirmarActivarPisoSiguiente && $pisoSiguienteNoActivo) {
-                                ProyectosDetalle::where('torre', $torre)
-                                    ->where('orden_proceso', $orden_proceso)
-                                    ->where('proyecto_id', $proyecto->id)
-                                    ->where('piso', $piso + 1)
-                                    ->where('estado', 0)
-                                    ->update([
-                                        'estado' => 1,
-                                        'fecha_habilitado' => now(),
-                                    ]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'data' => $info
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al confirmar apartamento',
-                'error' => $e->getMessage()
-            ], 500);
-        }
     }
 
     public function InformeDetalladoProyectos($id)
@@ -1014,7 +844,7 @@ class GestionProyectosController extends Controller
 
             // Guardar log de anulación
             $LogCambioEstadoApt = new AnulacionApt();
-            $LogCambioEstadoApt->motivo = $request->detalle;
+            $LogCambioEstadoApt->motivo = "Apartamentos " . $request->detalle;
             $LogCambioEstadoApt->piso = (int) $info->piso;
             $LogCambioEstadoApt->apt = $request->aptId;
             $LogCambioEstadoApt->fecha_confirmo = $info->fecha_fin;
@@ -1436,7 +1266,6 @@ class GestionProyectosController extends Controller
             ]);
     }
 
-
     private function validarYHabilitarPorPiso($proyecto, $torre, $piso, $procesoOrigen, $procesoDestino)
     {
         $aptMinimos = $proyecto->minimoApt;
@@ -1762,175 +1591,4 @@ class GestionProyectosController extends Controller
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
     }
-
-
-    //futuro en caso tal retie y ritel 
-    // private function confirmarPruebas($proyecto, $torre, $orden_proceso, $piso)
-    // {
-    //     $aptMinimos = $proyecto->minimoApt;
-
-    //     // Obtener todos los aptos del piso para este proceso
-    //     $aptosDelPiso = ProyectosDetalle::where('torre', $torre)
-    //         ->where('orden_proceso', $orden_proceso)
-    //         ->where('proyecto_id', $proyecto->id)
-    //         ->where('piso', $piso)
-    //         ->get();
-
-    //     // Filtrar solo los que están confirmados (estado == 2)
-    //     $confirmados = $aptosDelPiso->filter(fn($apt) => $apt->estado == 2);
-
-    //     // Validar si al menos se cumple el mínimo requerido
-    //     $confirmarInicioProceso = $confirmados->count() >= $aptMinimos;
-
-    //     if ($confirmarInicioProceso) {
-    //         // Validar y habilitar procesos dependientes
-    //         $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'retie');
-    //         $this->validarYHabilitarRetieYRitel($proyecto, $torre, $piso, 'ritel');
-    //     }
-    // }
-
-
-    // private function validarYHabilitarRetieYRitel($proyecto, $torre, $piso, $procesoNombre)
-    // {
-    //     $aptMinimos = $proyecto->minimoApt;
-    //     info("#entro");
-
-    //     // Obtener pisos requeridos
-    //     $CambioProceso = DB::table('cambio_procesos_x_proyecto')
-    //         ->join('procesos_proyectos', 'procesos_proyectos.id', '=', 'cambio_procesos_x_proyecto.proceso')
-    //         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-    //         ->where('cambio_procesos_x_proyecto.proyecto_id', $proyecto->id)
-    //         ->select('cambio_procesos_x_proyecto.*')
-    //         ->first();
-
-
-
-    //     $pisosRequeridos = $CambioProceso ? (int) $CambioProceso->numero : 0;
-    //     info("cambio nuemro " . $pisosRequeridos);
-
-    //     // Verificar si el proceso ya inició en piso 1
-    //     $inicioProceso = DB::table('proyecto_detalle')
-    //         ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //         ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-    //         ->where('proyecto_detalle.torre', $torre)
-    //         ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-    //         ->where('proyecto_detalle.piso', 1)
-    //         ->get();
-
-    //     $yaIniciado = $inicioProceso->isNotEmpty() && $inicioProceso->contains(fn($apt) => $apt->estado != 0);
-
-
-    //     if ($yaIniciado) {
-    //         info("cumple");
-    //         $nuevoPiso = $piso - ($pisosRequeridos - 1);
-
-    //         $verValidacion = DB::table('proyecto_detalle')
-    //             ->join('procesos_proyectos', 'proyecto_detalle.orden_proceso', '=', 'procesos_proyectos.id')
-    //             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-    //             ->where('proyecto_detalle.torre', $torre)
-    //             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-    //             ->where('proyecto_detalle.piso', $nuevoPiso)
-    //             ->select('proyecto_detalle.*')
-    //             ->get();
-
-    //         $todosPendientes = $verValidacion->every(fn($apt) => $apt->validacion == 1 && $apt->estado_validacion == 0);
-
-    //         if ($todosPendientes) {
-    //             return;
-    //         }
-
-    //         // Aplicar lógica de mínimos para habilitar
-    //         $aptosConfirmados = ProyectosDetalle::where('torre', $torre)
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->where('piso', $piso)
-    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-    //             ->where('estado', 2)
-    //             ->pluck('consecutivo')
-    //             ->toArray();
-
-    //         $pendientesDestino = ProyectosDetalle::where('torre', $torre)
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->where('piso', $nuevoPiso)
-    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-    //             ->where('estado', 0)
-    //             ->pluck('consecutivo')
-    //             ->toArray();
-
-    //         $pisoActualizado = $piso - $nuevoPiso;
-    //         $transformados = array_map(fn($apt) => (int)$apt - ($pisoActualizado * 100), $aptosConfirmados);
-
-    //         $aptosHabilitar = array_intersect($transformados, $pendientesDestino);
-
-    //         $yaHabilitados = ProyectosDetalle::where('torre', $torre)
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->where('piso', $nuevoPiso)
-    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-    //             ->where('estado', 1)
-    //             ->pluck('consecutivo')
-    //             ->toArray();
-
-    //         if ((count($yaHabilitados) + count($aptosHabilitar)) < $aptMinimos) {
-    //             return;
-    //         } elseif ((count($yaHabilitados) + count($aptosHabilitar)) == $aptMinimos) {
-    //             $this->habilitarPorConsecutivos($proyecto, $torre, $nuevoPiso, $procesoNombre, $aptosHabilitar);
-    //         } else {
-    //             $uno = reset($aptosHabilitar);
-    //             $this->habilitarPorConsecutivos($proyecto, $torre, $nuevoPiso, $procesoNombre, [$uno]);
-    //         }
-    //     } elseif ($piso >= $pisosRequeridos) {
-    //         info("no cumple pero se debe activar");
-    //         // Verifica que se cumplan pisos suficientes con mínimo de aptos confirmados
-    //         $pisosCumplen = ProyectosDetalle::select('piso')
-    //             ->where('torre', $torre)
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', ["pruebas"]))
-    //             ->where('estado', 2)
-    //             ->groupBy('piso')
-    //             ->havingRaw('COUNT(*) >= ?', [$aptMinimos])
-    //             ->pluck('piso')
-    //             ->toArray();
-
-
-
-    //         info("validacion exerna-1");
-    //         info("apt que cumplen: " . json_encode($pisosCumplen));
-
-
-
-    //         if (count($pisosCumplen) < $pisosRequeridos) {
-    //             info("no cumplen por pisos ");
-
-    //             return;
-    //         }
-    //         info("validacion exerna");
-
-    //         // Validación externa antes de habilitar piso 1
-    //         $detalle = DB::table('proyecto_detalle')
-    //             ->join('procesos_proyectos', 'proyecto_detalle.procesos_proyectos_id', '=', 'procesos_proyectos.id')
-    //             ->whereRaw('LOWER(procesos_proyectos.nombre_proceso) = ?', [$procesoNombre])
-    //             ->where('proyecto_detalle.torre', $torre)
-    //             ->where('proyecto_detalle.proyecto_id', $proyecto->id)
-    //             ->where('proyecto_detalle.piso', 1)
-    //             ->select('proyecto_detalle.*')
-    //             ->first();
-
-    //         if ($detalle && $detalle->validacion == 1 && $detalle->estado_validacion == 0) {
-    //             return;
-    //         }
-
-    //         info("validacion exerna superada");
-
-
-    //         // Aptos confirmados del procesoNombre en piso 1
-    //         $aptosConfirmados = ProyectosDetalle::where('torre', $torre)
-    //             ->where('proyecto_id', $proyecto->id)
-    //             ->where('piso', 1)
-    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoNombre]))
-    //             ->where('estado', 2)
-    //             ->pluck('consecutivo')
-    //             ->toArray();
-
-    //         $this->habilitarPorConsecutivos($proyecto, $torre, 1, $procesoNombre, $aptosConfirmados);
-    //     }
-    // }
 }

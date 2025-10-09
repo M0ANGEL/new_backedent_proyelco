@@ -17,11 +17,13 @@ use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
+use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
 use App\Http\Controllers\Api\Proyectos\ProcesosProyectoController;
 use App\Http\Controllers\Api\Proyectos\ProyectosController;
 use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
+use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
 use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
@@ -246,7 +248,18 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('obras-sin-movimientos-ing', [ProyectosController::class, 'obrasSinMovimientosIng']);
 
 
+    //proyectos de casa gestion
+    Route::get('info-proyecto-casa/{id}', [GestionProyectosCasasController::class, 'infoProyectoCasa']);
+    Route::get('gestion-proyectos-detalle-casa/{id}', [GestionProyectosCasasController::class, 'indexProgresoCasa']);
+    Route::apiResource('gestion-proyectos-casas', GestionProyectosCasasController::class);
 
+    //confirmaciones
+    Route::get('gestion-confirmar-confirmarCasas/{id}', [GestionProyectosCasasController::class, 'confirmarCasas']); //se cambia temporal para probar nueva logica este confirmarApt por confirmarAptNuevaLogica
+    Route::post('gestion-confirmar-validar-casa', [ValidarProcesoCasaController::class, 'validarProcesoCasas']);
+    Route::post('gestion-iniciar-manzana', [GestionProyectosCasasController::class, 'IniciarManzana']);
+    Route::post('casas-infoCasa', [GestionProyectosCasasController::class, 'infoCasa']);
+    Route::delete('activar-proyecto/{id}', [ProyectosController::class, 'destroyCasa']);
+    Route::post('CambioEstadosCasas-anulacion', [GestionProyectosCasasController::class, 'CambioEstadosCasas']);
 
     //talento humano
     Route::apiResource('administar-th', PersonalProyelcoController::class);
@@ -254,6 +267,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('ciudades-th/{id}', [PersonalProyelcoController::class, 'ciudades']);
     Route::get('cargos-th', [PersonalProyelcoController::class, 'cargos']);
 
+    //reporte detallado
+    Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
     //telefonos app mobile
     Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
@@ -279,4 +294,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
     
     
+    //unida de medida
+    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']);
 });
+
