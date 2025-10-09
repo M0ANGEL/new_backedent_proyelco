@@ -420,6 +420,14 @@ class KadexActivosController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        foreach ($clientes as $proyecto) {
+            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+
+            $proyecto->usuariosAsignados = DB::table('users')
+                ->whereIn('id', $encargadoIds)
+                ->pluck('nombre');
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => $clientes
@@ -600,5 +608,4 @@ class KadexActivosController extends Controller
             ], 500);
         }
     }
-
 }

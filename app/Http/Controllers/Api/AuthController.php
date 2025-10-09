@@ -20,6 +20,8 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
+
+        Log::info('Intento de login', $request->all());
         $credentials = $request->validate([
             'username' => 'required',
             'password' => 'required',
@@ -48,17 +50,6 @@ class AuthController extends Controller
             // Crear token de acceso
             $token = $user->createToken('token')->plainTextToken;
             $cookie = cookie('cookie_token', $token, 60 * 24);
-
-            // Registrar IP y ubicación
-            // $ipaddress = json_decode(file_get_contents("http://www.geoplugin.net/json.gp?ip=" . $request->header('Public')));
-            // Log::channel('user_login')->info("User_Id: $user->id | Username: $user->username | IP: " . $request->header('Public') . " | Ciudad: $ipaddress->geoplugin_city | Departamento: $ipaddress->geoplugin_region | Lat: $ipaddress->geoplugin_latitude | Lon: $ipaddress->geoplugin_longitude");
-
-            // Registrar el inicio de sesión en la tabla de logs
-            // $sessionLog = new UserSessionLogs();
-            // $sessionLog->user_id = $user->id;
-            // $sessionLog->start_session = now();
-            // $sessionLog->action = 'inicio de sesion';
-            // $sessionLog->save();
 
             return response(["token" => $token], Response::HTTP_OK)->withoutCookie($cookie);
         } else {
