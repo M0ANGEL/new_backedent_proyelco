@@ -270,6 +270,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
+    
     //telefonos app mobile
     Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
     Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
