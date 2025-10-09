@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\TalentoHumano\FichaObra;
 
 use App\Http\Controllers\Controller;
 use App\Models\FichaObra;
+use App\Models\Personal;
+use App\Models\PersonalProyelco;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,63 +15,166 @@ use Illuminate\Support\Facades\Storage;
 
 class FichaObraController extends Controller
 {
+
+
     public function index()
     {
-        $Personales = DB::connection('mysql')
-            ->table('activo')
-            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
-            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->leftJoin('bodegas_area', function ($join) {
-                $join->on('activo.ubicacion_actual_id', '=', 'bodegas_area.id')
-                    ->where('activo.tipo_ubicacion', 1); // solo si es bodega
+        $personales = DB::connection('mysql')
+            ->table('ficha_th')
+            ->leftJoin('empleados_proyelco_th as ep', function ($join) {
+                $join->on('ficha_th.empleado_id', '=', 'ep.id')
+                    ->where('ficha_th.tipo_empleado', 1);
             })
-            ->leftJoin('proyecto', function ($join) {
-                $join->on('activo.ubicacion_actual_id', '=', 'proyecto.id')
-                    ->where('activo.tipo_ubicacion', 2); // solo si es proyecto
+            ->leftJoin('empleados_th as et', function ($join) {
+                $join->on('ficha_th.empleado_id', '=', 'et.id')
+                    ->where('ficha_th.tipo_empleado', 2);
             })
-            ->leftJoin('solicitudes_activos', 'activo.id', '=', 'solicitudes_activos.activo_id') // 👈 cruce con solicitudes
+            ->leftJoin('cargos_th as c', function ($join) {
+                $join->on('ep.cargo_id', '=', 'c.id')
+                    ->orOn('et.cargo_id', '=', 'c.id');
+            })
+            ->leftJoin('ciudad_th as ci_exp', function ($join) {
+                $join->on('ep.ciuda_expedicion_id', '=', 'ci_exp.id')
+                    ->orOn('et.ciuda_expedicion_id', '=', 'ci_exp.id');
+            })
+            ->leftJoin('ciudad_th as ci_res', function ($join) {
+                $join->on('ep.ciudad_resudencia_id', '=', 'ci_res.id')
+                    ->orOn('et.ciudad_resudencia_id', '=', 'ci_res.id');
+            })
+            ->leftJoin('pais_th as p_res', function ($join) {
+                $join->on('ep.pais_residencia_id', '=', 'p_res.id')
+                    ->orOn('et.pais_residencia_id', '=', 'p_res.id');
+            })
+            ->leftJoin('contratistas_th as cont', 'ficha_th.contratista_id', '=', 'cont.id')
             ->select(
-                'activo.id',
-                'activo.numero_activo',
-                'activo.descripcion',
-                'activo.valor',
-                'activo.condicion',
-                'activo.marca',
-                'activo.serial',
-                'activo.estado',
-                'activo.created_at',
-                'categoria_activos.nombre as categoria',
-                'subcategoria_activos.nombre as subcategoria',
+                // Datos básicos de ficha_th
+                'ficha_th.id',
+                'ficha_th.tipo_empleado',
+                'ficha_th.empleado_id',
+                'ficha_th.identificacion',
+                'ficha_th.rh',
+                'ficha_th.hijos',
+                'ficha_th.eps',
+                'ficha_th.afp',
+                'ficha_th.contratista_id',
+                'ficha_th.estado',
+                'ficha_th.created_at',
+                'ficha_th.updated_at',
+
+                // Datos del empleado (según tipo)
                 DB::raw("
                 CASE 
-                    WHEN activo.tipo_ubicacion = 1 THEN bodegas_area.nombre
-                    WHEN activo.tipo_ubicacion = 2 THEN proyecto.descripcion_proyecto
-                END as bodega_actual
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.nombre_completo
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.nombre_completo
+                END as nombre_completo
             "),
                 DB::raw("
-                MAX(CASE WHEN solicitudes_activos.estado = 0 THEN 1 ELSE 0 END) as solicitud
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.tipo_documento
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.tipo_documento
+                END as tipo_documento
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.fecha_expedicion
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.fecha_expedicion
+                END as fecha_expedicion
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.estado_civil
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.estado_civil
+                END as estado_civil
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.fecha_nacimiento
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.fecha_nacimiento
+                END as fecha_nacimiento
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.genero
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.genero
+                END as genero
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.telefono_fijo
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.telefono_fijo
+                END as telefono_fijo
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.telefono_celular
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.telefono_celular
+                END as telefono_celular
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.direccion
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.direccion
+                END as direccion
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.correo
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.correo
+                END as correo
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.salario
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.salario
+                END as salario
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.valor_hora
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.valor_hora
+                END as valor_hora
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 2 THEN et.minimo
+                    ELSE NULL
+                END as minimo
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.fecha_terminacion
+                    ELSE NULL
+                END as fecha_terminacion
+            "),
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN ep.motivo_retiro
+                    ELSE NULL
+                END as motivo_retiro
+            "),
+
+                // Información de tablas relacionadas
+                'c.cargo',
+                'ci_exp.ciudad as ciudad_expedicion',
+                'ci_res.ciudad as ciudad_residencia',
+                'p_res.pais as pais_residencia',
+                'cont.contratista as nombre_contratista',
+
+                // Tipo de empleado como texto
+                DB::raw("
+                CASE 
+                    WHEN ficha_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
+                    WHEN ficha_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
+                    ELSE 'Desconocido'
+                END as tipo_empleado_texto
             ")
             )
-            ->where('activo.aceptacion', '!=', 1)
-            ->groupBy(
-                'activo.id',
-                'activo.numero_activo',
-                'activo.descripcion',
-                'activo.valor',
-                'activo.condicion',
-                'activo.marca',
-                'activo.serial',
-                'activo.estado',
-                'activo.created_at',
-                'categoria_activos.nombre',
-                'subcategoria_activos.nombre',
-                'bodega_actual',
-            )
+            ->orderBy('ficha_th.created_at', 'desc')
             ->get();
 
         return response()->json([
             'status' => 'success',
-            'data' => $Personales
+            'data' => $personales
         ]);
     }
 
@@ -79,7 +184,7 @@ class FichaObraController extends Controller
 
         try {
             $validator = Validator::make($request->all(), [
-                'identificacion' => ['required', 'string'],
+                'identificacion' => ['required', 'string', 'unique:ficha_th,identificacion'],
                 'tipo_documento' => ['required', 'string'],
                 'nombre_completo' => ['required', 'string'],
                 'fecha_expedicion' => ['required', 'string'],
@@ -92,7 +197,6 @@ class FichaObraController extends Controller
                 'telefono_fijo' => ['required', 'string'],
                 'telefono_celular' => ['required', 'string'],
                 'direccion' => ['required', 'string'],
-                'correo' => ['required', 'string', 'email'],
                 'cargo_id' => ['required', 'string'],
                 'contratista_id' => ['required'],
                 'salario' => ['required', 'numeric'],
@@ -100,48 +204,58 @@ class FichaObraController extends Controller
                 'pension' => ['required', 'string'],
                 'tipo_sangre' => ['required', 'string'],
                 'numero_hijos' => ['required', 'integer', 'min:0', 'max:20'],
-                'fotos' => ['sometimes', 'array'], // Para múltiples fotos
-                'fotos.*' => ['image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
+            $car = 0;
+            // Buscamos el usuario para saber su tipo
+            $proyelco = PersonalProyelco::where('identificacion', $request->identificacion)->first();
+            if ($proyelco == null) {
+                $car = 1;
+                $empleado = Personal::where('identificacion', $request->identificacion)->first();
+
+                // Verificar si se encontró el empleado
+                if (!$empleado) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No se encontró el empleado con la identificación proporcionada',
+                    ], 404);
+                }
+            }
+
+            $datosDelEmpelado = $car == 0 ? $proyelco : $empleado;
+
             // Crear el nuevo empleado
             $personal = new FichaObra();
-            $personal->identificacion = $request->identificacion;
-            $personal->contratista_id = $request->contratista_id;
-            $personal->eps = $request->eps;
-            $personal->afp = $request->pension;
+            $personal->tipo_empleado = $car == 0 ? 1 : 2;
+            $personal->identificacion = $datosDelEmpelado->identificacion;
+            $personal->empleado_id = $datosDelEmpelado->id;
             $personal->rh = $request->tipo_sangre;
             $personal->hijos = $request->numero_hijos;
-            // $personal->user_id = Auth::id();
+            $personal->eps = $request->eps;
+            $personal->afp = $request->pension;
+            $personal->contratista_id = $request->contratista_id;
 
             $personal->save();
 
-            // Procesar múltiples fotos si existen
-            if ($request->hasFile('fotos')) {
-                $fotosGuardadas = [];
+            // Procesar la foto si existe
+            if ($request->hasFile('foto')) {
+                $foto = $request->file('foto');
 
-                foreach ($request->file('fotos') as $index => $foto) {
-                    $extension = $foto->getClientOriginalExtension();
+                // Generar nombre único para el archivo
+                $nombreArchivo = 'empleado_' . $personal->id  .  '.' . $foto->getClientOriginalExtension();
 
-                    // Nombre del archivo: id_numero.extension
-                    $nombreArchivo = $personal->id . '_' . ($index + 1) . '.' . $extension;
+                // Ruta donde se guardará (sin la carpeta public)
+                $ruta = 'SST/' . $nombreArchivo;
 
-                    // Ruta donde se guardará
-                    $ruta = 'SST/' . $nombreArchivo;
-
-                    // Guardar la foto
-                    Storage::disk('public')->put($ruta, file_get_contents($foto));
-
-                    $fotosGuardadas[] = $ruta;
-                }
-
-                // Guardar las rutas de las fotos (puedes guardarlas como JSON o en una tabla separada)
-                $personal->fotos = json_encode($fotosGuardadas);
-                $personal->save();
+                // Usar storeAs para guardar el archivo
+                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+            } else {
+                info('No se recibió archivo de foto');
             }
 
             DB::commit();
@@ -153,6 +267,7 @@ class FichaObraController extends Controller
             ], 200);
         } catch (Exception $e) {
             DB::rollBack();
+            info('Error en store: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -168,48 +283,59 @@ class FichaObraController extends Controller
 
     public function update(Request $request, $id)
     {
+        DB::beginTransaction();
         try {
             $validator = Validator::make($request->all(), [
-                'identificacion' => ['required', 'string'],
-                'tipo_documento' => ['required', 'string'],
-                'nombre_completo' => ['required', 'string'],
-                'fecha_expedicion' => ['required', 'string'],
-                'estado_civil' => ['required', 'string'],
-                'ciuda_expedicion_id' => ['required'],
-                'fecha_nacimiento' => ['required', 'string'],
-                'pais_residencia_id' => ['required'],
-                'ciudad_resudencia_id' => ['required'],
-                'genero' => ['required', 'string'],
-                'telefono_fijo' => ['required', 'string'],
-                'telefono_celular' => ['required', 'string'],
-                'direccion' => ['required', 'string'],
-                'correo' => ['required', 'string'],
-                'cargo_id' => ['required', 'string'],
-                'salario' => ['required', 'string'],
+                // ... tus validaciones existentes ...
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
+            // Buscar el empleado existente
+            $personal = FichaObra::findOrFail($id);
 
-            // Obtener la categoría actual
-            $Personal = FichaObra::findOrFail($id);
-            $Personal->identificacion = $request->identificacion;
-            $Personal->tipo_documento = $request->tipo_documento;
-            $Personal->nombre_completo = $request->nombre_completo;
-            $Personal->user_id = Auth::id();
-            $Personal->save();
+            // Actualizar datos
+            $personal->rh = $request->tipo_sangre;
+            $personal->hijos = $request->numero_hijos;
+            $personal->eps = $request->eps;
+            $personal->afp = $request->pension;
+            $personal->contratista_id = $request->contratista_id;
+
+            // Procesar la foto si existe
+            if ($request->hasFile('foto')) {
+                $foto = $request->file('foto');
+
+                // Eliminar foto anterior si existe
+                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+                    Storage::disk('public')->delete($personal->foto);
+                    info('Foto anterior eliminada: ' . $personal->foto);
+                }
+
+                // Generar nombre único para el archivo
+                $nombreArchivo = 'empleado_' . $personal->id  .  '.' . $foto->getClientOriginalExtension();
+                // Guardar nueva foto
+                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+            }
+            $personal->save();
+
+
+            DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'data' => $Personal
+                'message' => 'Empleado actualizado exitosamente',
+                'data' => $personal
             ], 200);
         } catch (Exception $e) {
+            DB::rollBack();
+            info('Error en update: ' . $e->getMessage());
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
-                'code' => $e->getCode()
+                'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
             ], 500);
         }
     }

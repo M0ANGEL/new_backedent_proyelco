@@ -276,4 +276,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //Crear ficha
     Route::apiResource('ficha-obra',FichaObraController::class);
+    Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
+    
 });

@@ -18,10 +18,9 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->string('nit')->unique();
             $table->string('contratista');
-            $table->string('contratista');
-            $table->string('arl',50);
+            $table->string('arl',100);
             $table->string('actividad',100);
-            $table->string('contacto',50);
+            $table->string('contacto',100);
             $table->string('telefono',15)->default(0);
             $table->string('direccion',150)->default(0);
             $table->string('correo',150)->default(0);
