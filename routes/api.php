@@ -258,6 +258,30 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
+    //telefonos app mobile
+    Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
+    Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
+    Route::post('/registrar-sede', [AuthMarcacionController::class, 'registarUbicacionObra']);
+    Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
+
+    //marcacion
+    Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
+    Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
+
+    //contratista
+    Route::apiResource('administar-contratistas',ContratistasController::class);
+    Route::get('contratistas',[ContratistasController::class,'ContratistasActivos']);
+
+    //personal no proyelco
+    Route::apiResource('personal-no-proyelco',PersonalController::class);
+    Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
+
+
+    //Crear ficha
+    Route::apiResource('ficha-obra',FichaObraController::class);
+    Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
+    
+    
     //unida de medida
     Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']);
 });
