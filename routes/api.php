@@ -289,7 +289,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('personal-no-proyelco',PersonalController::class);
     Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
 
-
     //Crear ficha
     Route::apiResource('ficha-obra',FichaObraController::class);
     Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
