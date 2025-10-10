@@ -317,7 +317,7 @@ class ControlAsistenciasController extends Controller
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => "Salida registrada correctamente. Horas laborales: $horasDecimales horas",
+                    'message' => "Salida registrada correctamente.",
                     'horas_laborales' => $horasDecimales,
                     'hora_entrada' => $ultimaEntrada->hora_ingreso,
                     'hora_salida' => $horaActual->format('H:i:s')
