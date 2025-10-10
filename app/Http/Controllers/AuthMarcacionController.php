@@ -37,7 +37,6 @@ class AuthMarcacionController extends Controller
 
     public function loginMarcacion(Request $request)
     {
-        info($request->all());
         try {
             // Validar los campos requeridos
             $request->validate([
@@ -92,84 +91,6 @@ class AuthMarcacionController extends Controller
         }
     }
 
-    // public function validarTelefono(Request $request)
-    // {
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'serialTelefono' => ['required', 'string']
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json(['errors' => $validator->errors()], 400);
-    //         }
-
-    //         // Buscar el teléfono en la base de datos principal
-    //         $telefono = MaTelefono::where('serial_email', $request->serialTelefono)->where('estado', 1)->first();
-
-    //         if (!$telefono) {
-    //             return response()->json([
-    //                 'status' => 'error',
-    //                 'message' => 'El serial no está registrado, comunícate con TI',
-    //             ], 404);
-    //         }
-
-    //         //consulta de usuario y sus obras
-    //         $apartamentos = DB::table('proyecto')
-    //             ->where(function ($query) {
-    //                 $userId = Auth::id();
-    //                 $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
-    //                 // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
-    //             })
-    //             ->select(
-    //                 'id',
-    //                 'descripcion',
-    //                 'tipoProyecto_id',
-    //             )
-    //             ->get();
-
-    //         $casas = DB::table('proyectos_casas')
-    //             ->where(function ($query) {
-    //                 $userId = Auth::id();
-    //                 $query->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
-    //                 // ->orWhereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
-    //             })
-    //             ->select(
-    //                 'id',
-    //                 'descripcion',
-    //                 'tipoProyecto_id',
-    //             )
-    //             ->get();
-
-    //             //ya teniendo los proyectos de casas y apartamentos,
-    //             $ubicacion = DB::table('ubicacione_obras_th')
-    //             ->where('tipo_obra')
-    //             ->where('obra_id')
-    //             ->select(
-    //                 'id',
-    //                 'descripcion',
-    //                 'tipoProyecto_id',
-    //             )
-    //             ->get();
-
-
-    //         // if ($sedes->isEmpty()) {
-    //         //     return response()->json([
-    //         //         'status' => 'error',
-    //         //         'message' => 'No se encontró información de la sede',
-    //         //     ], 404);
-    //         // }
-
-    //         // return response()->json([
-    //         //     'status' => 'success',
-    //         //     'sedes' => $sedes
-    //         // ]);
-    //     } catch (Exception $e) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'Error: ' . $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
 
     // public function validarTelefono(Request $request)
     // {
@@ -196,43 +117,48 @@ class AuthMarcacionController extends Controller
 
     //         $userId = Auth::id();
 
-    //         // 🔹 1. Buscar apartamentos del usuario
-    //         $apartamentos = DB::table('proyecto')
+    //         // 🔹 1. Buscar apartamentos del usuario CON ubicación
+    //         $apartamentosConUbicacion = DB::table('proyecto')
+    //             ->join('ubicacion_obras_th', function ($join) {
+    //                 $join->on('proyecto.id', '=', 'ubicacion_obras_th.obra_id')
+    //                     ->where('ubicacion_obras_th.tipo_obra', '=', 1);
+    //             })
     //             ->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')")
-    //             ->select('id', 'descripcion_proyecto', 'tipoProyecto_id')
+    //             ->select('proyecto.id', 'proyecto.descripcion_proyecto', 'proyecto.tipoProyecto_id')
+    //             ->distinct()
     //             ->get();
 
-    //         // 🔹 2. Buscar casas del usuario
-    //         $casas = DB::table('proyectos_casas')
+    //         // 🔹 2. Buscar casas del usuario CON ubicación
+    //         $casasConUbicacion = DB::table('proyectos_casas')
+    //             ->join('ubicacion_obras_th', function ($join) {
+    //                 $join->on('proyectos_casas.id', '=', 'ubicacion_obras_th.obra_id')
+    //                     ->where('ubicacion_obras_th.tipo_obra', '=', 2);
+    //             })
     //             ->whereRaw("JSON_CONTAINS(proyectos_casas.encargado_id, '\"$userId\"')")
-    //             ->select('id', 'descripcion_proyecto', 'tipoProyecto_id')
+    //             ->select('proyectos_casas.id', 'proyectos_casas.descripcion_proyecto', 'proyectos_casas.tipoProyecto_id')
+    //             ->distinct()
     //             ->get();
 
-    //         // 🔹 3. Unir IDs de todas las obras
-    //         $obrasIds = collect($apartamentos)->pluck('id')
-    //             ->merge(collect($casas)->pluck('id'))
+    //         // 🔹 3. Buscar todas las ubicaciones para estas obras
+    //         $obrasIds = $apartamentosConUbicacion->pluck('id')
+    //             ->merge($casasConUbicacion->pluck('id'))
     //             ->toArray();
 
-    //         if (empty($obrasIds)) {
+    //         $ubicaciones = DB::table('ubicacion_obras_th')
+    //             ->whereIn('obra_id', $obrasIds)
+    //             ->select('id', 'obra_id', 'tipo_obra', 'latitud', 'longitud', 'rango')
+    //             ->get();
+
+
+
+    //         if ($apartamentosConUbicacion->isEmpty() && $casasConUbicacion->isEmpty()) {
     //             return response()->json([
     //                 'status' => 'error',
-    //                 'message' => 'No se encontraron obras asignadas para este usuario',
+    //                 'message' => 'No se encontraron obras con ubicación asignadas para este usuario',
     //             ], 404);
     //         }
 
-    //         // 🔹 4. Buscar ubicaciones y filtrar solo las obras que tienen
-    //         $ubicaciones = DB::table('ubicacion_obras_th')
-    //             ->whereIn('obra_id', $obrasIds)
-    //             ->select('id', 'obra_id', 'tipo_obra', 'latitud', 'longitud')
-    //             ->get();
-
-    //         // 🔹 5. Filtrar las obras que sí tengan ubicación
-    //         $obrasConUbicacionIds = $ubicaciones->pluck('obra_id')->toArray();
-
-    //         $apartamentosConUbicacion = $apartamentos->filter(fn($a) => in_array($a->id, $obrasConUbicacionIds))->values();
-    //         $casasConUbicacion = $casas->filter(fn($c) => in_array($c->id, $obrasConUbicacionIds))->values();
-
-    //         // 🔹 6. Responder solo las que tienen ubicación
+    //         // 🔹 5. Responder solo las que tienen ubicación
     //         return response()->json([
     //             'status' => 'success',
     //             'apartamentos' => $apartamentosConUbicacion,
@@ -248,85 +174,108 @@ class AuthMarcacionController extends Controller
     // }
 
     public function validarTelefono(Request $request)
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'serialTelefono' => ['required', 'string']
-        ]);
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'serialTelefono' => ['required', 'string']
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
 
-        // Buscar el teléfono
-        $telefono = MaTelefono::where('serial_email', $request->serialTelefono)
-            ->where('estado', 1)
-            ->first();
+            // Buscar el teléfono
+            $telefono = MaTelefono::where('serial_email', $request->serialTelefono)
+                ->where('estado', 1)
+                ->first();
 
-        if (!$telefono) {
+            if (!$telefono) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El serial no está registrado, comunícate con TI',
+                ], 404);
+            }
+
+            $user = Auth::user();
+            $userId = $user->id;
+            $esAdmin = in_array($user->rol, ['Administrador', 'Administrador TI','Directora Proyectos']); 
+
+            // ======================================
+            // 🔹 1. Consultar APARTAMENTOS
+            // ======================================
+            $apartamentosQuery = DB::table('proyecto')
+                ->join('ubicacion_obras_th', function ($join) {
+                    $join->on('proyecto.id', '=', 'ubicacion_obras_th.obra_id')
+                        ->where('ubicacion_obras_th.tipo_obra', '=', 1);
+                })
+                ->select('proyecto.id', 'proyecto.descripcion_proyecto', 'proyecto.tipoProyecto_id')
+                ->distinct();
+
+            if (!$esAdmin) {
+                $apartamentosQuery->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')");
+            }
+
+            $apartamentosConUbicacion = $apartamentosQuery->get();
+
+            // ======================================
+            // 🔹 2. Consultar CASAS
+            // ======================================
+            $casasQuery = DB::table('proyectos_casas')
+                ->join('ubicacion_obras_th', function ($join) {
+                    $join->on('proyectos_casas.id', '=', 'ubicacion_obras_th.obra_id')
+                        ->where('ubicacion_obras_th.tipo_obra', '=', 2);
+                })
+                ->select('proyectos_casas.id', 'proyectos_casas.descripcion_proyecto', 'proyectos_casas.tipoProyecto_id')
+                ->distinct();
+
+            if (!$esAdmin) {
+                $casasQuery->whereRaw("JSON_CONTAINS(proyectos_casas.encargado_id, '\"$userId\"')");
+            }
+
+            $casasConUbicacion = $casasQuery->get();
+
+            // ======================================
+            // 🔹 3. Traer las ubicaciones asociadas
+            // ======================================
+            $obrasIds = $apartamentosConUbicacion->pluck('id')
+                ->merge($casasConUbicacion->pluck('id'))
+                ->toArray();
+
+            $ubicaciones = DB::table('ubicacion_obras_th')
+                ->whereIn('obra_id', $obrasIds)
+                ->select('id', 'obra_id', 'tipo_obra', 'latitud', 'longitud', 'rango')
+                ->get();
+
+            // ======================================
+            // 🔹 4. Validar si hay resultados
+            // ======================================
+            if ($apartamentosConUbicacion->isEmpty() && $casasConUbicacion->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $esAdmin
+                        ? 'No hay obras registradas en el sistema.'
+                        : 'No se encontraron obras asignadas a este usuario.',
+                ], 404);
+            }
+
+            // ======================================
+            // 🔹 5. Respuesta final
+            // ======================================
+            return response()->json([
+                'status' => 'success',
+                'rol' => $user->rol,
+                'apartamentos' => $apartamentosConUbicacion,
+                'casas' => $casasConUbicacion,
+                'ubicaciones' => $ubicaciones
+            ], 200);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'El serial no está registrado, comunícate con TI',
-            ], 404);
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $userId = Auth::id();
-
-        // 🔹 1. Buscar apartamentos del usuario CON ubicación
-        $apartamentosConUbicacion = DB::table('proyecto')
-            ->join('ubicacion_obras_th', function($join) {
-                $join->on('proyecto.id', '=', 'ubicacion_obras_th.obra_id')
-                     ->where('ubicacion_obras_th.tipo_obra', '=', 1);
-            })
-            ->whereRaw("JSON_CONTAINS(proyecto.encargado_id, '\"$userId\"')")
-            ->select('proyecto.id', 'proyecto.descripcion_proyecto', 'proyecto.tipoProyecto_id')
-            ->distinct()
-            ->get();
-
-        // 🔹 2. Buscar casas del usuario CON ubicación
-        $casasConUbicacion = DB::table('proyectos_casas')
-            ->join('ubicacion_obras_th', function($join) {
-                $join->on('proyectos_casas.id', '=', 'ubicacion_obras_th.obra_id')
-                     ->where('ubicacion_obras_th.tipo_obra', '=', 2);
-            })
-            ->whereRaw("JSON_CONTAINS(proyectos_casas.encargado_id, '\"$userId\"')")
-            ->select('proyectos_casas.id', 'proyectos_casas.descripcion_proyecto', 'proyectos_casas.tipoProyecto_id')
-            ->distinct()
-            ->get();
-
-        // 🔹 3. Buscar todas las ubicaciones para estas obras
-        $obrasIds = $apartamentosConUbicacion->pluck('id')
-            ->merge($casasConUbicacion->pluck('id'))
-            ->toArray();
-
-        $ubicaciones = DB::table('ubicacion_obras_th')
-            ->whereIn('obra_id', $obrasIds)
-            ->select('id', 'obra_id', 'tipo_obra', 'latitud', 'longitud')
-            ->get();
-
-        
-
-        if ($apartamentosConUbicacion->isEmpty() && $casasConUbicacion->isEmpty()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No se encontraron obras con ubicación asignadas para este usuario',
-            ], 404);
-        }
-
-        // 🔹 5. Responder solo las que tienen ubicación
-        return response()->json([
-            'status' => 'success',
-            'apartamentos' => $apartamentosConUbicacion,
-            'casas' => $casasConUbicacion,
-            'ubicaciones' => $ubicaciones
-        ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Error: ' . $e->getMessage(),
-        ], 500);
     }
-}
+
 
 
     public function loginMarcacionConfi(Request $request)
