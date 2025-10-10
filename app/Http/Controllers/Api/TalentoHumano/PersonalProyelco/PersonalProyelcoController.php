@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\TalentoHumano\Personal;
+namespace App\Http\Controllers\Api\TalentoHumano\PersonalProyelco;
 
 use App\Http\Controllers\Controller;
 use App\Models\Personal;
@@ -12,15 +12,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
-class PersonalController extends Controller
+class PersonalProyelcoController extends Controller
 {
     public function index()
     {
         $Personales = DB::connection('mysql')
-            ->table('empleados_th')
-            ->join('cargos_th', 'empleados_th.cargo_id', 'cargos_th.id')
+            ->table('empleados_proyelco_th')
+            ->join('cargos_th', 'empleados_proyelco_th.cargo_id', 'cargos_th.id')
             ->select(
-                'empleados_th.*',
+                'empleados_proyelco_th.*',
                 'cargos_th.cargo'
             )
             ->get();
@@ -33,7 +33,6 @@ class PersonalController extends Controller
 
     public function store(Request $request)
     {
-
         try {
             $validator = Validator::make($request->all(), [
                 'identificacion' => ['required', 'string'],
@@ -51,6 +50,8 @@ class PersonalController extends Controller
                 'direccion' => ['required', 'string'],
                 'correo' => ['required', 'string'],
                 'cargo_id' => ['required', 'string'],
+                'fecha_ingreso' => ['required', 'string'],
+                'salario' => ['required', 'string'],
             ]);
 
             //validación falla
@@ -80,15 +81,14 @@ class PersonalController extends Controller
                 ], 404);
             }
 
-            $salario = $request->salarioMinimo == "SI" ?  1423500 : $request->salario;
-
 
             //calcular valor de hora
-            $nuevoValorHora = intval($salario / 220); //sin decimales
+            $nuevoValorHora = intval($request->salario / 220); //sin decimales
 
 
+            $user = Auth::user();
             // Si la validación ok creamos la nueva categoría
-            $Personal = new Personal();
+            $Personal = new PersonalProyelco();
             $Personal->identificacion = $request->identificacion;
             $Personal->tipo_documento = $request->tipo_documento;
             $Personal->nombre_completo = $request->nombre_completo;
@@ -96,6 +96,7 @@ class PersonalController extends Controller
             $Personal->estado_civil = $request->estado_civil;
             $Personal->ciuda_expedicion_id = $request->ciuda_expedicion_id;
             $Personal->fecha_nacimiento = Carbon::parse($request->fecha_nacimiento)->format('Y-m-d');
+            $Personal->fecha_ingreso = Carbon::parse($request->fecha_ingreso)->format('Y-m-d');
             $Personal->pais_residencia_id = $request->pais_residencia_id;
             $Personal->ciudad_resudencia_id = $request->ciudad_resudencia_id;
             $Personal->genero = $request->genero;
@@ -104,10 +105,9 @@ class PersonalController extends Controller
             $Personal->direccion = $request->direccion ? $request->direccion : null;
             $Personal->correo = $request->correo ? $request->correo : null;
             $Personal->cargo_id = $request->cargo_id;
-            $Personal->minimo = $request->salarioMinimo;
-            $Personal->salario = $salario;
+            $Personal->salario = $request->salario;
             $Personal->valor_hora = $nuevoValorHora;
-            $Personal->user_id = Auth::id();
+            $Personal->user_id = $user->id;
             $Personal->save();
 
             return response()->json([
@@ -125,7 +125,7 @@ class PersonalController extends Controller
 
     public function show($id)
     {
-        return response()->json(Personal::find($id), 200);
+        return response()->json(PersonalProyelco::find($id), 200);
     }
 
     public function update(Request $request, $id)
@@ -147,6 +147,7 @@ class PersonalController extends Controller
                 'direccion' => ['required', 'string'],
                 'correo' => ['required', 'string'],
                 'cargo_id' => ['required', 'string'],
+                'fecha_ingreso' => ['required', 'string'],
                 'salario' => ['required', 'string'],
             ]);
 
@@ -181,15 +182,11 @@ class PersonalController extends Controller
             }
 
 
-
-            $salario = $request->salarioMinimo == "SI" ?  1423500 : $request->salario;
-
-
             //calcular valor de hora
-            $nuevoValorHora = intval($salario / 220); //sin decimales
+            $nuevoValorHora = intval($request->salario / 220); //sin decimales
 
             // Obtener la categoría actual
-            $Personal = Personal::findOrFail($id);
+            $Personal = PersonalProyelco::findOrFail($id);
             $Personal->identificacion = $request->identificacion;
             $Personal->tipo_documento = $request->tipo_documento;
             $Personal->nombre_completo = $request->nombre_completo;
@@ -197,6 +194,7 @@ class PersonalController extends Controller
             $Personal->estado_civil = $request->estado_civil;
             $Personal->ciuda_expedicion_id = $request->ciuda_expedicion_id;
             $Personal->fecha_nacimiento = Carbon::parse($request->fecha_nacimiento)->format('Y-m-d');
+            $Personal->fecha_ingreso = Carbon::parse($request->fecha_ingreso)->format('Y-m-d');
             $Personal->pais_residencia_id = $request->pais_residencia_id;
             $Personal->ciudad_resudencia_id = $request->ciudad_resudencia_id;
             $Personal->genero = $request->genero;
@@ -205,10 +203,8 @@ class PersonalController extends Controller
             $Personal->direccion = $request->direccion ? $request->direccion : null;
             $Personal->correo = $request->correo ? $request->correo : null;
             $Personal->cargo_id = $request->cargo_id;
-            $Personal->minimo = $request->salarioMinimo;
-            $Personal->salario = $salario;
+            $Personal->salario = $request->salario;
             $Personal->valor_hora = $nuevoValorHora;
-            $Personal->user_id = Auth::id();
             $Personal->save();
 
             return response()->json([
@@ -226,31 +222,51 @@ class PersonalController extends Controller
 
     public function destroy($id)
     {
-        $Personal = Personal::find($id);
+        $Personal = PersonalProyelco::find($id);
 
         $Personal->estado = !$Personal->estado;
         $Personal->update();
     }
 
 
-    /* FICHA DE TRABAJADOR */
-
-    public function usuarioCedulaFicha($cedula)
+    public function paises()
     {
-        $Personal = DB::connection('mysql')
-            ->table('empleados_th')
-            ->where('identificacion', $cedula)
-            ->first();
+        $paises = DB::connection('mysql')
+            ->table('pais_th')
+            ->where('estado', 1)
+            ->get();
 
-        if ($Personal == null) {
-            $Personal = DB::connection('mysql')
-                ->table('empleados_proyelco_th')
-                ->where('identificacion', $cedula)
-                ->first();
-        }
-
+        return response()->json([
+            'status' => 'success',
+            'data' => $paises
+        ], 200);
+    }
 
 
-        return response()->json($Personal);
+    public function ciudades($id)
+    {
+        $paises = DB::connection('mysql')
+            ->table('ciudad_th')
+            ->where('estado', 1)
+            ->where('pais_id', $id)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $paises
+        ], 200);
+    }
+
+    public function cargos()
+    {
+        $cargos_th = DB::connection('mysql')
+            ->table('cargos_th')
+            ->where('estado', 1)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $cargos_th
+        ], 200);
     }
 }
