@@ -294,6 +294,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
     
     //unida de medida
-    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']);
+    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']); 
 });
 
