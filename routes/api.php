@@ -25,8 +25,11 @@ use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
+use App\Http\Controllers\Api\TalentoHumano\FichaObra\FichaObraController;
 use App\Http\Controllers\Api\TalentoHumano\Personal\PersonalController;
+use App\Http\Controllers\Api\TalentoHumano\PersonalProyelco\PersonalProyelcoController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsersPerfilesController;
 use App\Http\Controllers\MenuController;
@@ -37,6 +40,8 @@ use App\Http\Middleware\CompanyDatabase;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
+use App\Http\Controllers\AuthMarcacionController;
+use App\Http\Controllers\ContratistasController;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
@@ -51,8 +56,10 @@ use App\Models\ProyectosDetalle;
 |
  */
 
-// Route::post('PorcentajeDetalles', [ProyectosController::class, 'PorcentajeDetalles']);
-
+//manejo de login de app movile
+Route::get('Appupdate', [AuthMarcacionController::class, 'Appupdate']);
+Route::post('loginMarcacion', [AuthMarcacionController::class, 'loginMarcacion']);
+Route::post('loginMarcacionConfi', [AuthMarcacionController::class, 'loginMarcacionConfi']);
 
 Route::post('login', [AuthController::class, 'login']);
 Route::post('clear-sessions', [AuthController::class, 'clearSessions']);
@@ -254,11 +261,39 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::delete('activar-proyecto/{id}', [ProyectosController::class, 'destroyCasa']);
     Route::post('CambioEstadosCasas-anulacion', [GestionProyectosCasasController::class, 'CambioEstadosCasas']);
 
+    //talento humano
+    Route::apiResource('administar-th', PersonalProyelcoController::class);
+    Route::get('paises-th', [PersonalProyelcoController::class, 'paises']);
+    Route::get('ciudades-th/{id}', [PersonalProyelcoController::class, 'ciudades']);
+    Route::get('cargos-th', [PersonalProyelcoController::class, 'cargos']);
 
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
+    
+    //telefonos app mobile
+    Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
+    Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
+    Route::post('/registrar-sede', [AuthMarcacionController::class, 'registarUbicacionObra']);
+    Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
+
+    //marcacion
+    Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
+    Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
+
+    //contratista
+    Route::apiResource('administar-contratistas',ContratistasController::class);
+    Route::get('contratistas',[ContratistasController::class,'ContratistasActivos']);
+
+    //personal no proyelco
+    Route::apiResource('personal-no-proyelco',PersonalController::class);
+    Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
+
+    //Crear ficha
+    Route::apiResource('ficha-obra',FichaObraController::class);
+    Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
+    
     //unida de medida
-    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']);
+    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']); 
 });
 
