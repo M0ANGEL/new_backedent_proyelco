@@ -851,7 +851,7 @@ public function index()
                     $cantidadCasas = (int)$bloque['cantidadCasas'];
 
                     for ($casa = 1; $casa <= $cantidadCasas; $casa++) {
-                        $consecutivo = "C-" . $consecutivoGlobal;
+                        $consecutivo = $consecutivoGlobal;
                         $pisosCasa = $bloque['casas'][$casa - 1]['pisos'];
 
                         // -------------------
@@ -1772,6 +1772,24 @@ public function index()
     //         'total' => "{$completadosTotal}/{$totalGeneral}",
     //     ]);
     // }
+
+    public function proyectosUnidadMedida(){
+        $proyectos = DB::table('proyecto')
+            ->where(function ($query) {
+                $userId = Auth::id();
+                $query->whereRaw("JSON_CONTAINS(proyecto.ingeniero_id, '\"$userId\"')");
+            })
+            ->select(
+                'proyecto.id',
+                'proyecto.descripcion_proyecto',
+            )
+            ->get();
+
+             return response()->json([
+            'status' => 'success',
+            'data' => $proyectos,
+        ]);
+    }
 
     public function UnidadDeMedida(Request $request)
     {
