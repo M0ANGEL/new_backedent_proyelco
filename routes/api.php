@@ -295,5 +295,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     
     //unida de medida
     Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']); 
+    Route::get('proyectosUnidadMedida',[ProyectosController::class, 'proyectosUnidadMedida']);
 });
 

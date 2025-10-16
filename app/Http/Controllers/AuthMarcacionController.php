@@ -37,7 +37,6 @@ class AuthMarcacionController extends Controller
 
     public function loginMarcacion(Request $request)
     {
-        info($request->all());
         try {
             // Validar los campos requeridos
             $request->validate([
