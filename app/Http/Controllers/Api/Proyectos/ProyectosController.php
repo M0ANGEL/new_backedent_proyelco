@@ -1793,7 +1793,6 @@ public function index()
 
     public function UnidadDeMedida(Request $request)
     {
-
         $fechaInicio = $request->fechaInicio
             ? Carbon::parse($request->fechaInicio)->startOfDay()
             : null;
@@ -1805,15 +1804,44 @@ public function index()
         $proceso = strtolower($request->proceso);
         $proyectos = $request->proyecto ?? [];
 
+        // Obtener el usuario autenticado
+        $user = auth()->user();
+        $userRol = $user->rol;
+        $userId = $user->id;
+        // ==============================
+        // FUNCIÓN PARA FILTRAR PROYECTOS SEGÚN ROL
+        // ==============================
+        $aplicarFiltroRol = function ($query, $tabla = 'proyecto') use ($userRol, $userId, $proyectos) {
+            $idField = $tabla === 'proyectos_casas' ? 'proyectos_casas.id' : 'proyecto.id';
+            $ingenieroField = $tabla === 'proyectos_casas' ? 'proyectos_casas.ingeniero_id' : 'proyecto.ingeniero_id';
+
+            // Si es gerente o administrador y no se especifican proyectos, mostrar todos
+            if (in_array($userRol, ['gerente', 'administrador']) && empty($proyectos)) {
+                return $query;
+            }
+
+            // Si no es gerente/administrador O se especificaron proyectos
+            if (!in_array($userRol, ['gerente', 'administrador']) || !empty($proyectos)) {
+                // Si hay proyectos específicos, usar esos
+                if (!empty($proyectos)) {
+                    return $query->whereIn($idField, $proyectos);
+                }
+                // Si no hay proyectos específicos y no es gerente/administrador, filtrar por ingeniero
+                else {
+                    return $query->where($ingenieroField, $userId);
+                }
+            }
+
+            return $query;
+        };
+
         // ==============================
         // DETALLE APARTAMENTOS
         // ==============================
         $proyectosDetalleApt = ProyectosDetalle::query()
             ->join('proyecto', 'proyecto_detalle.proyecto_id', '=', 'proyecto.id')
             ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
-            ->when(!empty($proyectos), function ($q) use ($proyectos) {
-                $q->whereIn('proyecto.id', $proyectos);
-            })
+            ->when(true, fn($q) => $aplicarFiltroRol($q, 'proyecto'))
             ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
                 $q->whereBetween('proyecto_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
             })
@@ -1835,9 +1863,7 @@ public function index()
             $proyectosDetalleCasas = ProyectoCasaDetalle::query()
                 ->join('proyectos_casas', 'proyectos_casas_detalle.proyecto_casa_id', '=', 'proyectos_casas.id')
                 ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
-                ->when(!empty($proyectos), function ($q) use ($proyectos) {
-                    $q->whereIn('proyectos_casas.id', $proyectos);
-                })
+                ->when(true, fn($q) => $aplicarFiltroRol($q, 'proyectos_casas'))
                 ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
                     $q->whereBetween('proyectos_casas_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
                 })
@@ -1869,9 +1895,7 @@ public function index()
             $proyectosDetalleCasas = ProyectoCasaDetalle::query()
                 ->join('proyectos_casas', 'proyectos_casas_detalle.proyecto_casa_id', '=', 'proyectos_casas.id')
                 ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
-                ->when(!empty($proyectos), function ($q) use ($proyectos) {
-                    $q->whereIn('proyectos_casas.id', $proyectos);
-                })
+                ->when(true, fn($q) => $aplicarFiltroRol($q, 'proyectos_casas'))
                 ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
                     $q->whereBetween('proyectos_casas_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
                 })
