@@ -1816,12 +1816,12 @@ public function index()
             $ingenieroField = $tabla === 'proyectos_casas' ? 'proyectos_casas.ingeniero_id' : 'proyecto.ingeniero_id';
 
             // Si es gerente o administrador y no se especifican proyectos, mostrar todos
-            if (in_array($userRol, ['gerente', 'administrador']) && empty($proyectos)) {
+            if (in_array($userRol, ['Directora Proyectos', 'Administrador']) && empty($proyectos)) {
                 return $query;
             }
 
             // Si no es gerente/administrador O se especificaron proyectos
-            if (!in_array($userRol, ['gerente', 'administrador']) || !empty($proyectos)) {
+            if (!in_array($userRol, ['Directora Proyectos', 'Administrador']) || !empty($proyectos)) {
                 // Si hay proyectos específicos, usar esos
                 if (!empty($proyectos)) {
                     return $query->whereIn($idField, $proyectos);
