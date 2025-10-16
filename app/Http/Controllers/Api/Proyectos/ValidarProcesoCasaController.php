@@ -37,10 +37,10 @@ class ValidarProcesoCasaController extends Controller
 
             switch ($TipoProceso) {
                 case 'destapada':
-                    $this->validarYHabilitarPorPiso($info,  'fundida', 'destapada');
+                    $this->intentarHabilitarDestapaYProlongacion($info);
                     break;
                 case 'prolongacion':
-                    $this->validarYHabilitarPorPiso($info, 'fundida', 'prolongacion');
+                    $this->intentarHabilitarDestapaYProlongacion($info);
                     break;
                 case 'alambrada':
                     $this->intentarHabilitarAlambrada($info);
@@ -70,12 +70,11 @@ class ValidarProcesoCasaController extends Controller
                     $this->validarYHabilitarPorPiso($info, 'pruebas', 'retie');
                     break;
                 case 'ritel':
-                    $this->validarYHabilitarPorPiso($info,  'pruebas', 'ritel');
+                    $this->validarYHabilitarPorPiso($info, 'pruebas', 'ritel');
                     break;
 
                 case 'entrega':
                     $this->intentarHabilitarEntrega($info);
-
                     break;
 
                 default:
@@ -295,5 +294,84 @@ class ValidarProcesoCasaController extends Controller
                 $apt->save();
             }
         }
+    }
+
+    private function intentarHabilitarDestapaYProlongacion($info)
+    {
+
+        $manzana = $info->manzana;
+        $proyectoId = $info->proyecto_casa_id;
+        $piso = $info->piso;
+        $casa = $info->casa;
+        $etapa = 1;
+        $procesoActual = strtolower(ProcesosProyectos::where('id', $info->procesos_proyectos_id)->value('nombre_proceso'));
+
+        // Determinar qué proceso de cimentación validar según el piso
+        if ($piso == 1) {
+            // Para piso 1: validar proceso "losa entre pisos etapa 1"
+            $procesoCimentacion = 'losa entre pisos'; //13
+        } else if ($piso == 2) {
+            // Para piso 2: validar proceso "muros segundo piso"
+            $procesoCimentacion = 'muros segundo piso';
+        } else {
+            throw new \Exception("Solo se permiten pisos 1 y 2 para validación de procesos de cimentación.");
+        }
+
+
+        // Buscar el registro del proceso de cimentación correspondiente
+        $procesoCimentacionRegistro = ProyectoCasaDetalle::where('manzana', $manzana)
+            ->where('proyecto_casa_id', $proyectoId)
+            ->where('piso', $piso)
+            ->where('casa', $casa)
+            ->where('etapa', $etapa)
+            ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [strtolower($procesoCimentacion)]))
+            ->first();
+
+        // Validar si el proceso de cimentación existe y está confirmado (estado = 2)
+        if ($procesoCimentacionRegistro && $procesoCimentacionRegistro->estado == 2) {
+            // ✅ Proceso de cimentación confirmado, habilitar destapada/prolongación
+            $procesoActualRegistro = ProyectoCasaDetalle::where('manzana', $manzana)
+                ->where('proyecto_casa_id', $proyectoId)
+                ->where('piso', $piso)
+                ->where('casa', $casa)
+                ->where('etapa', $info->etapa)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoActual]))
+                ->where('estado', 0)
+                ->first();
+
+            if ($procesoActualRegistro) {
+                // Habilitar y marcar validación
+                $procesoActualRegistro->estado = 1;
+                $procesoActualRegistro->fecha_habilitado = now();
+                $procesoActualRegistro->estado_validacion = 1;
+                $procesoActualRegistro->fecha_validacion = now();
+                $procesoActualRegistro->save();
+
+                return true;
+            }
+        } else {
+            // ⚠️ Proceso de cimentación no confirmado, solo actualizar validación
+            $procesosParaValidar = ProyectoCasaDetalle::where('manzana', $manzana)
+                ->where('proyecto_casa_id', $proyectoId)
+                ->where('piso', $piso)
+                ->where('casa', $casa)
+                ->where('etapa', $info->etapa)
+                ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$procesoActual]))
+                ->where('estado', 0)
+                ->get();
+
+
+            // Actualizar cada registro individualmente
+            foreach ($procesosParaValidar as $registro) {
+                $registro->estado_validacion = 1;
+                $registro->fecha_validacion = now();
+                $registro->save();
+            }
+
+            DB::commit();
+            throw new \Exception("No se puede habilitar el proceso '{$procesoActual}', el proceso de cimentación '{$procesoCimentacion}' no está confirmado. Solo se actualizó la validación.");
+        }
+
+        return false;
     }
 }
