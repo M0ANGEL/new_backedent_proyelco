@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
+use App\Http\Controllers\Api\Materiales\MaterialesSolicitudesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
@@ -270,7 +271,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
-    
+
     //telefonos app mobile
     Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
     Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
@@ -278,23 +279,33 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
 
     //marcacion
-    Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
-    Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
+    Route::post('consultar-cedula', [ControlAsistenciasController::class, 'consultarUsuario']);
+    Route::post('registrar-asistencia', [ControlAsistenciasController::class, 'registrarMarcacion']);
 
     //contratista
-    Route::apiResource('administar-contratistas',ContratistasController::class);
-    Route::get('contratistas',[ContratistasController::class,'ContratistasActivos']);
+    Route::apiResource('administar-contratistas', ContratistasController::class);
+    Route::get('contratistas', [ContratistasController::class, 'ContratistasActivos']);
 
     //personal no proyelco
-    Route::apiResource('personal-no-proyelco',PersonalController::class);
-    Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
+    Route::apiResource('personal-no-proyelco', PersonalController::class);
+    Route::get('empleados/{cedula}', [PersonalController::class, 'usuarioCedulaFicha']);
 
     //Crear ficha
-    Route::apiResource('ficha-obra',FichaObraController::class);
+    Route::apiResource('ficha-obra', FichaObraController::class);
     Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
-    
-    //unida de medida
-    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']); 
-    Route::get('proyectosUnidadMedida',[ProyectosController::class, 'proyectosUnidadMedida']);
-});
 
+    //unida de medida
+    Route::post('UnidadDeMedida', [ProyectosController::class, 'UnidadDeMedida']);
+    Route::get('proyectosUnidadMedida', [ProyectosController::class, 'proyectosUnidadMedida']);
+
+
+    // Rutas para gestión de presupuesto y materiales
+
+    //proyectos nombre e id
+    Route::get('proyectos-nombre-id',[ProyectosController::class, 'ProyectoNombreId']);
+    Route::post('cargueProyecion',[MaterialesSolicitudesController::class, 'cargueProyecion']);
+
+    //docuemntacion de proyectos
+
+    
+});
