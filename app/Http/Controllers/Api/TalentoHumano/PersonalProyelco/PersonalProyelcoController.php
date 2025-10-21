@@ -303,7 +303,7 @@ class PersonalProyelcoController extends Controller
 
             // Consultar activos pendientes del empleado
             // Usando JSON_CONTAINS para buscar en el array JSON
-            $activosPendientes = Activo::whereRaw("JSON_CONTAINS(usuarios_asignados, '\"{$usuario->id}\"')")
+            $activosPendientes = Activo::whereRaw("JSON_CONTAINS(usuarios_confirmaron, '\"{$usuario->id}\"')")
                 ->where('estado', '1') // Asumiendo que tienes un campo estado
                 ->get();
 

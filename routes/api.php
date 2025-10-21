@@ -310,6 +310,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //proyectos nombre e id
     Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
     Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
+    Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
     Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
 
     //docuemntacion de proyectos
