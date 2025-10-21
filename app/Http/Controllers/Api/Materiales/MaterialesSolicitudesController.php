@@ -186,7 +186,8 @@ class MaterialesSolicitudesController extends Controller
 
     public function solicitudMaterial(Request $request) {}
 
-       public function index(){
+    public function index()
+    {
         $materialesAgrupados = DB::connection('mysql')
             ->table('materiales')
             ->leftJoin('proyecto', 'materiales.codigo_proyecto', '=', 'proyecto.codigo_proyecto')
@@ -223,52 +224,18 @@ class MaterialesSolicitudesController extends Controller
     }
 
 
-    //con valor promedio y mas data
-    // public function index()
-    // {
-    //     $materialesAgrupados = DB::connection('mysql')
-    //         ->table('materiales')
-    //         ->leftJoin('proyecto', 'materiales.codigo_proyecto', '=', 'proyecto.codigo_proyecto')
-    //         ->leftJoin('proyectos_casas', 'materiales.codigo_proyecto', '=', 'proyectos_casas.codigo_proyecto')
-    //         ->leftJoin('users', 'materiales.user_id', '=', 'users.id')
-    //         ->select(
-    //             'materiales.codigo_proyecto',
-    //             DB::raw('COALESCE(proyecto.descripcion_proyecto, proyectos_casas.descripcion_proyecto) as descripcion_proyecto'),
-    //             DB::raw('CASE 
-    //             WHEN proyecto.codigo_proyecto IS NOT NULL THEN "Apartamentos" 
-    //             WHEN proyectos_casas.codigo_proyecto IS NOT NULL THEN "Casas" 
-    //             ELSE "Sin Proyecto" 
-    //         END as tipo_proyecto'),
-    //             DB::raw('COUNT(materiales.id) as total_registros'),
-    //             DB::raw('COUNT(DISTINCT materiales.codigo) as items_unicos'),
-    //             DB::raw('MAX(materiales.created_at) as fecha_ultimo_registro'),
-    //             DB::raw('MIN(materiales.created_at) as fecha_primer_registro'),
-    //             DB::raw('SUM(materiales.cantidad) as cantidad_total'),
-    //             DB::raw('ROUND(SUM(materiales.valor_sin_iva), 2) as valor_total_sin_iva'),
-    //             DB::raw('ROUND(AVG(materiales.valor_sin_iva), 2) as valor_promedio'),
-    //             DB::raw('COUNT(DISTINCT materiales.user_id) as usuarios_involucrados'),
-    //             'users.nombre as usuario_principal'
-    //         )
-    //         ->groupBy(
-    //             'materiales.codigo_proyecto',
-    //             'descripcion_proyecto',
-    //             'tipo_proyecto',
-    //             'users.nombre'
-    //         )
-    //         ->orderBy('valor_total_sin_iva', 'desc')
-    //         ->get();
+    //envio de proyeccion
+    public function proyeccionData($codigo_proyecto)
+    {
+        $proyeccionData = DB::connection('mysql')
+            ->table('materiales')
+            ->where('codigo_proyecto',$codigo_proyecto)
+            ->get();
+            
 
-    //     // Calcular totales generales
-    //     $totales = [
-    //         'total_proyectos' => $materialesAgrupados->count(),
-    //         'total_registros' => $materialesAgrupados->sum('total_registros'),
-    //         'valor_total_general' => $materialesAgrupados->sum('valor_total_sin_iva')
-    //     ];
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $materialesAgrupados,
-    //         'totales' => $totales
-    //     ]);
-    // }
+        return response()->json([
+            'status' => 'success',
+            'data' => $proyeccionData,
+        ]);
+    }
 }
