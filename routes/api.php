@@ -298,14 +298,21 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('UnidadDeMedida', [ProyectosController::class, 'UnidadDeMedida']);
     Route::get('proyectosUnidadMedida', [ProyectosController::class, 'proyectosUnidadMedida']);
 
+    //rutas apra dar debaja empelado proyelco
+    Route::get('/activos/verificar-pendientes/{empleadoId}', [PersonalProyelcoController::class, 'checkActivosPendientes']);
+
+    // Inactivar empleado
+    Route::post('/personal/{id}/inactivar', [PersonalProyelcoController::class, 'inactivarPersonal']);
+
 
     // Rutas para gestión de presupuesto y materiales
 
     //proyectos nombre e id
-    Route::get('proyectos-nombre-id',[ProyectosController::class, 'ProyectoNombreId']);
-    Route::post('cargueProyecion',[MaterialesSolicitudesController::class, 'cargueProyecion']);
+    Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
+    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
+    Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
 
     //docuemntacion de proyectos
 
-    
+
 });
