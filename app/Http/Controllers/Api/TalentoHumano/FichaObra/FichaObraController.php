@@ -276,69 +276,180 @@ class FichaObraController extends Controller
         }
     }
 
+    // public function show($id)
+    // {
+    //     return response()->json(FichaObra::find($id), 200);
+    // }
+
     public function show($id)
     {
-        return response()->json(FichaObra::find($id), 200);
-    }
+        $empleado = FichaObra::find($id);
 
-    public function update(Request $request, $id)
-    {
-        DB::beginTransaction();
-        try {
-            $validator = Validator::make($request->all(), [
-                // ... tus validaciones existentes ...
-                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
-
-            // Buscar el empleado existente
-            $personal = FichaObra::findOrFail($id);
-
-            // Actualizar datos
-            $personal->rh = $request->tipo_sangre;
-            $personal->hijos = $request->numero_hijos;
-            $personal->eps = $request->eps;
-            $personal->afp = $request->pension;
-            $personal->contratista_id = $request->contratista_id;
-
-            // Procesar la foto si existe
-            if ($request->hasFile('foto')) {
-                $foto = $request->file('foto');
-
-                // Eliminar foto anterior si existe
-                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
-                    Storage::disk('public')->delete($personal->foto);
-                    info('Foto anterior eliminada: ' . $personal->foto);
-                }
-
-                // Generar nombre único para el archivo
-                $nombreArchivo = 'empleado_' . $personal->id  .  '.' . $foto->getClientOriginalExtension();
-                // Guardar nueva foto
-                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
-            }
-            $personal->save();
-
-
-            DB::commit();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Empleado actualizado exitosamente',
-                'data' => $personal
-            ], 200);
-        } catch (Exception $e) {
-            DB::rollBack();
-            info('Error en update: ' . $e->getMessage());
-
+        if (!$empleado) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
-            ], 500);
+                'message' => 'Empleado no encontrado'
+            ], 404);
         }
+
+        // Buscar foto del empleado con formato id.extension
+        $fotoUrl = $this->buscarFotoEmpleado($id);
+
+        $responseData = [
+            'empleado' => $empleado,
+            'foto_url' => $fotoUrl,
+            'tiene_foto' => !is_null($fotoUrl)
+        ];
+
+        return response()->json($responseData, 200);
     }
+
+    private function buscarFotoEmpleado($empleadoId)
+    {
+        $directorio = storage_path('app/public/SST');
+
+        // Verificar si existe el directorio
+        if (!file_exists($directorio)) {
+            return null;
+        }
+
+        // Extensiones de imagen permitidas
+        $extensiones = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP'];
+
+        foreach ($extensiones as $extension) {
+            $nombreArchivo = 'empleado_' . $empleadoId . '.' . $extension;
+            $rutaCompleta = $directorio . '/' . $nombreArchivo;
+
+            if (file_exists($rutaCompleta)) {
+                return asset('storage/SST/' . $nombreArchivo);
+            }
+        }
+
+        return null;
+    }
+
+
+
+    // public function update(Request $request, $id)
+    // {
+    //     DB::beginTransaction();
+    //     try {
+    //         $validator = Validator::make($request->all(), [
+    //             // ... tus validaciones existentes ...
+    //             'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
+    //         ]);
+
+    //         if ($validator->fails()) {
+    //             return response()->json(['errors' => $validator->errors()], 400);
+    //         }
+
+    //         // Buscar el empleado existente
+    //         $personal = FichaObra::findOrFail($id);
+
+    //         // Actualizar datos
+    //         $personal->rh = $request->tipo_sangre;
+    //         $personal->hijos = $request->numero_hijos;
+    //         $personal->eps = $request->eps;
+    //         $personal->afp = $request->pension;
+    //         $personal->contratista_id = $request->contratista_id;
+
+    //         // Procesar la foto si existe
+    //         if ($request->hasFile('foto')) {
+    //             $foto = $request->file('foto');
+
+    //             // Eliminar foto anterior si existe
+    //             if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+    //                 Storage::disk('public')->delete($personal->foto);
+    //                 info('Foto anterior eliminada: ' . $personal->foto);
+    //             }
+
+    //             // Generar nombre único para el archivo
+    //             $nombreArchivo = 'empleado_' . $personal->id  .  '.' . $foto->getClientOriginalExtension();
+    //             // Guardar nueva foto
+    //             $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+    //         }
+    //         $personal->save();
+
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Empleado actualizado exitosamente',
+    //             'data' => $personal
+    //         ], 200);
+    //     } catch (Exception $e) {
+    //         DB::rollBack();
+    //         info('Error en update: ' . $e->getMessage());
+
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+    public function update(Request $request, $id)
+{
+    DB::beginTransaction();
+    try {
+        $validator = Validator::make($request->all(), [
+            // ... tus validaciones existentes ...
+            'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        // Buscar el empleado existente
+        $personal = FichaObra::findOrFail($id);
+
+        // Actualizar datos
+        $personal->rh = $request->tipo_sangre;
+        $personal->hijos = $request->numero_hijos;
+        $personal->eps = $request->eps;
+        $personal->afp = $request->pension;
+        $personal->contratista_id = $request->contratista_id;
+
+        // Procesar la foto si existe
+        if ($request->hasFile('foto')) {
+            $foto = $request->file('foto');
+
+            // Eliminar foto anterior si existe
+            if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+                Storage::disk('public')->delete($personal->foto);
+                info('Foto anterior eliminada: ' . $personal->foto);
+            }
+
+            // Generar nombre único para el archivo
+            $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+            
+            // Guardar nueva foto
+            $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+            
+            // 🔹 GUARDAR LA RUTA EN EL MODELO
+            
+        }
+
+        $personal->save();
+
+        DB::commit();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Empleado actualizado exitosamente',
+            'data' => $personal
+        ], 200);
+    } catch (Exception $e) {
+        DB::rollBack();
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
+        ], 500);
+    }
+}
 
     public function destroy($id)
     {

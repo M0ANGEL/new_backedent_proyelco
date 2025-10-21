@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\TalentoHumano\PersonalProyelco;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activo;
+use App\Models\FichaObra;
 use App\Models\Personal;
 use App\Models\PersonalProyelco;
+use App\Models\User;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -268,5 +271,134 @@ class PersonalProyelcoController extends Controller
             'status' => 'success',
             'data' => $cargos_th
         ], 200);
+    }
+
+    public function checkActivosPendientes($empleadoId)
+    {
+        try {
+            // Verificar si el empleado existe
+            $empleado = PersonalProyelco::find($empleadoId);
+
+            if (!$empleado) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Empleado no encontrado'
+                ], 404);
+            }
+
+            // Obtener el usuario por cédula
+            $usuario = User::where('cedula', $empleado->identificacion)->first();
+
+
+            if (!$usuario) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [
+                        'tieneActivosPendientes' => false,
+                        'totalActivosPendientes' => 0,
+                        'activos' => []
+                    ]
+                ], 200);
+            }
+
+            // Consultar activos pendientes del empleado
+            // Usando JSON_CONTAINS para buscar en el array JSON
+            $activosPendientes = Activo::whereRaw("JSON_CONTAINS(usuarios_asignados, '\"{$usuario->id}\"')")
+                ->where('estado', '1') // Asumiendo que tienes un campo estado
+                ->get();
+
+            $tieneActivosPendientes = $activosPendientes->count() > 0;
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'tieneActivosPendientes' => $tieneActivosPendientes,
+                    'totalActivosPendientes' => $activosPendientes->count(),
+                    'activos' => $activosPendientes->map(function ($activo) {
+                        return [
+                            'id' => $activo->id,
+                            'nombre' => $activo->descripcion,
+                            'numero_activo' => $activo->numero_activo,
+                        ];
+                    })
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al verificar activos pendientes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Inactivar empleado (DeletePersonal)
+     */
+    public function inactivarPersonal(Request $request, $id)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Buscar el empleado
+            $empleado = PersonalProyelco::find($id);
+
+            if (!$empleado) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Empleado no encontrado'
+                ], 404);
+            }
+
+            // Verificar si ya está inactivo
+            if ($empleado->estado == 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El empleado ya se encuentra inactivo'
+                ], 400);
+            }
+
+            // Obtener el motivo de la request
+            $motivo = $request->motivo;
+
+            // Inactivar el empleado - CORREGIDO el nombre del campo
+            $empleado->update([
+                'estado' => 0, // 0 = inactivo
+                'fecha_terminacion' => now(),
+                'motivo_retiro' => $motivo,
+                'uuario_retira' => auth()->id() // CORREGIDO: era 'uuario_retira'
+            ]);
+
+            // Recargar el modelo para ver los cambios
+            $empleado->refresh();
+
+            //inactivar ficha igual
+
+            $ficha = FichaObra::where('identificacion', $empleado->identificacion)->first();
+            $ficha->update([
+                'estado' => 2, // 2 = inactivo por retiro
+            ]);
+
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Empleado inactivado exitosamente',
+                'data' => [
+                    'empleado' => $empleado->nombre_completo,
+                    'fecha_retiro' => now()->format('Y-m-d H:i:s'),
+                    'motivo' => $motivo,
+                    'usuario_retira' => auth()->id()
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            info('Error al inactivar empleado:', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al inactivar empleado: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
