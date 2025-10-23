@@ -478,6 +478,75 @@ class GestionProyectosController extends Controller
         ]);
     }
 
+        //Calcula porcentajes de avance y atraso para procesos y torres
+    private function calcularPorcentajes(&$resultado, &$torreResumen)
+    {
+        // --- Porcentajes por proceso ---
+        foreach ($resultado as $torre => &$procesos) {
+            foreach ($procesos as $orden_proceso => &$proceso) {
+                if ($orden_proceso === 'nombre_torre') continue;
+
+                $total_atraso      = $proceso['apartamentos_atraso'];     // estado = 1
+                $total_realizados  = $proceso['apartamentos_realizados']; // estado = 2
+                $total_apartamentos = $proceso['total_apartamentos'];     // estados 0,1,2
+
+                // % ATRASO (se excluye proceso 1)
+                if ($orden_proceso == 1) {
+                    $proceso['porcentaje_atraso'] = 0;
+                } else {
+                    $den = $total_atraso + $total_realizados;
+                    $proceso['porcentaje_atraso'] = $den > 0 ? round(($total_atraso / $den) * 100, 2) : 0;
+                }
+
+                // % AVANCE (incluye todos los procesos)
+                $proceso['porcentaje_avance'] = $total_apartamentos > 0
+                    ? round(($total_realizados / $total_apartamentos) * 100, 2)
+                    : 0;
+            }
+        }
+
+        // --- Porcentajes por torre ---
+        foreach ($torreResumen as $torre => &$datos) {
+            // Para atraso: sumar solo estados de procesos != 1
+            $total_atraso_excl = 0;           // suma estado=1 (excluye op=1)
+            $total_realizados_excl = 0;       // suma estado=2 (excluye op=1, para el denominador del atraso)
+
+            // Para avance: incluir todos los procesos
+            $total_realizados_all = 0;        // suma estado=2 (incluye op=1)
+            $total_apartamentos_all = 0;      // total aptos (incluye op=1)
+
+            foreach ($resultado[$torre] as $op => $proc) {
+                if ($op === 'nombre_torre') continue;
+
+                // avance (incluye todo)
+                $total_realizados_all += $proc['apartamentos_realizados'];
+                $total_apartamentos_all += $proc['total_apartamentos'];
+
+                // atraso (excluir proceso 1)
+                if ($op != 1) {
+                    $total_atraso_excl += $proc['apartamentos_atraso'];
+                    $total_realizados_excl += $proc['apartamentos_realizados'];
+                }
+            }
+
+            // Atraso torre: estado1 / (estado1 + estado2) — ambos excluyen op=1
+            $denAtraso = $total_atraso_excl + $total_realizados_excl;
+            $datos['porcentaje_atraso'] = $denAtraso > 0
+                ? round(($total_atraso_excl / $denAtraso) * 100, 2)
+                : 0;
+
+            // Avance torre: estado2 (incluye todo) / total aptos (incluye todo)
+            $datos['porcentaje_avance'] = $total_apartamentos_all > 0
+                ? round(($total_realizados_all / $total_apartamentos_all) * 100, 2)
+                : 0;
+
+            $datos['serial_avance'] = $total_realizados_all . '/' . $total_apartamentos_all;
+            $datos['total_pisos'] = count($datos['pisos_unicos']);
+
+            unset($datos['pisos_unicos']); // Eliminar campo auxiliar
+        }
+    }
+
     /* ************************************************ESTADO EN BLANCO********************************************** */
     private function determinarEstadoBlanco($resultado, $torre, $orden_proceso, $piso, $apartamento, $procesosConfig)
     {
@@ -594,74 +663,7 @@ class GestionProyectosController extends Controller
         }
     }
 
-    //Calcula porcentajes de avance y atraso para procesos y torres
-    private function calcularPorcentajes(&$resultado, &$torreResumen)
-    {
-        // --- Porcentajes por proceso ---
-        foreach ($resultado as $torre => &$procesos) {
-            foreach ($procesos as $orden_proceso => &$proceso) {
-                if ($orden_proceso === 'nombre_torre') continue;
 
-                $total_atraso      = $proceso['apartamentos_atraso'];     // estado = 1
-                $total_realizados  = $proceso['apartamentos_realizados']; // estado = 2
-                $total_apartamentos = $proceso['total_apartamentos'];     // estados 0,1,2
-
-                // % ATRASO (se excluye proceso 1)
-                if ($orden_proceso == 1) {
-                    $proceso['porcentaje_atraso'] = 0;
-                } else {
-                    $den = $total_atraso + $total_realizados;
-                    $proceso['porcentaje_atraso'] = $den > 0 ? round(($total_atraso / $den) * 100, 2) : 0;
-                }
-
-                // % AVANCE (incluye todos los procesos)
-                $proceso['porcentaje_avance'] = $total_apartamentos > 0
-                    ? round(($total_realizados / $total_apartamentos) * 100, 2)
-                    : 0;
-            }
-        }
-
-        // --- Porcentajes por torre ---
-        foreach ($torreResumen as $torre => &$datos) {
-            // Para atraso: sumar solo estados de procesos != 1
-            $total_atraso_excl = 0;           // suma estado=1 (excluye op=1)
-            $total_realizados_excl = 0;       // suma estado=2 (excluye op=1, para el denominador del atraso)
-
-            // Para avance: incluir todos los procesos
-            $total_realizados_all = 0;        // suma estado=2 (incluye op=1)
-            $total_apartamentos_all = 0;      // total aptos (incluye op=1)
-
-            foreach ($resultado[$torre] as $op => $proc) {
-                if ($op === 'nombre_torre') continue;
-
-                // avance (incluye todo)
-                $total_realizados_all += $proc['apartamentos_realizados'];
-                $total_apartamentos_all += $proc['total_apartamentos'];
-
-                // atraso (excluir proceso 1)
-                if ($op != 1) {
-                    $total_atraso_excl += $proc['apartamentos_atraso'];
-                    $total_realizados_excl += $proc['apartamentos_realizados'];
-                }
-            }
-
-            // Atraso torre: estado1 / (estado1 + estado2) — ambos excluyen op=1
-            $denAtraso = $total_atraso_excl + $total_realizados_excl;
-            $datos['porcentaje_atraso'] = $denAtraso > 0
-                ? round(($total_atraso_excl / $denAtraso) * 100, 2)
-                : 0;
-
-            // Avance torre: estado2 (incluye todo) / total aptos (incluye todo)
-            $datos['porcentaje_avance'] = $total_apartamentos_all > 0
-                ? round(($total_realizados_all / $total_apartamentos_all) * 100, 2)
-                : 0;
-
-            $datos['serial_avance'] = $total_realizados_all . '/' . $total_apartamentos_all;
-            $datos['total_pisos'] = count($datos['pisos_unicos']);
-
-            unset($datos['pisos_unicos']); // Eliminar campo auxiliar
-        }
-    }
 
     /* ************************************************ESTADO EN BLANCO FIN********************************************** */
 
