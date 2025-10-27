@@ -312,6 +312,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
     Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
     Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
+    Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
 
     //docuemntacion de proyectos
 
