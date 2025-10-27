@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ActivosFijos\ActivosController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,8 +15,19 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
+// Route::get('/', function () {
+//     return view('welcome');
+// });
+
+Route::get('/status', function () {
+    try {
+        DB::connection()->getPdo();
+        $dbStatus = '✅ Conectado a la base de datos';
+    } catch (\Exception $e) {
+        $dbStatus = '❌ Error al conectar: ' . $e->getMessage();
+    }
+
+    return view('status', compact('dbStatus'));
 });
 
 // routes/web.php
