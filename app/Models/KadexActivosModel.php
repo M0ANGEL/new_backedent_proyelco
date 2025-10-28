@@ -21,5 +21,7 @@ class KadexActivosModel extends Model
         'ubicacion_id',
         'fecha_Aceptacion',
         'observacion',
+        'mensajero',
+        'observacionMensajero'
     ];
 }

@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CargueMasivo\CarguesMasivosCotroller;
 use App\Http\Controllers\Api\Clientes\ClientesController;
 use App\Http\Controllers\Api\Compras\CargueComprasController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\Documentos\DocumentosController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
@@ -225,6 +226,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class, 'aceptarActivo']);
     Route::post('activo-rechazarActivo', [KadexActivosController::class, 'rechazarActivo']);
     Route::get('activo-informacion/{id}', [KadexActivosController::class, 'infoActivo']);
+    Route::get('mensajero-activos', [KadexActivosController::class, 'mensajero']);
+    Route::post('confirmar-entrega-mensajero', [KadexActivosController::class, 'mensajeroEntrega']);
 
     //solicitar activo
     Route::get('solicitar-activos', [KadexActivosController::class, 'solicitarActivos']);
@@ -315,6 +318,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
 
     //docuemntacion de proyectos
+    Route::get('gestion-documentos-emcali',[DocumentosController::class, 'indexEmcali']);
+    Route::get('gestion-documentos-celsia',[DocumentosController::class, 'indexCELSIA']);
+    Route::get('gestion-documentosDetalle/{codigo_poryecto}',[DocumentosController::class,'detalleDocumentos']);
+    Route::post('gestion-documentos-confirmar',[DocumentosController::class,'confirmarDocumento']);
 
 
 });

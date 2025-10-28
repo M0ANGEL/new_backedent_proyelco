@@ -239,9 +239,8 @@ class ProyectosController extends Controller
     public function store(Request $request)
     {
 
-        info($request->all());
 
-        $this->AuxDocumentos($request);
+
         DB::beginTransaction();
         try {
 
@@ -695,6 +694,8 @@ class ProyectosController extends Controller
             }
 
             //envio de data para documentos
+            $this->AuxDocumentos($request);
+
 
 
             DB::commit(); // Confirmamos los cambios
@@ -1428,8 +1429,8 @@ class ProyectosController extends Controller
 
     public function ProyectoNombreId()
     {
-        $proyectosApartamentos = Proyectos::select('descripcion_proyecto', 'id', 'tipoProyecto_id','codigo_proyecto')->get();
-        $proyectosCasas = ProyectoCasa::select('descripcion_proyecto', 'id', 'tipoProyecto_id','codigo_proyecto')->get();
+        $proyectosApartamentos = Proyectos::select('descripcion_proyecto', 'id', 'tipoProyecto_id', 'codigo_proyecto')->get();
+        $proyectosCasas = ProyectoCasa::select('descripcion_proyecto', 'id', 'tipoProyecto_id', 'codigo_proyecto')->get();
 
         // Unificar ambos tipos de proyectos
         $proyectosUnificados = $proyectosApartamentos->concat($proyectosCasas);
@@ -1440,35 +1441,356 @@ class ProyectosController extends Controller
         ]);
     }
 
+    //documentacion
     private function AuxDocumentos($datos)
     {
-
-        $operador = $datos->operador_red;
-        $torres = $datos->torres;
-        $organismo = $datos->organismo;
-        $etapa = $datos->etapa;
-        $tipoProyecto_id = $datos->tipoProyecto_id;
+        //datos unicos del proyecto
+        $codigo_proyecto = $datos->codigo_proyecto;
         $codigo_proyecto_documentos = $datos->codigo_proyecto_documentos;
+        $etapa = $datos->etapa;
+
+        //datos de operadores para plantilla
+        $operador = $datos->operador_red;
+        $organismo = $datos->organismo;
         $fecha_entrega = $datos->fecha_entrega;
 
+        //tipo de proyecto en caso que casas sea distinto
+        $tipoProyecto_id = $datos->tipoProyecto_id;
+
+        //OPERADORES DE RED
         //APARTAMENTOS
         if ($tipoProyecto_id == 1) {
             if ($etapa == '1') {
-                if($operador == "1"){ //emcali
-
-                }else if($operador == "2"){//celsia
-
+                if ($operador == "1") { //emcali
+                    $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id);
+                } else if ($operador == "2") { //celsia
+                    // Para Celsia
                 }
             } else {
-                # code...
+                if ($operador == "1") { //emcali
+                    $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id);
+                } else if ($operador == "2") { //celsia
+                    // Para Celsia
+                }
             }
-
-            
         } else if ($tipoProyecto_id == 2) {
             //CASAS
         }
+    }
 
-        info("datos para documentos");
-        info($datos);
+    // private function generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id)
+    // {
+    //     // Consultar actividades desde la base de datos
+    //     $actividades = DB::table('actividades_documentos')
+    //         ->where('etapa', $etapa)
+    //         ->where('operador', $operador)
+    //         ->where('estado', 1)
+    //         ->orderBy('id')
+    //         ->get();
+
+    //     if ($actividades->isEmpty()) {
+    //         info("No se encontraron actividades para etapa: $etapa, operador: $operador");
+    //         return;
+    //     }
+
+    //     // Convertir fecha_entrega a Carbon - CORREGIDO para formato ISO
+    //     try {
+    //         if (is_object($fecha_entrega) && method_exists($fecha_entrega, 'format')) {
+    //             $fechaBase = $fecha_entrega;
+    //         } else if (is_string($fecha_entrega)) {
+    //             // Formato ISO 8601: 2026-10-22T05:00:00.000Z
+    //             if (strpos($fecha_entrega, 'T') !== false) {
+    //                 $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i:s.v\Z', $fecha_entrega);
+    //             } else if (strpos($fecha_entrega, '-') !== false) {
+    //                 // Formato con guiones (1-Oct-25)
+    //                 $fechaBase = \Carbon\Carbon::createFromFormat('d-M-y', $fecha_entrega);
+    //             } else {
+    //                 // Intentar parsear automáticamente
+    //                 $fechaBase = \Carbon\Carbon::parse($fecha_entrega);
+    //             }
+    //         } else {
+    //             throw new Exception("Formato de fecha no reconocido");
+    //         }
+    //     } catch (\Exception $e) {
+    //         info("Error al parsear fecha: " . $e->getMessage());
+    //         // Usar fecha actual como fallback
+    //         $fechaBase = \Carbon\Carbon::now();
+    //     }
+
+    //     $cronograma = [];
+    //     $orden = 1;
+
+    //     // Calcular todas las fechas
+    //     $fechasCalculadas = [];
+    //     $totalDias = 0;
+
+    //     // Sumar todos los días para calcular la fecha inicial
+    //     foreach ($actividades as $actividad) {
+    //         $totalDias += $actividad->tiempo;
+    //     }
+
+    //     // Fecha inicial (la más antigua) - CORREGIDO: restar el total de días
+    //     $fechaInicial = $fechaBase->copy()->subDays($totalDias);
+    //     $fechaActual = $fechaInicial->copy();
+
+    //     foreach ($actividades as $actividad) {
+    //         $fechaFinActividad = $fechaActual->copy()->addDays($actividad->tiempo);
+
+    //         $fechasCalculadas[$actividad->id] = [
+    //             'inicio' => $fechaActual->copy(),
+    //             'fin' => $fechaFinActividad->copy()
+    //         ];
+
+    //         $fechaActual = $fechaFinActividad->copy();
+    //     }
+
+    //     // Generar el cronograma
+    //     foreach ($actividades as $actividad) {
+    //         $fechas = $fechasCalculadas[$actividad->id];
+
+    //         // Determinar dependencia
+    //         $dependencia = $this->determinarDependencia($actividad->id, $actividades);
+
+    //         // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
+    //         $estado = ($orden == 1) ? 1 : 0;
+
+    //         $registro = [
+    //             'codigo_proyecto' => $codigo_proyecto,
+    //             'codigo_documento' => $codigo_proyecto_documentos,
+    //             'etapa' => $etapa,
+    //             'actividad_id' => $actividad->id,
+    //             'actividad_depende_id' => $dependencia,
+    //             'tipo' => ($actividad->tipo == 1) ? 'principal' : 'simultanea',
+    //             'orden' => $orden,
+    //             'fecha_proyeccion' => $fechas['inicio']->format('Y-m-d'),
+    //             'fecha_actual' => $fechas['inicio']->format('Y-m-d'),
+    //             'estado' => $estado,
+    //             'operador' => $operador,
+
+    //         ];
+
+    //         $cronograma[] = $registro;
+    //         $orden++;
+    //     }
+
+    //     // Mostrar debug del cronograma generado
+    //     foreach ($cronograma as $item) {
+    //         info(json_encode($item));
+    //     }
+
+    //     // Insertar en la base de datos
+    //     try {
+    //         foreach ($cronograma as $registro) {
+    //             DB::table('documentacion_operadores')->insert($registro);
+    //         }
+    //     } catch (\Exception $e) {
+    //         info("Error al insertar cronograma: " . $e->getMessage());
+    //     }
+
+    //     return $cronograma;
+    // }
+
+    // private function determinarDependencia($actividadId, $actividades)
+    // {
+    //     // Para actividades simultáneas (14-19) que dependen de 13
+    //     if ($actividadId >= 14 && $actividadId <= 19) {
+    //         return 13;
+    //     }
+
+    //     // Para actividad 20 que depende de 13 (las simultáneas se completan)
+    //     if ($actividadId == 20) {
+    //         return 13;
+    //     }
+
+    //     // Para las demás, dependen de la actividad anterior
+    //     if ($actividadId > 1) {
+    //         return $actividadId - 1;
+    //     }
+
+    //     // Primera actividad no tiene dependencia
+    //     return null;
+    // }
+
+    private function generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id)
+    {
+        // Consultar actividades desde la base de datos
+        $actividades = DB::table('actividades_documentos')
+            ->where('etapa', $etapa)
+            ->where('operador', $operador)
+            ->where('estado', 1)
+            ->orderBy('id')
+            ->get();
+
+        if ($actividades->isEmpty()) {
+            info("No se encontraron actividades para etapa: $etapa, operador: $operador");
+            return;
+        }
+
+        // Convertir fecha_entrega a Carbon - CORREGIDO para formato ISO
+        try {
+            if (is_object($fecha_entrega) && method_exists($fecha_entrega, 'format')) {
+                $fechaBase = $fecha_entrega;
+            } else if (is_string($fecha_entrega)) {
+                // Formato ISO 8601: 2026-10-22T05:00:00.000Z
+                if (strpos($fecha_entrega, 'T') !== false) {
+                    $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i:s.v\Z', $fecha_entrega);
+                } else if (strpos($fecha_entrega, '-') !== false) {
+                    // Formato con guiones (1-Oct-25)
+                    $fechaBase = \Carbon\Carbon::createFromFormat('d-M-y', $fecha_entrega);
+                } else {
+                    // Intentar parsear automáticamente
+                    $fechaBase = \Carbon\Carbon::parse($fecha_entrega);
+                }
+            } else {
+                throw new Exception("Formato de fecha no reconocido");
+            }
+        } catch (\Exception $e) {
+            info("Error al parsear fecha: " . $e->getMessage());
+            // Usar fecha actual como fallback
+            $fechaBase = \Carbon\Carbon::now();
+        }
+
+        $cronograma = [];
+        $orden = 1;
+
+        // Calcular todas las fechas
+        $fechasCalculadas = [];
+        $totalDias = 0;
+
+        // Sumar todos los días para calcular la fecha inicial
+        foreach ($actividades as $actividad) {
+            $totalDias += $actividad->tiempo;
+        }
+
+        // Fecha inicial (la más antigua) - CORREGIDO: restar el total de días
+        $fechaInicial = $fechaBase->copy()->subDays($totalDias);
+        $fechaActual = $fechaInicial->copy();
+
+        // Identificar actividades simultáneas para operador 1
+        $actividadesSimultaneasIds = [2, 3, 4, 5];
+        $fechaSimultaneas = null;
+        $maxTiempoSimultaneas = 0;
+
+        // Primera pasada: calcular fechas normales y detectar simultáneas
+        foreach ($actividades as $actividad) {
+            // Si es operador 1 y está en las actividades simultáneas
+            if ($operador == 1 && in_array($actividad->id, $actividadesSimultaneasIds)) {
+                // Para la primera actividad simultánea, guardar la fecha de inicio
+                if ($fechaSimultaneas === null) {
+                    $fechaSimultaneas = $fechaActual->copy();
+                }
+                // Encontrar el tiempo máximo entre las actividades simultáneas
+                if ($actividad->tiempo > $maxTiempoSimultaneas) {
+                    $maxTiempoSimultaneas = $actividad->tiempo;
+                }
+
+                // Todas las simultáneas comparten la misma fecha de inicio
+                $fechaFinActividad = $fechaSimultaneas->copy()->addDays($actividad->tiempo);
+                $fechasCalculadas[$actividad->id] = [
+                    'inicio' => $fechaSimultaneas->copy(),
+                    'fin' => $fechaFinActividad->copy()
+                ];
+            } else {
+                // Actividades normales
+                $fechaFinActividad = $fechaActual->copy()->addDays($actividad->tiempo);
+                $fechasCalculadas[$actividad->id] = [
+                    'inicio' => $fechaActual->copy(),
+                    'fin' => $fechaFinActividad->copy()
+                ];
+                $fechaActual = $fechaFinActividad->copy();
+            }
+        }
+
+        // Segunda pasada: ajustar fechas después de las simultáneas
+        $fechaActual = $fechaInicial->copy();
+        foreach ($actividades as $actividad) {
+            if ($operador == 1 && in_array($actividad->id, $actividadesSimultaneasIds)) {
+                // Para actividades simultáneas, usar la fecha compartida
+                $fechaActual = $fechaSimultaneas->copy();
+            } else {
+                // Para actividades normales, calcular normalmente
+                $fechaFinActividad = $fechaActual->copy()->addDays($actividad->tiempo);
+                $fechasCalculadas[$actividad->id] = [
+                    'inicio' => $fechaActual->copy(),
+                    'fin' => $fechaFinActividad->copy()
+                ];
+                $fechaActual = $fechaFinActividad->copy();
+            }
+        }
+
+        // Ajustar: después de todas las simultáneas, avanzar con el tiempo máximo
+        if ($operador == 1 && $maxTiempoSimultaneas > 0) {
+            $fechaActual = $fechaSimultaneas->copy()->addDays($maxTiempoSimultaneas);
+        }
+
+        // Generar el cronograma
+        foreach ($actividades as $actividad) {
+            $fechas = $fechasCalculadas[$actividad->id];
+
+            // Determinar dependencia
+            $dependencia = $this->determinarDependencia($actividad->id, $actividades, $operador);
+
+            // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
+            $estado = ($orden == 1) ? 1 : 0;
+
+            $registro = [
+                'codigo_proyecto' => $codigo_proyecto,
+                'codigo_documento' => $codigo_proyecto_documentos,
+                'etapa' => $etapa,
+                'actividad_id' => $actividad->id,
+                'actividad_depende_id' => $dependencia,
+                'tipo' => ($actividad->tipo == 1) ? 'principal' : 'simultanea',
+                'orden' => $orden,
+                'fecha_proyeccion' => $fechas['inicio']->format('Y-m-d'),
+                'fecha_actual' => $fechas['inicio']->format('Y-m-d'),
+                'estado' => $estado,
+                'operador' => $operador,
+            ];
+
+            $cronograma[] = $registro;
+            $orden++;
+        }
+
+        // Mostrar debug del cronograma generado
+        foreach ($cronograma as $item) {
+            info("Actividad ID: {$item['actividad_id']}, Fecha: {$item['fecha_proyeccion']}, Tipo: {$item['tipo']}");
+        }
+
+        // Insertar en la base de datos
+        try {
+            foreach ($cronograma as $registro) {
+                DB::table('documentacion_operadores')->insert($registro);
+            }
+        } catch (\Exception $e) {
+            info("Error al insertar cronograma: " . $e->getMessage());
+        }
+
+        return $cronograma;
+    }
+
+    private function determinarDependencia($actividadId, $actividades, $operador = null)
+    {
+        // Para operador 1, actividades simultáneas (2,3,4,5) dependen de la actividad 1
+        if ($operador == 1 && in_array($actividadId, [2, 3, 4, 5])) {
+            return 1;
+        }
+
+        // Para actividades simultáneas (14-19) que dependen de 13
+        if ($actividadId >= 14 && $actividadId <= 19) {
+            return 13;
+        }
+
+        // Para actividad 20 que depende de 13 (las simultáneas se completan)
+        if ($actividadId == 20) {
+            return 13;
+        }
+
+        // Para las demás, dependen de la actividad anterior
+        if ($actividadId > 1) {
+            return $actividadId - 1;
+        }
+
+        // Primera actividad no tiene dependencia
+        return null;
     }
 }

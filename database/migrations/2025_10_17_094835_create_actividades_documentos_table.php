@@ -13,11 +13,14 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('actividades_emcali', function (Blueprint $table) {
+        Schema::create('actividades_documentos', function (Blueprint $table) {
             $table->id();
             $table->string('actividad'); //nombre
             $table->string('tiempo',5); // en dias
-            $table->text('descripcion')->nullable();
+            $table->string('descripcion')->nullable();
+            $table->tinyInteger('tipo'); //1 principal 2 simultaneo
+            $table->tinyInteger('etapa'); 
+            $table->tinyInteger('operador'); //emcali o celsia
             $table->tinyInteger('estado')->default(1); 
             $table->timestamps();
         });
@@ -30,6 +33,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('actividades_emcali');
+        Schema::dropIfExists('actividades_documentos');
     }
 };
