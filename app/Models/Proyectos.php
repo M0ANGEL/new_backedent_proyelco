@@ -38,6 +38,11 @@ class Proyectos extends Model
     {
         return $this->belongsTo(User::class, 'ingeniero_id');
     }
+
+    public function documentacion()
+{
+    return $this->hasMany(Documentos::class, 'codigo_proyecto', 'codigo_proyecto');
+}
 }
 /* no se si la idea no se entendio, si en proyectosDetalle hay inactividad mas de 3 dias sin contar dias de la tabla festivos ni domingos, entonces se debe enviar un correo
 informativo indicndo que hay inactivida, entonces mejoremos la loliga
