@@ -320,7 +320,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //docuemntacion de proyectos
     Route::get('gestion-documentos-emcali',[DocumentosController::class, 'indexEmcali']);
     Route::get('gestion-documentos-celsia',[DocumentosController::class, 'indexCELSIA']);
-    Route::get('gestion-documentosDetalle/{codigo_poryecto}',[DocumentosController::class,'detalleDocumentos']);
+    Route::get('gestion-documentosDetalle/{codigo_documento}',[DocumentosController::class,'detalleDocumentos']);
+    Route::get('gestion-documentos-proyectos',[DocumentosController::class,'proyectosCodigo']);
+    Route::post('StoreDocumentacionRed',[DocumentosController::class,'StoreDocumentacionRed']);
     Route::post('gestion-documentos-confirmar',[DocumentosController::class,'confirmarDocumento']);
 
 
