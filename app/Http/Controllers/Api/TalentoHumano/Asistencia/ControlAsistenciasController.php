@@ -15,6 +15,8 @@ class ControlAsistenciasController extends Controller
 
     public function consultarUsuario(Request $request)
     {
+
+        info($request->all());
         // Validar que la cédula venga en el request
         if (!$request->has('cedula') || empty($request->cedula)) {
             return response()->json([
@@ -62,25 +64,17 @@ class ControlAsistenciasController extends Controller
             if ($ultimaAsistencia) {
                 // Si ya tiene registro de entrada pero no tiene fecha de salida
                 if ($ultimaAsistencia->fecha_ingreso && !$ultimaAsistencia->fecha_salida) {
-                    if ($ultimaAsistencia->tipo_obra !== $request->tipo_obra && $ultimaAsistencia->obra_id !== $request->obra_id) {
+                    if ($ultimaAsistencia->obra_id !== $request->obra_id && $ultimaAsistencia->obra_id !== $request->obra_id) {
 
-                        if ($ultimaAsistencia->tipo_obra == 1) {
-                            $proyecto = DB::connection('mysql')
-                                ->table('proyecto')
-                                ->select('descripcion_proyecto')
-                                ->where('id', $ultimaAsistencia->obra_id)
-                                ->first();
-                        } else {
-                            $proyecto = DB::connection('mysql')
-                                ->table('proyectos_casas')
-                                ->select('descripcion_proyecto')
-                                ->where('id', $ultimaAsistencia->obra_id)
-                                ->first();
-                        }
+                        $proyecto = DB::connection('mysql')
+                            ->table('bodegas_area')
+                            ->select('nombre')
+                            ->where('id', $ultimaAsistencia->obra_id)
+                            ->first();
 
                         return response()->json([
                             'status' => 'error',
-                            'message' => 'El usuario se encuntra registrado en otra obra: ' . '[' . $proyecto->descripcion_proyecto . ']' . ' comunicate con el encargado de la obra y registre la salida'
+                            'message' => 'El usuario se encuntra registrado en otra obra: ' . '[' . $proyecto->nombre . ']' . ' comunicate con el encargado de la obra y registre la salida'
                         ], 404);
                     }
                 }
@@ -187,6 +181,8 @@ class ControlAsistenciasController extends Controller
 
     public function registrarMarcacion(Request $request)
     {
+
+        info($request->all());
         // Validar los datos requeridos
         $validator = Validator::make($request->all(), [
             'cedula' => 'required|string',
@@ -210,7 +206,7 @@ class ControlAsistenciasController extends Controller
                 ->where('estado', 1)
                 ->first();
 
-            Log::info((array) $empleado);
+            // Log::info((array) $empleado);
 
 
 
@@ -236,7 +232,7 @@ class ControlAsistenciasController extends Controller
                     ->whereNull('fecha_salida')
                     ->first();
 
-                Log::info((array) $entradaPendiente);
+                // Log::info((array) $entradaPendiente);
 
 
                 if ($entradaPendiente) {
@@ -256,7 +252,6 @@ class ControlAsistenciasController extends Controller
                         'identificacion' => $empleado->identificacion,
                         'fecha_ingreso' => $fechaActual,
                         'hora_ingreso' => $horaActual->format('H:i:s'),
-                        'tipo_obra' => $request->tipo_obra,
                         'obra_id' => $request->obra_id,
                     ]);
 
@@ -331,124 +326,7 @@ class ControlAsistenciasController extends Controller
         }
     }
 
-    //   public function reporteAsistencia(Request $request)
-    // {
-    //     try {
-    //         $reporte = DB::table('asistencias_th as a')
-    //             // Empleados Proyelco
-    //             ->leftJoin('empleados_proyelco_th as ep', function ($join) {
-    //                 $join->on('a.empleado_id', '=', 'ep.id')
-    //                     ->where('a.tipo_empleado', 1);
-    //             })
-    //             // Empleados No Proyelco
-    //             ->leftJoin('empleados_th as enp', function ($join) {
-    //                 $join->on('a.empleado_id', '=', 'enp.id')
-    //                     ->where('a.tipo_empleado', 2);
-    //             })
-    //             // Contratista (desde ficha_th)
-    //             ->leftJoin('ficha_th as f', function ($join) {
-    //                 $join->on('a.identificacion', '=', 'f.identificacion');
-    //             })
-    //             ->leftJoin('contratistas_th as cont', 'f.contratista_id', '=', 'cont.id')
-    //             // Proyectos
-    //             ->leftJoin('proyecto as p', function ($join) {
-    //                 $join->on('a.obra_id', '=', 'p.id')
-    //                     ->where('a.tipo_obra', 1);
-    //             })
-    //             ->leftJoin('proyectos_casas as pc', function ($join) {
-    //                 $join->on('a.obra_id', '=', 'pc.id')
-    //                     ->where('a.tipo_obra', 2);
-    //             })
-    //             // Cargo (unificado)
-    //             ->leftJoin('cargos_th as c', function ($join) {
-    //                 $join->on('ep.cargo_id', '=', 'c.id')
-    //                     ->orOn('enp.cargo_id', '=', 'c.id');
-    //             })
 
-    //             // SELECT
-    //             ->select(
-    //                 'a.id as asistencia_id',
-    //                 'a.fecha_ingreso',
-    //                 'a.hora_ingreso',
-    //                 'a.fecha_salida',
-    //                 'a.hora_salida',
-    //                 'a.horas_laborales',
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_obra = 1 THEN p.nombre 
-    //                         WHEN a.tipo_obra = 2 THEN pc.nombre 
-    //                         ELSE 'N/A' 
-    //                     END as obra
-    //                 "),
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_empleado = 1 THEN ep.nombre_completo
-    //                         WHEN a.tipo_empleado = 2 THEN enp.nombre_completo
-    //                         ELSE 'Desconocido'
-    //                     END as nombre_empleado
-    //                 "),
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_empleado = 1 THEN ep.identificacion
-    //                         WHEN a.tipo_empleado = 2 THEN enp.identificacion
-    //                         ELSE 'N/A'
-    //                     END as identificacion
-    //                 "),
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_empleado = 1 THEN ep.telefono_celular
-    //                         WHEN a.tipo_empleado = 2 THEN enp.telefono_celular
-    //                         ELSE 'N/A'
-    //                     END as telefono
-    //                 "),
-    //                 'c.cargo',
-    //                 'cont.contratista as nombre_contratista',
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_empleado = 1 THEN 'Empleado Proyelco'
-    //                         WHEN a.tipo_empleado = 2 THEN 'Empleado No Proyelco'
-    //                         ELSE 'Desconocido'
-    //                     END as tipo_empleado_texto
-    //                 "),
-    //                 DB::raw("
-    //                     CASE 
-    //                         WHEN a.tipo_obra = 1 THEN 'Apartamentos'
-    //                         WHEN a.tipo_obra = 2 THEN 'Casas'
-    //                         ELSE 'Desconocido'
-    //                     END as tipo_obra_texto
-    //                 ")
-    //             )
-
-    //             // FILTROS OPCIONALES
-    //             ->when($request->filled('fecha_inicio') && $request->filled('fecha_fin'), function ($q) use ($request) {
-    //                 $q->whereBetween('a.fecha_ingreso', [$request->fecha_inicio, $request->fecha_fin]);
-    //             })
-    //             ->when($request->filled('obra_id'), function ($q) use ($request) {
-    //                 $q->where('a.obra_id', $request->obra_id);
-    //             })
-    //             ->when($request->filled('tipo_empleado'), function ($q) use ($request) {
-    //                 $q->where('a.tipo_empleado', $request->tipo_empleado);
-    //             })
-    //             ->when($request->filled('tipo_obra'), function ($q) use ($request) {
-    //                 $q->where('a.tipo_obra', $request->tipo_obra);
-    //             })
-
-    //             ->orderBy('a.fecha_ingreso', 'desc')
-    //             ->orderBy('a.hora_ingreso', 'desc')
-    //             ->get();
-
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'total' => $reporte->count(),
-    //             'data' => $reporte
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'Error al generar el reporte: ' . $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
 
     public function reporteAsistencia(Request $request)
     {
@@ -471,7 +349,6 @@ class ControlAsistenciasController extends Controller
             ], 400);
         }
 
-
         $asistencias = DB::connection('mysql')
             ->table('asistencias_th')
             //empleado
@@ -483,15 +360,8 @@ class ControlAsistenciasController extends Controller
                 $join->on('asistencias_th.empleado_id', '=', 'et.id')
                     ->where('asistencias_th.tipo_empleado', 2);
             })
-            //proyecto
-            ->leftJoin('proyecto', function ($join) {
-                $join->on('asistencias_th.obra_id', '=', 'proyecto.id')
-                    ->where('asistencias_th.tipo_obra', 1);
-            })
-            ->leftJoin('proyectos_casas', function ($join) {
-                $join->on('asistencias_th.obra_id', '=', 'proyectos_casas.id')
-                    ->where('asistencias_th.tipo_obra', 2);
-            })
+            //proyecto - AHORA SOLO CON bodegas_area
+            ->leftJoin('bodegas_area as ba', 'asistencias_th.obra_id', '=', 'ba.id')
             //cargo
             ->leftJoin('cargos_th as c', function ($join) {
                 $join->on('ep.cargo_id', '=', 'c.id')
@@ -508,43 +378,36 @@ class ControlAsistenciasController extends Controller
                 'asistencias_th.fecha_salida',
                 'asistencias_th.hora_salida',
                 'asistencias_th.horas_laborales',
-                'asistencias_th.tipo_obra',
                 'asistencias_th.tipo_empleado',
 
                 // Datos del empleado
                 DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_empleado = 1 THEN ep.nombre_completo
-                    WHEN asistencias_th.tipo_empleado = 2 THEN et.nombre_completo
-                END as nombre_completo
-            "),
+            CASE 
+                WHEN asistencias_th.tipo_empleado = 1 THEN ep.nombre_completo
+                WHEN asistencias_th.tipo_empleado = 2 THEN et.nombre_completo
+            END as nombre_completo
+        "),
                 DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_empleado = 1 THEN ep.identificacion
-                    WHEN asistencias_th.tipo_empleado = 2 THEN et.identificacion
-                END as identificacion
-            "),
+            CASE 
+                WHEN asistencias_th.tipo_empleado = 1 THEN ep.identificacion
+                WHEN asistencias_th.tipo_empleado = 2 THEN et.identificacion
+            END as identificacion
+        "),
                 DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_empleado = 1 THEN ep.tipo_documento
-                    WHEN asistencias_th.tipo_empleado = 2 THEN et.tipo_documento
-                END as tipo_documento
-            "),
+            CASE 
+                WHEN asistencias_th.tipo_empleado = 1 THEN ep.tipo_documento
+                WHEN asistencias_th.tipo_empleado = 2 THEN et.tipo_documento
+            END as tipo_documento
+        "),
                 DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_empleado = 1 THEN ep.telefono_celular
-                    WHEN asistencias_th.tipo_empleado = 2 THEN et.telefono_celular
-                END as telefono_celular
-            "),
+            CASE 
+                WHEN asistencias_th.tipo_empleado = 1 THEN ep.telefono_celular
+                WHEN asistencias_th.tipo_empleado = 2 THEN et.telefono_celular
+            END as telefono_celular
+        "),
 
-                // Información de la obra
-                DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_obra = 1 THEN proyecto.descripcion_proyecto
-                    WHEN asistencias_th.tipo_obra = 2 THEN proyectos_casas.descripcion_proyecto
-                    ELSE 'Sin obra asignada'
-                END as nombre_obra
-            "),
+                // Información de la obra - AHORA SOLO DESDE bodegas_area
+                'ba.nombre as nombre_obra',
 
                 // Información del contratista
                 'cont.contratista as nombre_contratista',
@@ -555,21 +418,12 @@ class ControlAsistenciasController extends Controller
 
                 // Tipo de empleado como texto
                 DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
-                    WHEN asistencias_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
-                    ELSE 'Desconocido'
-                END as tipo_empleado_texto
-            "),
-
-                // Tipo de obra como texto
-                DB::raw("
-                CASE 
-                    WHEN asistencias_th.tipo_obra = 1 THEN 'Apartamentos'
-                    WHEN asistencias_th.tipo_obra = 2 THEN 'Casas'
-                    ELSE 'Desconocido'
-                END as tipo_obra_texto
-            ")
+            CASE 
+                WHEN asistencias_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
+                WHEN asistencias_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
+                ELSE 'Desconocido'
+            END as tipo_empleado_texto
+        ")
             )
             ->whereBetween('asistencias_th.fecha_ingreso', [$fechaInicio, $fechaFin])
             ->orderBy('asistencias_th.fecha_ingreso', 'desc')
