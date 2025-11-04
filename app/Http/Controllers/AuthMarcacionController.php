@@ -228,6 +228,39 @@ class AuthMarcacionController extends Controller
         ], 201);
     }
 
+    // public function registarUbicacionObra(Request $request)
+    // {
+    //     $request->validate([
+    //         'serial' => 'required|string',
+    //         'bodega_id' => 'required',
+    //         'latitude' => 'required',
+    //         'longitude' => 'required',
+    //     ]);
+
+    //     // Obtener el ID del teléfono a partir del serial
+    //     $telefono = MaTelefono::where('serial_email', $request->serial)->first();
+
+    //     if (!$telefono) {
+    //         return response()->json([
+    //             'message' => 'El teléfono no está registrado.',
+    //         ], 404);
+    //     }
+
+
+    //     $sede = UbicacionObraTh::create([
+    //         'latitud' => $request->latitude,
+    //         'longitud' => $request->longitude,
+    //         'serial' => $request->serial,
+    //         'obra_id' => $request->bodega_id,
+    //         'user_id' => Auth::id()
+    //     ]);
+
+    //     return response()->json([
+    //         'message' => 'Ubicacion registrada exitosamente.',
+    //         'sede' => $sede
+    //     ], 201);
+    // }
+
     public function registarUbicacionObra(Request $request)
     {
         $request->validate([
@@ -246,7 +279,17 @@ class AuthMarcacionController extends Controller
             ], 404);
         }
 
+        // Verificar si ya existe una ubicación para esta obra
+        $ubicacionExistente = UbicacionObraTh::where('obra_id', $request->bodega_id)->first();
 
+        if ($ubicacionExistente) {
+            // Si ya existe, retornar éxito sin mensaje
+            return response()->json([
+                'message' => 'OK',
+            ], 200);
+        }
+
+        // Solo crear nueva ubicación si no existe
         $sede = UbicacionObraTh::create([
             'latitud' => $request->latitude,
             'longitud' => $request->longitude,
