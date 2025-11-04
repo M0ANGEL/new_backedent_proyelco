@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('documentacion_operadores', function (Blueprint $table) {
             $table->id();
+            $table->string('nombre_etapa', 200);
             $table->string('codigo_proyecto', 10);
             $table->string('codigo_documento', 100);
             $table->tinyInteger('etapa');

@@ -70,6 +70,7 @@ class UserController extends Controller
                 'cargos'   => ['required'],
                 'perfiles' => ['required'],
                 'correo' => ['nullable', 'email', 'max:255'],
+                'can_config_telefono' => ['integer'],
             ]);
 
             $cargoName = Cargo::where('id',$request->cargos)->first();
@@ -86,6 +87,7 @@ class UserController extends Controller
             $user->image = 'img/default.png';
             $user->last_login = now();
             $user->correo = $data['correo'];
+             $user->can_config_telefono =  $data['can_config_telefono'];
             $user->save();
 
 
@@ -204,6 +206,7 @@ class UserController extends Controller
                 'created_at' => ['sometimes', 'date'],
                 'updated_at' => ['sometimes', 'date'],
                 'correo' => ['nullable', 'email', 'max:255'],
+                'can_config_telefono' => ['integer'],
             ]);
 
             // Verificar que no se actualice el estado o el username

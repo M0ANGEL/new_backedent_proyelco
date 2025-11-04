@@ -11,13 +11,14 @@ class Documentos extends Model
 
     protected $table = 'documentacion_operadores';
     protected $fillable = [
+        'nombre_etapa',
         'codigo_proyecto',
         'codigo_documento',
         'etapa',
-        'actividad_id',
-        'actividad_depende_id',
         'tipo',
         'orden',
+        'actividad_id',
+        'actividad_depende_id',
         'fecha_proyeccion',
         'fecha_actual',
         'fecha_confirmacion',
