@@ -37,6 +37,7 @@ class User extends Authenticatable
         'created_at',
         'updated_at',
         'correo',
+        'can_config_telefono'
     ];
 
     /**
