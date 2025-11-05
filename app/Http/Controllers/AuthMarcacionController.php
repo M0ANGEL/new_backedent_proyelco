@@ -246,7 +246,17 @@ class AuthMarcacionController extends Controller
     //         ], 404);
     //     }
 
+    //     // Verificar si ya existe una ubicación para esta obra
+    //     $ubicacionExistente = UbicacionObraTh::where('obra_id', $request->bodega_id)->first();
 
+    //     if ($ubicacionExistente) {
+    //         // Si ya existe, retornar éxito sin mensaje
+    //         return response()->json([
+    //             'message' => 'OK',
+    //         ], 200);
+    //     }
+
+    //     // Solo crear nueva ubicación si no existe
     //     $sede = UbicacionObraTh::create([
     //         'latitud' => $request->latitude,
     //         'longitud' => $request->longitude,
@@ -270,7 +280,6 @@ class AuthMarcacionController extends Controller
             'longitude' => 'required',
         ]);
 
-        // Obtener el ID del teléfono a partir del serial
         $telefono = MaTelefono::where('serial_email', $request->serial)->first();
 
         if (!$telefono) {
@@ -279,30 +288,42 @@ class AuthMarcacionController extends Controller
             ], 404);
         }
 
-        // Verificar si ya existe una ubicación para esta obra
         $ubicacionExistente = UbicacionObraTh::where('obra_id', $request->bodega_id)->first();
+        $userId = (string) Auth::id(); // convertir siempre a string
 
         if ($ubicacionExistente) {
-            // Si ya existe, retornar éxito sin mensaje
+            // Decodificar permisos existentes
+            $permisos = json_decode($ubicacionExistente->usuarios_permisos, true) ?? [];
+
+            // Agregar el ID solo si no existe (en formato string)
+            if (!in_array($userId, $permisos)) {
+                $permisos[] = $userId;
+                $ubicacionExistente->usuarios_permisos = json_encode($permisos, JSON_UNESCAPED_UNICODE);
+                $ubicacionExistente->save();
+            }
+
             return response()->json([
                 'message' => 'OK',
             ], 200);
         }
 
-        // Solo crear nueva ubicación si no existe
+        // Crear nueva sede con el ID actual en formato string
         $sede = UbicacionObraTh::create([
             'latitud' => $request->latitude,
             'longitud' => $request->longitude,
             'serial' => $request->serial,
             'obra_id' => $request->bodega_id,
-            'user_id' => Auth::id()
+            'user_id' => Auth::id(),
+            'usuarios_permisos' => json_encode([$userId], JSON_UNESCAPED_UNICODE),
         ]);
 
         return response()->json([
-            'message' => 'Ubicacion registrada exitosamente.',
+            'message' => 'Ubicación registrada exitosamente.',
             'sede' => $sede
         ], 201);
     }
+
+
 
     public function obrasApp()
     {

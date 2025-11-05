@@ -19,5 +19,6 @@ class UbicacionObraTh extends Model
         'tipo_obra',
         'obra_id',
         'estado',
+        'usuarios_permisos',
     ];
 }
