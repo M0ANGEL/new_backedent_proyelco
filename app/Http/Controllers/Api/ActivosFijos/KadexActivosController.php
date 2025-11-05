@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Svg\Tag\Rect;
 
 class KadexActivosController extends Controller
 {
@@ -324,14 +325,14 @@ class KadexActivosController extends Controller
         ]);
     }
 
-    public function aceptarActivo($id)
+    public function aceptarActivo(Request $request)
     {
         $userId = (string) Auth::id(); // forzar a string
 
         $activo = Activo::where(function ($query) use ($userId) {
             $query->whereRaw("JSON_CONTAINS(usuarios_asignados, '\"$userId\"')");
         })
-            ->where('id', $id)
+            ->where('id', $request->id)
             ->where('aceptacion', 1)
             ->firstOrFail();
 
@@ -356,8 +357,9 @@ class KadexActivosController extends Controller
         $activo->save();
 
         //actualizar kardex
-        $cliente = KadexActivosModel::where('activo_id', $id)->where('aceptacion', 1)->first();
+        $cliente = KadexActivosModel::where('activo_id', $request->id)->where('aceptacion', 1)->first();
         $cliente->usuarios_confirmaron = $usuariosConfirmaron;
+        $cliente->observacion_aceptado = $request->observacion;
         $cliente->aceptacion = 2;
 
         $cliente->save(); // se guarda para obtener el ID
