@@ -223,7 +223,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     Route::get('administar-mis-activos', [KadexActivosController::class, 'misActivos']);
     Route::get('activo-pendientes', [KadexActivosController::class, 'activosSinConfirmar']);
-    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class, 'aceptarActivo']);
+    Route::post('activo-aceptarActivo', [KadexActivosController::class, 'aceptarActivo']);
     Route::post('activo-rechazarActivo', [KadexActivosController::class, 'rechazarActivo']);
     Route::get('activo-informacion/{id}', [KadexActivosController::class, 'infoActivo']);
     Route::get('mensajero-activos', [KadexActivosController::class, 'mensajero']);
@@ -280,6 +280,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
     Route::post('/registrar-sede', [AuthMarcacionController::class, 'registarUbicacionObra']);
     Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
+    Route::get('/obras-app-permisos', [AuthMarcacionController::class, 'permisoObras']);
+    Route::post('/darPermisosObrasAsistencia', [AuthMarcacionController::class, 'darPermisosObrasAsistencia']);
 
     //marcacion
     Route::post('consultar-cedula', [ControlAsistenciasController::class, 'consultarUsuario']);
