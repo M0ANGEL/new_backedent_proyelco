@@ -21,6 +21,7 @@ class DocumentosController extends Controller
     public function StoreDocumentacionRed(Request $request)
     {
 
+        info($request->all());
         // Buscar primero en Proyectos
         $datosBusqueda = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)->first();
 
@@ -67,6 +68,12 @@ class DocumentosController extends Controller
         }
 
         $cronogramaGenerado = null;
+
+        //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
+        if ($request->requiereOrganismos == "1") {
+            $this->documentosOrganismos($request->organismoInspeccion);
+        }
+
 
         //OPERADORES DE RED
         //APARTAMENTOS
@@ -453,7 +460,7 @@ class DocumentosController extends Controller
                     $request->actividad_id . '.' .
                     $archivo->getClientOriginalExtension();
 
-                    /* la foto se guarda con codigo_proyecto-codigo_documento-etapa-actividad_id.ex */
+                /* la foto se guarda con codigo_proyecto-codigo_documento-etapa-actividad_id.ex */
 
                 // Guardar en la ruta especificada
                 $ruta = $archivo->storeAs(
@@ -720,4 +727,11 @@ class DocumentosController extends Controller
     }
 
     //FIN CONFIRMACION EMCALI
+
+    //CRER ORGANISMO RITEL RETIE RETIALP
+    private function documentosOrganismos($data)
+    {
+        info("organismos");
+        info($data);
+    }
 }

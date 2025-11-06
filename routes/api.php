@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\ApkController;
 use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\FichaObra\FichaObraController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
 use App\Http\Controllers\AuthMarcacionController;
 use App\Http\Controllers\ContratistasController;
+use App\Models\LinkDescargaAPK;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
@@ -321,18 +323,22 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
 
     //docuemntacion de proyectos
-    Route::get('gestion-documentos-emcali',[DocumentosController::class, 'indexEmcali']);
-    Route::get('gestion-documentos-celsia',[DocumentosController::class, 'indexCELSIA']);
-    Route::get('gestion-documentosDetalle/{codigo_documento}',[DocumentosController::class,'detalleDocumentos']);
-    Route::get('gestion-documentos-proyectos',[DocumentosController::class,'proyectosCodigo']);
-    Route::post('StoreDocumentacionRed',[DocumentosController::class,'StoreDocumentacionRed']);
-    Route::post('gestion-documentos-confirmar',[DocumentosController::class,'confirmarDocumento']);
+    Route::get('gestion-documentos-emcali', [DocumentosController::class, 'indexEmcali']);
+    Route::get('gestion-documentos-celsia', [DocumentosController::class, 'indexCELSIA']);
+    Route::get('gestion-documentos-organismo', [DocumentosController::class, 'indexCELSIA']);
+    Route::get('gestion-documentosDetalle/{codigo_documento}', [DocumentosController::class, 'detalleDocumentos']);
+    Route::get('gestion-documentos-proyectos', [DocumentosController::class, 'proyectosCodigo']);
+    Route::post('StoreDocumentacionRed', [DocumentosController::class, 'StoreDocumentacionRed']);
+    Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
 
 
     //CONTABILIDAD
     //control de gasolina
-    Route::get('placas-carros',[ControlGasolinaController::class,'placas']);
-    Route::get('conductores',[ControlGasolinaController::class,'conductores']);
-    Route::post('dataControlGasolina',[ControlGasolinaController::class,'dataControlGasolina']);
+    Route::get('placas-carros', [ControlGasolinaController::class, 'placas']);
+    Route::get('conductores', [ControlGasolinaController::class, 'conductores']);
+    Route::post('dataControlGasolina', [ControlGasolinaController::class, 'dataControlGasolina']);
 
+    //link descargas apk (funcion en ruta)
+    Route::get('link-descargas', [ApkController::class, 'index']);
+    Route::get('descargar-apk', [APKController::class, 'descargarAPK'])->name('descargar.apk');
 });
