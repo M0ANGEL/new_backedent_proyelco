@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CargoController;
 use App\Http\Controllers\Api\CargueMasivo\CarguesMasivosCotroller;
 use App\Http\Controllers\Api\Clientes\ClientesController;
 use App\Http\Controllers\Api\Compras\CargueComprasController;
+use App\Http\Controllers\Api\Contabilidad\ControlGasolinaController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Documentos\DocumentosController;
 use App\Http\Controllers\Api\EmpresaController;
@@ -327,5 +328,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('StoreDocumentacionRed',[DocumentosController::class,'StoreDocumentacionRed']);
     Route::post('gestion-documentos-confirmar',[DocumentosController::class,'confirmarDocumento']);
 
+
+    //CONTABILIDAD
+    //control de gasolina
+    Route::get('placas-carros',[ControlGasolinaController::class,'placas']);
+    Route::get('conductores',[ControlGasolinaController::class,'conductores']);
+    Route::post('dataControlGasolina',[ControlGasolinaController::class,'dataControlGasolina']);
 
 });

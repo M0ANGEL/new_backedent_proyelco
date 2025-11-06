@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\TalentoHumano\Asistencia;
 
 use App\Http\Controllers\Controller;
+use App\Models\EmpleadoProyelco;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -349,6 +350,8 @@ class ControlAsistenciasController extends Controller
             ], 400);
         }
 
+        $totalPersonalProyelco = EmpleadoProyelco::where('estado',1)->count();
+
         $asistencias = DB::connection('mysql')
             ->table('asistencias_th')
             //empleado
@@ -432,7 +435,8 @@ class ControlAsistenciasController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $asistencias
+            'data' => $asistencias,
+            'totalPersonalProyelco' => $totalPersonalProyelco
         ]);
     }
 }
