@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\LinkDescargaAPK;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class ApkController extends Controller
 {
-    public function index(){
+    public function index()
+    {
 
 
-         $data = LinkDescargaAPK::where('estado', 1)->get();
+        $data = LinkDescargaAPK::where('estado', 1)->get();
 
         return response()->json([
             'status' => 'success',
@@ -21,19 +23,38 @@ class ApkController extends Controller
     }
 
     //desacrgue un acrhivo apk que esta en storage/app/public/apk/apk asistencias 4-nov-2025.apk
-    public function descargarAPK()
+    public function linkDescargaAPK(Request $request)
     {
-        $path = 'public/apk/apk asistencias 4-nov-2025.apk';
+        // Verificamos el token del usuario (si usas Sanctum o JWT)
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'No autorizado'], 401);
+        }
 
+        // Generamos un enlace temporal firmado válido por 2 minutos
+        $url = URL::temporarySignedRoute(
+            'descargar.apk.firmado',
+            now()->addMinutes(2)
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'url' => $url
+        ]);
+    }
+
+    public function descargarAPKFirmado(Request $request)
+    {
+        if (!$request->hasValidSignature()) {
+            return response()->json(['error' => 'Enlace inválido o expirado'], 403);
+        }
+
+        $path = 'public/apk/apk asistencias 4-nov-2025.apk';
         if (!Storage::exists($path)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'El archivo no existe.'
-            ], 404);
+            return response()->json(['error' => 'Archivo no encontrado'], 404);
         }
 
         $filePath = Storage::path($path);
-
         return response()->download($filePath, 'asistencias.apk', [
             'Content-Type' => 'application/vnd.android.package-archive',
         ]);

@@ -340,5 +340,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //link descargas apk (funcion en ruta)
     Route::get('link-descargas', [ApkController::class, 'index']);
-    Route::get('descargar-apk', [APKController::class, 'descargarAPK'])->name('descargar.apk');
 });
+
+Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
+Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado'])
+    ->name('descargar.apk.firmado');
