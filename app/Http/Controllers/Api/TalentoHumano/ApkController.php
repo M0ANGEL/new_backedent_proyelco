@@ -49,7 +49,7 @@ class ApkController extends Controller
             return response()->json(['error' => 'Enlace inválido o expirado'], 403);
         }
 
-        $path = 'public/apk/apk asistencias 4-nov-2025.apk';
+        $path = 'public/apk/apk-4-nov-2025.apk';
         if (!Storage::exists($path)) {
             return response()->json(['error' => 'Archivo no encontrado'], 404);
         }
