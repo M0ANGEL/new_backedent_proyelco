@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Documentos;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActividadesOrganismos;
 use App\Models\Documentos;
+use App\Models\DocumentosOrganismos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
 use Exception;
@@ -21,7 +23,12 @@ class DocumentosController extends Controller
     public function StoreDocumentacionRed(Request $request)
     {
 
-        info($request->all());
+
+        //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
+        if ($request->requiereOrganismos == "1") {
+            $this->documentosOrganismos($request);
+        }
+
         // Buscar primero en Proyectos
         $datosBusqueda = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)->first();
 
@@ -69,10 +76,10 @@ class DocumentosController extends Controller
 
         $cronogramaGenerado = null;
 
-        //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
-        if ($request->requiereOrganismos == "1") {
-            $this->documentosOrganismos($request->organismoInspeccion);
-        }
+        // //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
+        // if ($request->requiereOrganismos == "1") {
+        //     $this->documentosOrganismos($request->organismoInspeccion);
+        // }
 
 
         //OPERADORES DE RED
@@ -373,12 +380,67 @@ class DocumentosController extends Controller
     }
 
 
+    //CONSULTA DOCUMENTACION EMCALI
+    public function indexORGANISMOS($operador = null)
+    {
+        $query = Proyectos::with(['documentosOrganismos' => function ($query) use ($operador) {
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+                ->when($operador, function ($q) use ($operador) {
+                    $q->where('operador', $operador);
+                })
+                ->distinct();
+        }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
+            if ($operador) {
+                $query->where('operador', $operador);
+            }
+        });
+
+        $proyectosApartamentos = $query->get();
+
+        // Similar para ProyectoCasa...
+        // $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => function ($query) use ($operador) {
+        //     $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+        //         ->when($operador, function ($q) use ($operador) {
+        //             $q->where('operador', $operador);
+        //         })
+        //         ->distinct();
+        // }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
+        //     if ($operador) {
+        //         $query->where('operador', $operador);
+        //     }
+        // })->get();
+
+        // $data = $proyectosApartamentos->merge($proyectosCasas);
+        $data = $proyectosApartamentos;
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data
+        ]);
+    }
+
+
     //se envia codigo de proyecto pero se cambia por codigo del documento
     //para traer datos unicos
     public function detalleDocumentos($codigo_documento)
     {
 
         $data = Documentos::with('actividad') // Asegúrate de tener esta relación
+            ->where('codigo_documento', $codigo_documento)
+            ->orderBy('orden')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data
+        ]);
+    }
+
+
+    public function detalleDocumentosOrganismos($codigo_documento)
+    {
+
+        $data = DocumentosOrganismos::with('actividad') // Asegúrate de tener esta relación
             ->where('codigo_documento', $codigo_documento)
             ->orderBy('orden')
             ->get();
@@ -729,9 +791,311 @@ class DocumentosController extends Controller
     //FIN CONFIRMACION EMCALI
 
     //CRER ORGANISMO RITEL RETIE RETIALP
+    // private function documentosOrganismos($data)
+    // {
+    //     info("organismo--------");
+    //     $etapa = $data->etapaProyecto;
+    //     $nombre_etapa = $data->nombre_etapa;
+    //     $codigoDocumentos = $data->codigoDocumentos;
+    //     $codigo_proyecto = $data->codigo_proyecto;
+    //     $organismoInspeccion = $data->organismoInspeccion;
+    //     $fechaEntrega = $data->fechaEntrega;
+    //     $usuarioId = $data->usuarioId;
+
+    //     // Usar el modelo correcto - ActividadesOrganismos
+    //     $dataActividades = ActividadesOrganismos::where('estado', 1)->get();
+
+    //     // Mapeo de organismos
+    //     $organismosMap = [
+    //         1 => 'RETIE',
+    //         2 => 'RITEL',
+    //         3 => 'RETIALP'
+    //     ];
+
+    //     $operadoresMap = [
+    //         'RETIE' => 1,
+    //         'RITEL' => 2,
+    //         'RETIALP' => 3
+    //     ];
+
+    //     $documentosInsertados = [];
+
+    //     foreach ($organismoInspeccion as $organismoId) {
+    //         $nombreOrganismo = $organismosMap[$organismoId] ?? null;
+    //         $operador = $operadoresMap[$nombreOrganismo] ?? null;
+
+    //         if (!$nombreOrganismo || !$operador) {
+    //             info("Organismo no válido ID: $organismoId");
+    //             continue;
+    //         }
+
+    //         info("Procesando organismo: $nombreOrganismo (ID: $organismoId, Operador: $operador)");
+
+    //         // Obtener actividades principales para este operador (tipo = 1)
+    //         $actividadesPrincipales = $dataActividades
+    //             ->where('operador', $operador)
+    //             ->where('tipo', 1) // Actividades principales
+    //             ->sortBy('id');
+
+    //         info("Actividades principales encontradas para $nombreOrganismo: " . $actividadesPrincipales->count());
+
+    //         $orden = 1;
+
+    //         foreach ($actividadesPrincipales as $actividadPrincipal) {
+    //             info("Procesando actividad principal ID: {$actividadPrincipal->id} - {$actividadPrincipal->actividad}");
+
+    //             // Insertar actividad principal
+    //             $documentoPrincipalId = DB::table('documentos_organismos')->insertGetId([
+    //                 'nombre_etapa' => $nombre_etapa,
+    //                 'codigo_proyecto' => $codigo_proyecto,
+    //                 'codigo_documento' => $codigoDocumentos,
+    //                 'etapa' => $etapa,
+    //                 'actividad_id' => $actividadPrincipal->id,
+    //                 'actividad_depende_id' => null,
+    //                 'tipo' => 'principal',
+    //                 'orden' => $orden,
+    //                 'fecha_confirmacion' => $fechaEntrega,
+    //                 'usuario_id' => $usuarioId,
+    //                 'operador' => $operador,
+    //                 'observacion' => null,
+    //                 'estado' => 0,
+    //                 'created_at' => now(),
+    //                 'updated_at' => now(),
+    //             ]);
+
+    //             $documentosInsertados[] = $documentoPrincipalId;
+    //             info("Insertada actividad principal ID: $documentoPrincipalId");
+
+    //             // Buscar actividades de tipo 2 (con hijos) para esta actividad principal
+    //             $actividadesConHijos = $dataActividades
+    //                 ->where('operador', $operador)
+    //                 ->where('tipo', 2) // Actividades con hijos
+    //                 ->where('padre', $actividadPrincipal->id)
+    //                 ->sortBy('id');
+
+    //             $ordenIntermedio = 1;
+
+    //             foreach ($actividadesConHijos as $actividadConHijos) {
+    //                 info("Procesando actividad con hijos ID: {$actividadConHijos->id} - {$actividadConHijos->actividad}");
+
+    //                 // Insertar actividad intermedia (tipo 2)
+    //                 $documentoIntermedioId = DB::table('documentos_organismos')->insertGetId([
+    //                     'nombre_etapa' => $nombre_etapa,
+    //                     'codigo_proyecto' => $codigo_proyecto,
+    //                     'codigo_documento' => $codigoDocumentos,
+    //                     'etapa' => $etapa,
+    //                     'actividad_id' => $actividadConHijos->id,
+    //                     'actividad_depende_id' => $actividadPrincipal->id,
+    //                     'tipo' => 'con_hijos',
+    //                     'orden' => $ordenIntermedio,
+    //                     'fecha_confirmacion' => $fechaEntrega,
+    //                     'usuario_id' => $usuarioId,
+    //                     'operador' => $operador,
+    //                     'observacion' => null,
+    //                     'estado' => 0,
+    //                     'created_at' => now(),
+    //                     'updated_at' => now(),
+    //                 ]);
+
+    //                 $documentosInsertados[] = $documentoIntermedioId;
+
+    //                 // Buscar actividades hijas (tipo 3) para esta actividad intermedia
+    //                 $actividadesHijas = $dataActividades
+    //                     ->where('operador', $operador)
+    //                     ->where('tipo', 3) // Actividades hijas
+    //                     ->where('padre', $actividadConHijos->id)
+    //                     ->sortBy('id');
+
+    //                 $ordenHijo = 1;
+
+    //                 foreach ($actividadesHijas as $actividadHija) {
+    //                     info("Procesando actividad hija ID: {$actividadHija->id} - {$actividadHija->actividad}");
+
+    //                     // Insertar actividad hija
+    //                     $documentoHijoId = DB::table('documentos_organismos')->insertGetId([
+    //                         'nombre_etapa' => $nombre_etapa,
+    //                         'codigo_proyecto' => $codigo_proyecto,
+    //                         'codigo_documento' => $codigoDocumentos,
+    //                         'etapa' => $etapa,
+    //                         'actividad_id' => $actividadHija->id,
+    //                         'actividad_depende_id' => $actividadConHijos->id,
+    //                         'tipo' => 'hijos',
+    //                         'orden' => $ordenHijo,
+    //                         'fecha_confirmacion' => $fechaEntrega,
+    //                         'usuario_id' => $usuarioId,
+    //                         'operador' => $operador,
+    //                         'observacion' => null,
+    //                         'estado' => 0,
+    //                         'created_at' => now(),
+    //                         'updated_at' => now(),
+    //                     ]);
+
+    //                     $documentosInsertados[] = $documentoHijoId;
+    //                     $ordenHijo++;
+    //                 }
+
+    //                 $ordenIntermedio++;
+    //             }
+
+    //             // También buscar actividades hijas directas (tipo 3) que apunten a la actividad principal
+    //             $actividadesHijasDirectas = $dataActividades
+    //                 ->where('operador', $operador)
+    //                 ->where('tipo', 3)
+    //                 ->where('padre', $actividadPrincipal->id)
+    //                 ->sortBy('id');
+
+    //             $ordenHijoDirecto = 1;
+
+    //             foreach ($actividadesHijasDirectas as $actividadHijaDirecta) {
+    //                 info("Procesando actividad hija directa ID: {$actividadHijaDirecta->id} - {$actividadHijaDirecta->actividad}");
+
+    //                 // Insertar actividad hija directa
+    //                 $documentoHijoDirectoId = DB::table('documentos_organismos')->insertGetId([
+    //                     'nombre_etapa' => $nombre_etapa,
+    //                     'codigo_proyecto' => $codigo_proyecto,
+    //                     'codigo_documento' => $codigoDocumentos,
+    //                     'etapa' => $etapa,
+    //                     'actividad_id' => $actividadHijaDirecta->id,
+    //                     'actividad_depende_id' => $actividadPrincipal->id,
+    //                     'tipo' => 'hijos',
+    //                     'orden' => $ordenHijoDirecto,
+    //                     'fecha_confirmacion' => $fechaEntrega,
+    //                     'usuario_id' => $usuarioId,
+    //                     'operador' => $operador,
+    //                     'observacion' => null,
+    //                     'estado' => 0,
+    //                     'created_at' => now(),
+    //                     'updated_at' => now(),
+    //                 ]);
+
+    //                 $documentosInsertados[] = $documentoHijoDirectoId;
+    //                 $ordenHijoDirecto++;
+    //             }
+
+    //             $orden++;
+    //         }
+
+    //         info("Organismo $nombreOrganismo procesado con " . $actividadesPrincipales->count() . " actividades principales");
+    //     }
+
+    //     info("Total de documentos insertados: " . count($documentosInsertados));
+
+    //     return [
+    //         'success' => true,
+    //         'documentos_insertados' => count($documentosInsertados),
+    //         'ids_documentos' => $documentosInsertados
+    //     ];
+    // }
+
+
     private function documentosOrganismos($data)
     {
-        info("organismos");
-        info($data);
+        info("organismo--------");
+        $etapa = $data->etapaProyecto;
+        $nombre_etapa = $data->nombre_etapa;
+        $codigoDocumentos = $data->codigoDocumentos;
+        $codigo_proyecto = $data->codigo_proyecto;
+        $organismoInspeccion = $data->organismoInspeccion;
+        $fechaEntrega = $data->fechaEntrega;
+        $usuarioId = $data->usuarioId;
+
+        // Usar el modelo correcto - ActividadesOrganismos
+        $dataActividades = ActividadesOrganismos::where('estado', 1)->get();
+
+        // Mapeo de organismos
+        $organismosMap = [
+            1 => 'RETIE',
+            2 => 'RITEL',
+            3 => 'RETIALP'
+        ];
+
+        $operadoresMap = [
+            'RETIE' => 1,
+            'RITEL' => 2,
+            'RETIALP' => 3
+        ];
+
+        $documentosInsertados = [];
+
+        foreach ($organismoInspeccion as $organismoId) {
+            $nombreOrganismo = $organismosMap[$organismoId] ?? null;
+            $operador = $operadoresMap[$nombreOrganismo] ?? null;
+
+            if (!$nombreOrganismo || !$operador) {
+                info("Organismo no válido ID: $organismoId");
+                continue;
+            }
+
+            info("Procesando organismo: $nombreOrganismo (ID: $organismoId, Operador: $operador)");
+
+            // Obtener TODAS las actividades para este operador
+            $actividadesOperador = $dataActividades
+                ->where('operador', $operador)
+                ->sortBy('id');
+
+            info("Total actividades encontradas para $nombreOrganismo: " . $actividadesOperador->count());
+
+            $orden = 1;
+
+            foreach ($actividadesOperador as $actividad) {
+                info("Procesando actividad ID: {$actividad->id} - {$actividad->actividad} - Tipo: {$actividad->tipo}");
+
+                // Determinar el tipo para documentos_organismos
+                $tipoDocumento = '';
+                switch ($actividad->tipo) {
+                    case 1:
+                        $tipoDocumento = 'principal';
+                        break;
+                    case 2:
+                        $tipoDocumento = 'principal_hijos';
+                        break;
+                    case 3:
+                        $tipoDocumento = 'hijos';
+                        break;
+                }
+
+                // Determinar actividad_depende_id
+                $actividadDependeId = null;
+                if ($actividad->tipo == 3 && !empty($actividad->padre)) {
+                    // Para actividades tipo 3 (hijos), usar el padre
+                    $actividadDependeId = $actividad->padre;
+                }
+                // Para actividades tipo 1 y 2, actividad_depende_id queda como null
+
+                // Insertar la actividad
+                $documentoId = DB::table('documentos_organismos')->insertGetId([
+                    'nombre_etapa' => $nombre_etapa,
+                    'codigo_proyecto' => $codigo_proyecto,
+                    'codigo_documento' => $codigoDocumentos,
+                    'etapa' => $etapa,
+                    'actividad_id' => $actividad->id,
+                    'actividad_depende_id' => $actividadDependeId,
+                    'tipo' => $tipoDocumento,
+                    'orden' => $orden,
+                    'fecha_confirmacion' => $fechaEntrega,
+                    'usuario_id' => $usuarioId,
+                    'operador' => $operador,
+                    'observacion' => null,
+                    'estado' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $documentosInsertados[] = $documentoId;
+                info("Insertada actividad ID: $documentoId - Tipo: $tipoDocumento - Depende de: " . ($actividadDependeId ?? 'Ninguno'));
+
+                $orden++;
+            }
+
+            info("Organismo $nombreOrganismo procesado con " . $actividadesOperador->count() . " actividades");
+        }
+
+        info("Total de documentos insertados: " . count($documentosInsertados));
+
+        return [
+            'success' => true,
+            'documentos_insertados' => count($documentosInsertados),
+            'ids_documentos' => $documentosInsertados
+        ];
     }
 }
