@@ -28,7 +28,12 @@ class ProyectoCasa extends Model
     ];
 
     public function documentacion()
-{
-    return $this->hasMany(Documentos::class, 'codigo_proyecto', 'codigo_proyecto');
-}
+    {
+        return $this->hasMany(Documentos::class, 'codigo_proyecto', 'codigo_proyecto');
+    }
+
+    public function documentosOrganismos()
+    {
+        return $this->hasMany(DocumentosOrganismos::class, 'codigo_proyecto', 'codigo_proyecto');
+    }
 }

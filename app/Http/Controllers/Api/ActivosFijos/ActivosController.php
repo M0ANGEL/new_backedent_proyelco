@@ -9,43 +9,144 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 
 class ActivosController extends Controller
 {
-    public function index()
-    {
-        //consulta a la bd los clientes
-        $clientes = DB::connection('mysql')
+    // public function index()
+    // {
+    //     //consulta a la bd los clientes
+    //     $clientes = DB::connection('mysql')
+    //         ->table('activo')
+    //         ->join('users', 'activo.user_id', '=', 'users.id')
+    //         ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+    //         ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+    //         ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+    //         ->select(
+    //             'activo.*',
+    //             'users.nombre as usuario',
+    //             'categoria_activos.nombre as categoria',
+    //             'subcategoria_activos.nombre as subcategoria',
+    //             'bodegas_area.nombre as bodega_actual'
+    //         )
+    //         ->where('activo.estado', 1)
+    //         ->get();
+
+    //     foreach ($clientes as $proyecto) {
+    //         $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+    //         $proyecto->usuariosAsignados = DB::table('users')
+    //             ->whereIn('id', $encargadoIds)
+    //             ->pluck('nombre');
+    //     }
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $clientes
+    //     ]);
+    // }
+
+    public function index(Request $request)
+{
+    try {
+        $perPage = $request->get('per_page', 50);
+        $page = $request->get('page', 1);
+        $search = $request->get('search', '');
+
+        // ✅ CONSULTA OPTIMIZADA con índices
+        $query = DB::connection('mysql')
             ->table('activo')
-            ->join('users', 'activo.user_id', '=', 'users.id')
-            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
-            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
-            ->select(
-                'activo.*',
+            ->select([
+                'activo.id',
+                'activo.numero_activo',
+                'activo.descripcion',
+                'activo.valor',
+                'activo.condicion',
+                'activo.estado',
+                'activo.tipo_activo',
+                'activo.aceptacion',
+                'activo.usuarios_asignados',
+                'activo.created_at',
+                'activo.updated_at',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
                 'bodegas_area.nombre as bodega_actual'
-            )
-            ->where('activo.estado', 1)
-            ->get();
+            ])
+            ->join('users', 'activo.user_id', '=', 'users.id')
+            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+            ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+            ->where('activo.estado', 1);
 
-        foreach ($clientes as $proyecto) {
-            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
-            $proyecto->usuariosAsignados = DB::table('users')
-                ->whereIn('id', $encargadoIds)
-                ->pluck('nombre');
+        // ✅ BÚSQUEDA OPTIMIZADA (solo campos indexados)
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('activo.numero_activo', 'LIKE', "%{$search}%")
+                  ->orWhere('activo.descripcion', 'LIKE', "%{$search}%")
+                  ->orWhere('categoria_activos.nombre', 'LIKE', "%{$search}%");
+            });
         }
+
+        // ✅ PAGINACIÓN + CACHE
+        $cacheKey = 'activos_page_' . $page . '_' . $perPage . '_' . md5($search);
+        $clientes = Cache::remember($cacheKey, 300, function() use ($query, $perPage, $page) { // 5 minutos cache
+            return $query->paginate($perPage, ['*'], 'page', $page);
+        });
+
+        // ✅ OPTIMIZACIÓN USUARIOS ASIGNADOS (1 sola consulta)
+        $allUserIds = collect($clientes->items())
+            ->pluck('usuarios_asignados')
+            ->filter()
+            ->map(fn($ids) => json_decode($ids, true) ?? [])
+            ->flatten()
+            ->unique()
+            ->values();
+
+        $usuariosMap = [];
+        if ($allUserIds->isNotEmpty()) {
+            $usuariosMap = DB::table('users')
+                ->whereIn('id', $allUserIds)
+                ->pluck('nombre', 'id')
+                ->toArray();
+        }
+
+        // ✅ PROCESAMIENTO RÁPIDO
+        $clientes->getCollection()->transform(function ($proyecto) use ($usuariosMap) {
+            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+            $proyecto->usuariosAsignados = collect($encargadoIds)
+                ->map(fn($id) => $usuariosMap[$id] ?? null)
+                ->filter()
+                ->values()
+                ->toArray();
+            
+            return $proyecto;
+        });
 
         return response()->json([
             'status' => 'success',
-            'data' => $clientes
+            'data' => $clientes->items(),
+            'pagination' => [
+                'current_page' => $clientes->currentPage(),
+                'per_page' => $clientes->perPage(),
+                'total' => $clientes->total(),
+                'last_page' => $clientes->lastPage(),
+                'from' => $clientes->firstItem(),
+                'to' => $clientes->lastItem()
+            ]
         ]);
+
+    } catch (\Exception $e) {
+        Log::error('Error loading activos: ' . $e->getMessage());
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al cargar los datos'
+        ], 500);
     }
+}
 
     public function indexActivosBaja()
     {

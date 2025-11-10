@@ -12,6 +12,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Svg\Tag\Rect;
 
@@ -402,43 +403,149 @@ class KadexActivosController extends Controller
         ]);
     }
 
-    public function historico()
+    // public function historico()
+    // {
+    //     $clientes = DB::connection('mysql')
+    //         ->table('kadex_activos')
+    //         ->join('users', 'kadex_activos.user_id', '=', 'users.id')
+    //         ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
+    //         ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+    //         ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+    //         ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
+    //         ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
+    //         ->select(
+    //             'kadex_activos.*',
+    //             'users.nombre as usuario',
+    //             'categoria_activos.nombre as categoria',
+    //             'subcategoria_activos.nombre as subcategoria',
+    //             'bodega_origen.nombre as bodega_origen',
+    //             'bodega_destino.nombre as bodega_destino',
+    //             'activo.numero_activo',
+    //             'activo.valor',
+    //             'activo.condicion',
+    //             'activo.descripcion',
+    //         )
+    //         ->orderBy('id', 'asc')
+    //         ->get();
+
+    //     foreach ($clientes as $proyecto) {
+    //         $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+
+    //         $proyecto->usuariosAsignados = DB::table('users')
+    //             ->whereIn('id', $encargadoIds)
+    //             ->pluck('nombre');
+    //     }
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $clientes
+    //     ]);
+    // }
+
+    public function historico(Request $request)
     {
-        $clientes = DB::connection('mysql')
-            ->table('kadex_activos')
-            ->join('users', 'kadex_activos.user_id', '=', 'users.id')
-            ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
-            ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
-            ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
-            ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
-            ->select(
-                'kadex_activos.*',
-                'users.nombre as usuario',
-                'categoria_activos.nombre as categoria',
-                'subcategoria_activos.nombre as subcategoria',
-                'bodega_origen.nombre as bodega_origen',
-                'bodega_destino.nombre as bodega_destino',
-                'activo.numero_activo',
-                'activo.valor',
-                'activo.condicion',
-                'activo.descripcion',
-            )
-            ->orderBy('id', 'asc')
-            ->get();
+        try {
+            $perPage = $request->get('per_page', 50);
+            $page = $request->get('page', 1);
+            $search = $request->get('search', '');
 
-        foreach ($clientes as $proyecto) {
-            $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+            $query = DB::connection('mysql')
+                ->table('kadex_activos')
+                ->join('users', 'kadex_activos.user_id', '=', 'users.id')
+                ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
+                ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+                ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+                ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
+                ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
+                ->select(
+                    'kadex_activos.*',
+                    'users.nombre as usuario',
+                    'categoria_activos.nombre as categoria',
+                    'subcategoria_activos.nombre as subcategoria',
+                    'bodega_origen.nombre as bodega_origen',
+                    'bodega_destino.nombre as bodega_destino',
+                    'activo.numero_activo',
+                    'activo.valor',
+                    'activo.condicion',
+                    'activo.descripcion',
+                );
 
-            $proyecto->usuariosAsignados = DB::table('users')
-                ->whereIn('id', $encargadoIds)
-                ->pluck('nombre');
+            // ✅ Búsqueda optimizada
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('activo.numero_activo', 'LIKE', "%{$search}%")
+                        ->orWhere('kadex_activos.codigo_traslado', 'LIKE', "%{$search}%")
+                        ->orWhere('activo.descripcion', 'LIKE', "%{$search}%")
+                        ->orWhere('categoria_activos.nombre', 'LIKE', "%{$search}%")
+                        ->orWhere('bodega_destino.nombre', 'LIKE', "%{$search}%");
+                });
+            }
+
+            $query->orderBy('kadex_activos.id', 'desc');
+
+            $clientes = $query->paginate($perPage, ['*'], 'page', $page);
+
+            // ✅ CORRECCIÓN: Obtener datos directamente del paginator
+            $items = $clientes->items();
+
+            // ✅ Optimización: Obtener todos los usuarios asignados en una sola consulta
+            $allUserIds = collect($items)
+                ->pluck('usuarios_asignados')
+                ->filter()
+                ->map(function ($ids) {
+                    return json_decode($ids, true) ?? [];
+                })
+                ->flatten()
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $usuariosMap = [];
+            if (!empty($allUserIds)) {
+                $usuarios = DB::table('users')
+                    ->whereIn('id', $allUserIds)
+                    ->select('id', 'nombre')
+                    ->get();
+
+                foreach ($usuarios as $usuario) {
+                    $usuariosMap[$usuario->id] = $usuario->nombre;
+                }
+            }
+
+            // ✅ CORRECCIÓN: Procesar datos sin getCollection()
+            $processedItems = array_map(function ($proyecto) use ($usuariosMap) {
+                $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
+                $usuariosAsignados = [];
+
+                foreach ($encargadoIds as $userId) {
+                    if (isset($usuariosMap[$userId])) {
+                        $usuariosAsignados[] = $usuariosMap[$userId];
+                    }
+                }
+
+                $proyecto->usuariosAsignados = $usuariosAsignados;
+                return $proyecto;
+            }, $items);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $processedItems,
+                'pagination' => [
+                    'current_page' => $clientes->currentPage(),
+                    'per_page' => $clientes->perPage(),
+                    'total' => $clientes->total(),
+                    'last_page' => $clientes->lastPage(),
+                    'from' => $clientes->firstItem(),
+                    'to' => $clientes->lastItem()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error loading historico: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al cargar el histórico'
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $clientes
-        ]);
     }
 
     public function solicitarActivos()
