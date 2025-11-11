@@ -328,10 +328,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-documentos-celsia', [DocumentosController::class, 'indexCELSIA']);
     Route::get('gestion-documentos-organismo', [DocumentosController::class, 'indexORGANISMOS']);
     Route::get('gestion-documentosDetalle/{codigo_documento}', [DocumentosController::class, 'detalleDocumentos']);
-    Route::get('detalleDocumentosOrganismos/{codigo_documento}', [DocumentosController::class, 'detalleDocumentosOrganismos']);
+    Route::post('detalleDocumentosOrganismos', [DocumentosController::class, 'detalleDocumentosOrganismos']);
     Route::get('gestion-documentos-proyectos', [DocumentosController::class, 'proyectosCodigo']);
     Route::post('StoreDocumentacionRed', [DocumentosController::class, 'StoreDocumentacionRed']);
     Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
+    Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
 
 
     //CONTABILIDAD

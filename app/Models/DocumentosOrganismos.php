@@ -11,6 +11,21 @@ class DocumentosOrganismos extends Model
 
     protected $table = 'documentos_organismos';
 
+    protected $fillable = [
+        'nombre_etapa',
+        'codigo_proyecto',
+        'etapa',
+        'actividad_id',
+        'actividad_depende_id',
+        'tipo',
+        'orden',
+        'fecha_confirmacion',
+        'usuario_id',
+        'estado',
+        'operador',
+        'observacion'
+    ];
+
 
     public function actividad()
     {

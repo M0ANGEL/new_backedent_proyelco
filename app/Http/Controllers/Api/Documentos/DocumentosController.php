@@ -9,10 +9,9 @@ use App\Models\DocumentosOrganismos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
 use Exception;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 
 class DocumentosController extends Controller
 {
@@ -379,7 +378,6 @@ class DocumentosController extends Controller
         ]);
     }
 
-
     //CONSULTA DOCUMENTACION EMCALI
     public function indexORGANISMOS($operador = null)
     {
@@ -398,27 +396,26 @@ class DocumentosController extends Controller
         $proyectosApartamentos = $query->get();
 
         // Similar para ProyectoCasa...
-        // $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => function ($query) use ($operador) {
-        //     $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-        //         ->when($operador, function ($q) use ($operador) {
-        //             $q->where('operador', $operador);
-        //         })
-        //         ->distinct();
-        // }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
-        //     if ($operador) {
-        //         $query->where('operador', $operador);
-        //     }
-        // })->get();
+        $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => function ($query) use ($operador) {
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+                ->when($operador, function ($q) use ($operador) {
+                    $q->where('operador', $operador);
+                })
+                ->distinct();
+        }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
+            if ($operador) {
+                $query->where('operador', $operador);
+            }
+        })->get();
 
-        // $data = $proyectosApartamentos->merge($proyectosCasas);
-        $data = $proyectosApartamentos;
+        $data = $proyectosApartamentos->merge($proyectosCasas);
+        // $data = $proyectosApartamentos;
 
         return response()->json([
             'status' => 'success',
             'data' => $data
         ]);
     }
-
 
     //se envia codigo de proyecto pero se cambia por codigo del documento
     //para traer datos unicos
@@ -436,18 +433,82 @@ class DocumentosController extends Controller
         ]);
     }
 
-
-    public function detalleDocumentosOrganismos($codigo_documento)
+    public function detalleDocumentosOrganismos(Request $request)
     {
+        $codigo_documento = $request->codigo_documento;
+        $operador = $request->operador;
 
-        $data = DocumentosOrganismos::with('actividad') // Asegúrate de tener esta relación
+
+        $data = DocumentosOrganismos::with('actividad')
             ->where('codigo_documento', $codigo_documento)
+            ->where('operador', $operador)
             ->orderBy('orden')
             ->get();
 
+        // Separar por tipo
+        $principales = $data->where('tipo', 'principal'); // Tipo 1 - sin hijos
+        $conHijos = $data->where('tipo', 'principal_hijos'); // Tipo 2 - con hijos
+        $hijos = $data->where('tipo', 'hijos'); // Tipo 3 - hijos
+
+        $dataEstructurada = [];
+
+        // Procesar elementos PRINCIPALES (tipo 1) - SIN campo hijos
+        foreach ($principales as $principal) {
+            $dataEstructurada[] = [
+                'id' => $principal->id,
+                'nombre_etapa' => $principal->nombre_etapa,
+                'codigo_proyecto' => $principal->codigo_proyecto,
+                'codigo_documento' => $principal->codigo_documento,
+                'etapa' => $principal->etapa,
+                'actividad_id' => $principal->actividad_id,
+                'actividad_depende_id' => $principal->actividad_depende_id,
+                'tipo' => $principal->tipo,
+                'orden' => $principal->orden,
+                'fecha_confirmacion' => $principal->fecha_confirmacion,
+                'usuario_id' => $principal->usuario_id,
+                'estado' => $principal->estado,
+                'operador' => $principal->operador,
+                'observacion' => $principal->observacion,
+                'created_at' => $principal->created_at,
+                'updated_at' => $principal->updated_at,
+                'actividad' => $principal->actividad
+                // NO incluir campo 'hijos'
+            ];
+        }
+
+        // Procesar elementos CON HIJOS (tipo 2 - principal_hijos) - CON campo hijos
+        foreach ($conHijos as $itemConHijos) {
+            // Buscar los hijos de este elemento (donde actividad_depende_id = actividad_id del padre)
+            $hijosDelItem = $hijos->where('actividad_depende_id', $itemConHijos->actividad_id);
+
+            $dataEstructurada[] = [
+                'id' => $itemConHijos->id,
+                'nombre_etapa' => $itemConHijos->nombre_etapa,
+                'codigo_proyecto' => $itemConHijos->codigo_proyecto,
+                'codigo_documento' => $itemConHijos->codigo_documento,
+                'etapa' => $itemConHijos->etapa,
+                'actividad_id' => $itemConHijos->actividad_id,
+                'actividad_depende_id' => $itemConHijos->actividad_depende_id,
+                'tipo' => $itemConHijos->tipo,
+                'orden' => $itemConHijos->orden,
+                'fecha_confirmacion' => $itemConHijos->fecha_confirmacion,
+                'usuario_id' => $itemConHijos->usuario_id,
+                'estado' => $itemConHijos->estado,
+                'operador' => $itemConHijos->operador,
+                'observacion' => $itemConHijos->observacion,
+                'created_at' => $itemConHijos->created_at,
+                'updated_at' => $itemConHijos->updated_at,
+                'actividad' => $itemConHijos->actividad,
+                'hijos' => $hijosDelItem->values()->toArray() // SOLO tipo principal_hijos tiene hijos
+            ];
+        }
+
+        // Ordenar por el campo orden
+        $dataEstructurada = collect($dataEstructurada)->sortBy('orden')->values()->toArray();
+
         return response()->json([
             'status' => 'success',
-            'data' => $data
+            'data' => $dataEstructurada
         ]);
     }
 
@@ -788,206 +849,6 @@ class DocumentosController extends Controller
         info("Total de actividades actualizadas: " . $actividadesSiguientes->count());
     }
 
-    //FIN CONFIRMACION EMCALI
-
-    //CRER ORGANISMO RITEL RETIE RETIALP
-    // private function documentosOrganismos($data)
-    // {
-    //     info("organismo--------");
-    //     $etapa = $data->etapaProyecto;
-    //     $nombre_etapa = $data->nombre_etapa;
-    //     $codigoDocumentos = $data->codigoDocumentos;
-    //     $codigo_proyecto = $data->codigo_proyecto;
-    //     $organismoInspeccion = $data->organismoInspeccion;
-    //     $fechaEntrega = $data->fechaEntrega;
-    //     $usuarioId = $data->usuarioId;
-
-    //     // Usar el modelo correcto - ActividadesOrganismos
-    //     $dataActividades = ActividadesOrganismos::where('estado', 1)->get();
-
-    //     // Mapeo de organismos
-    //     $organismosMap = [
-    //         1 => 'RETIE',
-    //         2 => 'RITEL',
-    //         3 => 'RETIALP'
-    //     ];
-
-    //     $operadoresMap = [
-    //         'RETIE' => 1,
-    //         'RITEL' => 2,
-    //         'RETIALP' => 3
-    //     ];
-
-    //     $documentosInsertados = [];
-
-    //     foreach ($organismoInspeccion as $organismoId) {
-    //         $nombreOrganismo = $organismosMap[$organismoId] ?? null;
-    //         $operador = $operadoresMap[$nombreOrganismo] ?? null;
-
-    //         if (!$nombreOrganismo || !$operador) {
-    //             info("Organismo no válido ID: $organismoId");
-    //             continue;
-    //         }
-
-    //         info("Procesando organismo: $nombreOrganismo (ID: $organismoId, Operador: $operador)");
-
-    //         // Obtener actividades principales para este operador (tipo = 1)
-    //         $actividadesPrincipales = $dataActividades
-    //             ->where('operador', $operador)
-    //             ->where('tipo', 1) // Actividades principales
-    //             ->sortBy('id');
-
-    //         info("Actividades principales encontradas para $nombreOrganismo: " . $actividadesPrincipales->count());
-
-    //         $orden = 1;
-
-    //         foreach ($actividadesPrincipales as $actividadPrincipal) {
-    //             info("Procesando actividad principal ID: {$actividadPrincipal->id} - {$actividadPrincipal->actividad}");
-
-    //             // Insertar actividad principal
-    //             $documentoPrincipalId = DB::table('documentos_organismos')->insertGetId([
-    //                 'nombre_etapa' => $nombre_etapa,
-    //                 'codigo_proyecto' => $codigo_proyecto,
-    //                 'codigo_documento' => $codigoDocumentos,
-    //                 'etapa' => $etapa,
-    //                 'actividad_id' => $actividadPrincipal->id,
-    //                 'actividad_depende_id' => null,
-    //                 'tipo' => 'principal',
-    //                 'orden' => $orden,
-    //                 'fecha_confirmacion' => $fechaEntrega,
-    //                 'usuario_id' => $usuarioId,
-    //                 'operador' => $operador,
-    //                 'observacion' => null,
-    //                 'estado' => 0,
-    //                 'created_at' => now(),
-    //                 'updated_at' => now(),
-    //             ]);
-
-    //             $documentosInsertados[] = $documentoPrincipalId;
-    //             info("Insertada actividad principal ID: $documentoPrincipalId");
-
-    //             // Buscar actividades de tipo 2 (con hijos) para esta actividad principal
-    //             $actividadesConHijos = $dataActividades
-    //                 ->where('operador', $operador)
-    //                 ->where('tipo', 2) // Actividades con hijos
-    //                 ->where('padre', $actividadPrincipal->id)
-    //                 ->sortBy('id');
-
-    //             $ordenIntermedio = 1;
-
-    //             foreach ($actividadesConHijos as $actividadConHijos) {
-    //                 info("Procesando actividad con hijos ID: {$actividadConHijos->id} - {$actividadConHijos->actividad}");
-
-    //                 // Insertar actividad intermedia (tipo 2)
-    //                 $documentoIntermedioId = DB::table('documentos_organismos')->insertGetId([
-    //                     'nombre_etapa' => $nombre_etapa,
-    //                     'codigo_proyecto' => $codigo_proyecto,
-    //                     'codigo_documento' => $codigoDocumentos,
-    //                     'etapa' => $etapa,
-    //                     'actividad_id' => $actividadConHijos->id,
-    //                     'actividad_depende_id' => $actividadPrincipal->id,
-    //                     'tipo' => 'con_hijos',
-    //                     'orden' => $ordenIntermedio,
-    //                     'fecha_confirmacion' => $fechaEntrega,
-    //                     'usuario_id' => $usuarioId,
-    //                     'operador' => $operador,
-    //                     'observacion' => null,
-    //                     'estado' => 0,
-    //                     'created_at' => now(),
-    //                     'updated_at' => now(),
-    //                 ]);
-
-    //                 $documentosInsertados[] = $documentoIntermedioId;
-
-    //                 // Buscar actividades hijas (tipo 3) para esta actividad intermedia
-    //                 $actividadesHijas = $dataActividades
-    //                     ->where('operador', $operador)
-    //                     ->where('tipo', 3) // Actividades hijas
-    //                     ->where('padre', $actividadConHijos->id)
-    //                     ->sortBy('id');
-
-    //                 $ordenHijo = 1;
-
-    //                 foreach ($actividadesHijas as $actividadHija) {
-    //                     info("Procesando actividad hija ID: {$actividadHija->id} - {$actividadHija->actividad}");
-
-    //                     // Insertar actividad hija
-    //                     $documentoHijoId = DB::table('documentos_organismos')->insertGetId([
-    //                         'nombre_etapa' => $nombre_etapa,
-    //                         'codigo_proyecto' => $codigo_proyecto,
-    //                         'codigo_documento' => $codigoDocumentos,
-    //                         'etapa' => $etapa,
-    //                         'actividad_id' => $actividadHija->id,
-    //                         'actividad_depende_id' => $actividadConHijos->id,
-    //                         'tipo' => 'hijos',
-    //                         'orden' => $ordenHijo,
-    //                         'fecha_confirmacion' => $fechaEntrega,
-    //                         'usuario_id' => $usuarioId,
-    //                         'operador' => $operador,
-    //                         'observacion' => null,
-    //                         'estado' => 0,
-    //                         'created_at' => now(),
-    //                         'updated_at' => now(),
-    //                     ]);
-
-    //                     $documentosInsertados[] = $documentoHijoId;
-    //                     $ordenHijo++;
-    //                 }
-
-    //                 $ordenIntermedio++;
-    //             }
-
-    //             // También buscar actividades hijas directas (tipo 3) que apunten a la actividad principal
-    //             $actividadesHijasDirectas = $dataActividades
-    //                 ->where('operador', $operador)
-    //                 ->where('tipo', 3)
-    //                 ->where('padre', $actividadPrincipal->id)
-    //                 ->sortBy('id');
-
-    //             $ordenHijoDirecto = 1;
-
-    //             foreach ($actividadesHijasDirectas as $actividadHijaDirecta) {
-    //                 info("Procesando actividad hija directa ID: {$actividadHijaDirecta->id} - {$actividadHijaDirecta->actividad}");
-
-    //                 // Insertar actividad hija directa
-    //                 $documentoHijoDirectoId = DB::table('documentos_organismos')->insertGetId([
-    //                     'nombre_etapa' => $nombre_etapa,
-    //                     'codigo_proyecto' => $codigo_proyecto,
-    //                     'codigo_documento' => $codigoDocumentos,
-    //                     'etapa' => $etapa,
-    //                     'actividad_id' => $actividadHijaDirecta->id,
-    //                     'actividad_depende_id' => $actividadPrincipal->id,
-    //                     'tipo' => 'hijos',
-    //                     'orden' => $ordenHijoDirecto,
-    //                     'fecha_confirmacion' => $fechaEntrega,
-    //                     'usuario_id' => $usuarioId,
-    //                     'operador' => $operador,
-    //                     'observacion' => null,
-    //                     'estado' => 0,
-    //                     'created_at' => now(),
-    //                     'updated_at' => now(),
-    //                 ]);
-
-    //                 $documentosInsertados[] = $documentoHijoDirectoId;
-    //                 $ordenHijoDirecto++;
-    //             }
-
-    //             $orden++;
-    //         }
-
-    //         info("Organismo $nombreOrganismo procesado con " . $actividadesPrincipales->count() . " actividades principales");
-    //     }
-
-    //     info("Total de documentos insertados: " . count($documentosInsertados));
-
-    //     return [
-    //         'success' => true,
-    //         'documentos_insertados' => count($documentosInsertados),
-    //         'ids_documentos' => $documentosInsertados
-    //     ];
-    // }
-
-
     private function documentosOrganismos($data)
     {
         info("organismo--------");
@@ -1097,5 +958,114 @@ class DocumentosController extends Controller
             'documentos_insertados' => count($documentosInsertados),
             'ids_documentos' => $documentosInsertados
         ];
+    }
+
+    public function confirmarDocumentoOrganismo(Request $request)
+    {
+        // Validar los datos de entrada
+        $validated = $request->validate([
+            'id' => 'required|integer|exists:documentos_organismos,id',
+            'observacion' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            // Buscar el documento
+            $documento = DocumentosOrganismos::find($validated['id']);
+
+            if (!$documento) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Documento no encontrado'
+                ], 404);
+            }
+
+            // Verificar que el documento no esté ya confirmado
+            if ($documento->estado == 2) {
+                return response()->json([
+                    'status' => 'warning',
+                    'message' => 'El documento ya está confirmado'
+                ], 422);
+            }
+
+            // Actualizar el documento
+            $documento->update([
+                'estado' => 2, // Completado
+                'observacion' => $validated['observacion'] ?? null,
+                'fecha_confirmacion' => $validated['fecha_confirmacion'] ?? now(),
+                'usuario_id' => $validated['usuario_id'] ?? Auth::id(),
+            ]);
+
+            // Recargar el modelo para obtener los datos actualizados
+            $documento->refresh();
+
+            // Verificar si el documento tiene un padre (usando actividad_depende_id) y actualizarlo si todos los hijos están en estado 2
+            if ($documento->actividad_depende_id) {
+                $this->actualizarEstadoPadre($documento->actividad_depende_id, $documento->codigo_documento);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Documento confirmado exitosamente',
+                'data' => $documento
+            ], 200);
+        } catch (\Exception $e) {
+            // Log del error
+            logger()->error('Error al confirmar documento organismo: ' . $e->getMessage(), [
+                'request' => $validated,
+                'user_id' => Auth::id(),
+                'exception' => $e
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error interno del servidor al confirmar el documento'
+            ], 500);
+        }
+    }
+
+    private function actualizarEstadoPadre($actividadDependeId, $codigo)
+    {
+        try {
+            // Buscar el documento padre usando actividad_depende_id
+            $documentoPadre = DocumentosOrganismos::where('actividad_id', $actividadDependeId)
+                ->where('codigo_documento', $codigo) // Asumiendo que el padre es tipo principal
+                ->first();
+            info($documentoPadre);
+
+
+            if (!$documentoPadre) {
+                return;
+            }
+
+            // Verificar si el padre ya está en estado 2
+            if ($documentoPadre->estado == 2) {
+                return;
+            }
+
+            // Contar todos los documentos hijos del padre (donde actividad_depende_id apunta al actividad_id del padre)
+            $totalHijos = DocumentosOrganismos::where('actividad_depende_id', $actividadDependeId)->where('codigo_documento', $codigo)->count();
+
+            // Contar los documentos hijos que están en estado 2
+            $hijosCompletados = DocumentosOrganismos::where('actividad_depende_id', $actividadDependeId)
+                ->where('codigo_documento', $codigo)
+                ->where('estado', 2)
+                ->count();
+
+            // Si todos los hijos están en estado 2, actualizar el padre
+            if ($totalHijos > 0 && $hijosCompletados == $totalHijos) {
+                $documentoPadre->update([
+                    'estado' => 2,
+                    'fecha_confirmacion' => now(), // Agregar fecha de confirmación para el padre
+                    'usuario_id' => Auth::id(),
+                ]);
+
+            }
+        } catch (\Exception $e) {
+            logger()->error('Error al actualizar estado del padre: ' . $e->getMessage(), [
+                'actividad_depende_id' => $actividadDependeId,
+                'user_id' => Auth::id(),
+                'exception' => $e
+            ]);
+        }
     }
 }
