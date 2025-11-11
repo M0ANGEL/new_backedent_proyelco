@@ -383,7 +383,7 @@ class PersonalProyelcoController extends Controller
 
             //inactivar usuario de arp
 
-            $usuario = User::where('identificacion', $empleado->identificacion)->first();
+            $usuario = User::where('cedula', $empleado->identificacion)->first();
             if ($usuario) {
                 $usuario->update([
                     'estado' => 0,
