@@ -374,9 +374,21 @@ class PersonalProyelcoController extends Controller
             //inactivar ficha igual
 
             $ficha = FichaObra::where('identificacion', $empleado->identificacion)->first();
-            $ficha->update([
-                'estado' => 2, // 2 = inactivo por retiro
-            ]);
+            if ($ficha) {
+                $ficha->update([
+                    'estado' => 2, // 2 = inactivo por retiro
+                ]);
+            }
+
+
+            //inactivar usuario de arp
+
+            $usuario = User::where('identificacion', $empleado->identificacion)->first();
+            if ($usuario) {
+                $usuario->update([
+                    'estado' => 0,
+                ]);
+            }
 
 
             DB::commit();

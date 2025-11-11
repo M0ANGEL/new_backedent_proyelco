@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
-use Svg\Tag\Rect;
 
 class MaterialesSolicitudesController extends Controller
 {
@@ -233,47 +232,6 @@ class MaterialesSolicitudesController extends Controller
             'data' => $bloquesArray,
         ]);
     }
-
-
-
-    // public function generarExcelAxuiliarMaterial(Request $request)
-    // {
-    //     // Extraer los IDs del array items
-    //     $ids = collect($request->items)->pluck('id')->toArray();
-
-    //     // Se busca el proyecto con esa proyección usando los IDs recibidos
-    //     $proyeccionData = DB::connection('mysql')
-    //         ->table('materiales')
-    //         ->where('codigo_proyecto', $request->codigo_proyecto)
-    //         ->whereIn('id', $ids)
-    //         ->orderBy('nivel')
-    //         ->get();
-
-    //     // Filtrar solo los registros de nivel 2
-    //     $nivel2Items = $proyeccionData->where('nivel', 2);
-
-    //     // Buscar niveles 3 para cada item de nivel 2
-    //     $nivel3Data = [];
-    //     foreach ($nivel2Items as $item) {
-    //         $nivel3Data[$item->id] = DB::connection('mysql')
-    //             ->table('materiales')
-    //             ->where('codigo_proyecto', $request->codigo_proyecto)
-    //             ->where('nivel', 3)
-    //             ->where('codigo', $item->codigo)
-    //             ->where('padre', $item->descripcion)
-    //             ->get();
-    //     }
-
-    //     info($proyeccionData);
-    //     info($nivel3Data);
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $proyeccionData,
-    //         'nivel3' => $nivel3Data
-    //     ]);
-    // }
-
 
     public function generarExcelAxuiliarMaterial(Request $request)
     {
