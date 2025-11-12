@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Exports\ReporteAsistenciasExport;
 use App\Exports\ReporteCompletoAsistenciasExport;
 use App\Exports\ReporteCompletoConCalculoHorasExport;
+use App\Models\User;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ControlAsistenciasController extends Controller
@@ -21,7 +22,6 @@ class ControlAsistenciasController extends Controller
     public function consultarUsuario(Request $request)
     {
 
-        info($request->all());
         // Validar que la cédula venga en el request
         if (!$request->has('cedula') || empty($request->cedula)) {
             return response()->json([
@@ -66,21 +66,33 @@ class ControlAsistenciasController extends Controller
                 ->orderBy('id', 'desc')
                 ->first();
 
-            if ($ultimaAsistencia) {
-                // Si ya tiene registro de entrada pero no tiene fecha de salida
-                if ($ultimaAsistencia->fecha_ingreso && !$ultimaAsistencia->fecha_salida) {
-                    if ($ultimaAsistencia->obra_id !== $request->obra_id && $ultimaAsistencia->obra_id !== $request->obra_id) {
+            //vamoa escluir usuarios con perfil de ingenieros
+            //buscamos usuairo 
+            // Buscar si el empleado tiene usuario en la tabla users
+            $usuario = User::where('cedula', $empleado->identificacion)->first();
 
-                        $proyecto = DB::connection('mysql')
-                            ->table('bodegas_area')
-                            ->select('nombre')
-                            ->where('id', $ultimaAsistencia->obra_id)
-                            ->first();
+            // Si el usuario NO existe o su rol NO es "INGENIERO OBRA", se valida si está registrado en otra obra
+            if (!$usuario || $usuario->rol !== "INGENIERO OBRA") {
 
-                        return response()->json([
-                            'status' => 'error',
-                            'message' => 'El usuario se encuntra registrado en otra obra: ' . '[' . $proyecto->nombre . ']' . ' comunicate con el encargado de la obra y registre la salida'
-                        ], 404);
+                if ($ultimaAsistencia) {
+                    // Si ya tiene registro de entrada pero no tiene salida
+                    if ($ultimaAsistencia->fecha_ingreso && !$ultimaAsistencia->fecha_salida) {
+
+                        // Si el registro pertenece a otra obra diferente
+                        if ($ultimaAsistencia->obra_id !== $request->obra_id) {
+
+                            // Obtener el nombre del proyecto donde está registrado actualmente
+                            $proyecto = DB::connection('mysql')
+                                ->table('bodegas_area')
+                                ->select('nombre')
+                                ->where('id', $ultimaAsistencia->obra_id)
+                                ->first();
+
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => 'El usuario se encuentra registrado en otra obra: ' . '[' . $proyecto->nombre . ']' . '. Comunícate con el encargado de la obra y registra la salida.'
+                            ], 404);
+                        }
                     }
                 }
             }
