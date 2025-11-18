@@ -378,7 +378,7 @@ class DocumentosController extends Controller
         ]);
     }
 
-    //CONSULTA DOCUMENTACION EMCALI
+    //CONSULTA DOCUMENTACION ORGANISMOS
     public function indexORGANISMOS($operador = null)
     {
         $query = Proyectos::with(['documentosOrganismos' => function ($query) use ($operador) {
@@ -602,7 +602,6 @@ class DocumentosController extends Controller
             $fechaHoy = now();
             $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
 
-            info("Diferencia de días calculada: {$diasDiferencia}");
 
             // 2. Actualizar la actividad actual a estado 2 (Completado)
             $actividadActual->update([

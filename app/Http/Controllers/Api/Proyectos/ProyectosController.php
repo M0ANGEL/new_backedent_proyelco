@@ -692,10 +692,6 @@ class ProyectosController extends Controller
                 }
             }
 
-            //envio de data para documentos
-            $this->AuxDocumentos($request);
-
-
 
             DB::commit(); // Confirmamos los cambios
 
