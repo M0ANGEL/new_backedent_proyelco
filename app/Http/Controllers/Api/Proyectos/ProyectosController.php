@@ -1289,6 +1289,115 @@ class ProyectosController extends Controller
         ]);
     }
 
+    // public function UnidadDeMedida(Request $request)
+    // {
+
+    //     $fechaInicio = $request->fechaInicio
+    //         ? Carbon::parse($request->fechaInicio)->startOfDay()
+    //         : null;
+
+    //     $fechaFin = $request->fechaFin
+    //         ? Carbon::parse($request->fechaFin)->endOfDay()
+    //         : null;
+
+    //     $proceso = strtolower($request->proceso);
+    //     $proyectos = $request->proyecto ?? [];
+
+    //     // ==============================
+    //     // DETALLE APARTAMENTOS
+    //     // ==============================
+    //     $proyectosDetalleApt = ProyectosDetalle::query()
+    //         ->join('proyecto', 'proyecto_detalle.proyecto_id', '=', 'proyecto.id')
+    //         ->join('clientes', 'proyecto.cliente_id', '=', 'clientes.id')
+    //         ->when(!empty($proyectos), function ($q) use ($proyectos) {
+    //             $q->whereIn('proyecto.id', $proyectos);
+    //         })
+    //         ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
+    //             $q->whereBetween('proyecto_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
+    //         })
+    //         ->where('proyecto_detalle.estado', 2)
+    //         ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
+    //         ->select(
+    //             'clientes.emp_nombre as cliente',
+    //             'proyecto.descripcion_proyecto as proyecto',
+    //             DB::raw('COUNT(proyecto_detalle.id) as total')
+    //         )
+    //         ->groupBy('clientes.emp_nombre', 'proyecto.descripcion_proyecto')
+    //         ->get();
+
+    //     // ==============================
+    //     // DETALLE CASAS
+    //     // ==============================
+    //     $proyectosDetalleCasas = collect();
+    //     if ($proceso === 'fundida') {
+    //         $proyectosDetalleCasas = ProyectoCasaDetalle::query()
+    //             ->join('proyectos_casas', 'proyectos_casas_detalle.proyecto_casa_id', '=', 'proyectos_casas.id')
+    //             ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+    //             ->when(!empty($proyectos), function ($q) use ($proyectos) {
+    //                 $q->whereIn('proyectos_casas.id', $proyectos);
+    //             })
+    //             ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
+    //                 $q->whereBetween('proyectos_casas_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
+    //             })
+    //             ->where('proyectos_casas_detalle.etapa', 1)
+    //             ->select(
+    //                 'clientes.emp_nombre as cliente',
+    //                 'proyectos_casas.descripcion_proyecto as proyecto',
+    //                 'proyectos_casas_detalle.proyecto_casa_id',
+    //                 'proyectos_casas_detalle.estado'
+    //             )
+    //             ->get()
+    //             ->groupBy('proyecto_casa_id')
+    //             ->map(function ($detalles) {
+    //                 $cliente = $detalles->first()->cliente;
+    //                 $proyecto = $detalles->first()->proyecto;
+
+    //                 if ($detalles->every(fn($item) => $item->estado == 2)) {
+    //                     return [
+    //                         'cliente' => $cliente,
+    //                         'proyecto' => $proyecto,
+    //                         'total' => 1
+    //                     ];
+    //                 }
+    //                 return null;
+    //             })
+    //             ->filter()
+    //             ->values();
+    //     } else {
+    //         $proyectosDetalleCasas = ProyectoCasaDetalle::query()
+    //             ->join('proyectos_casas', 'proyectos_casas_detalle.proyecto_casa_id', '=', 'proyectos_casas.id')
+    //             ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+    //             ->when(!empty($proyectos), function ($q) use ($proyectos) {
+    //                 $q->whereIn('proyectos_casas.id', $proyectos);
+    //             })
+    //             ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
+    //                 $q->whereBetween('proyectos_casas_detalle.fecha_fin', [$fechaInicio, $fechaFin]);
+    //             })
+    //             ->where('proyectos_casas_detalle.estado', 2)
+    //             ->where('proyectos_casas_detalle.etapa', 2)
+    //             ->whereHas('proceso', fn($q) => $q->whereRaw('LOWER(nombre_proceso) = ?', [$proceso]))
+    //             ->select(
+    //                 'clientes.emp_nombre as cliente',
+    //                 'proyectos_casas.descripcion_proyecto as proyecto',
+    //                 DB::raw('COUNT(proyectos_casas_detalle.id) as total')
+    //             )
+    //             ->groupBy('clientes.emp_nombre', 'proyectos_casas.descripcion_proyecto')
+    //             ->get();
+    //     }
+
+    //     // ==============================
+    //     // UNIR RESULTADOS
+    //     // ==============================
+    //     $data = $proyectosDetalleApt->concat($proyectosDetalleCasas);
+    //     $total = $data->sum('total');
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $data,
+    //         'total' => $total,
+    //     ]);
+    // }
+
     public function UnidadDeMedida(Request $request)
     {
         $fechaInicio = $request->fechaInicio
