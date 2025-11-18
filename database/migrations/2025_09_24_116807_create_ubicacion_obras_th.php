@@ -22,13 +22,14 @@ return new class extends Migration
             $table->string('serial'); //campo de array de seriales
 
             $table->unsignedBigInteger('user_id');
-            $table->tinyInteger('tipo_obra'); //1 apartamentos 2 casas
-            $table->string('obra_id',15); //id
-            $table->string('distancia')->default(20); //metros permitidos de la distancia
+            $table->unsignedBigInteger('obra_id'); //ubicacion
+            $table->string('rango')->default(150); //metros permitidos de la distancia
+            $table->json('usuarios_permisos',100)->nullable(); //usuarios que tiene permisos de las obras
             $table->tinyInteger('estado')->default(1);
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('obra_id')->references('id')->on('bodegas_area');
         });
     }
 

@@ -31,3 +31,10 @@ contra. front.prueba
 backend
 usuario: ftp_backend_pruebas
 contraseña: Bakend.prueba
+
+borrar rama nuve: git push origin --delete nombre_rama
+borrar rama local: git branch -D nombre_rama
+
+
+generar apk:  eas build -p android --profile preview
+

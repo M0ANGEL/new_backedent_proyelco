@@ -12,10 +12,13 @@ use App\Http\Controllers\Api\CargoController;
 use App\Http\Controllers\Api\CargueMasivo\CarguesMasivosCotroller;
 use App\Http\Controllers\Api\Clientes\ClientesController;
 use App\Http\Controllers\Api\Compras\CargueComprasController;
+use App\Http\Controllers\Api\Contabilidad\ControlGasolinaController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\Documentos\DocumentosController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
+use App\Http\Controllers\Api\Materiales\MaterialesSolicitudesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosController;
@@ -25,6 +28,7 @@ use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\TalentoHumano\ApkController;
 use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
 use App\Http\Controllers\Api\TalentoHumano\FichaObra\FichaObraController;
@@ -42,6 +46,7 @@ use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
 use App\Http\Controllers\AuthMarcacionController;
 use App\Http\Controllers\ContratistasController;
+use App\Models\LinkDescargaAPK;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
 
@@ -221,9 +226,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     Route::get('administar-mis-activos', [KadexActivosController::class, 'misActivos']);
     Route::get('activo-pendientes', [KadexActivosController::class, 'activosSinConfirmar']);
-    Route::get('activo-aceptarActivo/{id}', [KadexActivosController::class, 'aceptarActivo']);
+    Route::post('activo-aceptarActivo', [KadexActivosController::class, 'aceptarActivo']);
     Route::post('activo-rechazarActivo', [KadexActivosController::class, 'rechazarActivo']);
     Route::get('activo-informacion/{id}', [KadexActivosController::class, 'infoActivo']);
+    Route::get('mensajero-activos', [KadexActivosController::class, 'mensajero']);
+    Route::post('confirmar-entrega-mensajero', [KadexActivosController::class, 'mensajeroEntrega']);
 
     //solicitar activo
     Route::get('solicitar-activos', [KadexActivosController::class, 'solicitarActivos']);
@@ -270,31 +277,74 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //reporte detallado
     Route::get('InformeDetalladoProyectosCasas/{id}', [GestionProyectosCasasController::class, 'InformeDetalladoProyectosCasas']);
 
-    
+
     //telefonos app mobile
     Route::post('validarTelefono', [AuthMarcacionController::class, 'validarTelefono']);
     Route::post('/registrar-telefono', [AuthMarcacionController::class, 'registrarTelefono']);
     Route::post('/registrar-sede', [AuthMarcacionController::class, 'registarUbicacionObra']);
     Route::get('/obras-app', [AuthMarcacionController::class, 'obrasApp']);
+    Route::get('/obras-app-permisos', [AuthMarcacionController::class, 'permisoObras']);
+    Route::post('/darPermisosObrasAsistencia', [AuthMarcacionController::class, 'darPermisosObrasAsistencia']);
 
     //marcacion
-    Route::post('consultar-cedula',[ControlAsistenciasController::class, 'consultarUsuario']);
-    Route::post('registrar-asistencia',[ControlAsistenciasController::class, 'registrarMarcacion']);
+    Route::post('consultar-cedula', [ControlAsistenciasController::class, 'consultarUsuario']);
+    Route::post('registrar-asistencia', [ControlAsistenciasController::class, 'registrarMarcacion']);
 
     //contratista
-    Route::apiResource('administar-contratistas',ContratistasController::class);
-    Route::get('contratistas',[ContratistasController::class,'ContratistasActivos']);
+    Route::apiResource('administar-contratistas', ContratistasController::class);
+    Route::get('contratistas', [ContratistasController::class, 'ContratistasActivos']);
 
     //personal no proyelco
-    Route::apiResource('personal-no-proyelco',PersonalController::class);
-    Route::get('empleados/{cedula}',[PersonalController::class,'usuarioCedulaFicha']);
+    Route::apiResource('personal-no-proyelco', PersonalController::class);
+    Route::get('empleados/{cedula}', [PersonalController::class, 'usuarioCedulaFicha']);
 
     //Crear ficha
-    Route::apiResource('ficha-obra',FichaObraController::class);
+    Route::apiResource('ficha-obra', FichaObraController::class);
     Route::post('/reportesth-asistencia', [ControlAsistenciasController::class, 'reporteAsistencia']);
-    
+    Route::post('/export-reporte-completo-asistencias-th ', [ControlAsistenciasController::class, 'exportReporteCompletoAsistenciasTH']);
+
     //unida de medida
-    Route::post('UnidadDeMedida',[ProyectosController::class, 'UnidadDeMedida']); 
-    Route::get('proyectosUnidadMedida',[ProyectosController::class, 'proyectosUnidadMedida']);
+    Route::post('UnidadDeMedida', [ProyectosController::class, 'UnidadDeMedida']);
+    Route::get('proyectosUnidadMedida', [ProyectosController::class, 'proyectosUnidadMedida']);
+
+    //rutas apra dar debaja empelado proyelco
+    Route::get('/activos/verificar-pendientes/{empleadoId}', [PersonalProyelcoController::class, 'checkActivosPendientes']);
+
+    // Inactivar empleado
+    Route::post('/personal/{id}/inactivar', [PersonalProyelcoController::class, 'inactivarPersonal']);
+
+
+    // Rutas para gestión de presupuesto y materiales
+
+    //proyectos nombre e id
+    Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
+    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
+    Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
+    Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
+    Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
+
+    //docuemntacion de proyectos
+    Route::get('gestion-documentos-emcali', [DocumentosController::class, 'indexEmcali']);
+    Route::get('gestion-documentos-celsia', [DocumentosController::class, 'indexCELSIA']);
+    Route::get('gestion-documentos-organismo', [DocumentosController::class, 'indexORGANISMOS']);
+    Route::get('gestion-documentosDetalle/{codigo_documento}', [DocumentosController::class, 'detalleDocumentos']);
+    Route::post('detalleDocumentosOrganismos', [DocumentosController::class, 'detalleDocumentosOrganismos']);
+    Route::get('gestion-documentos-proyectos', [DocumentosController::class, 'proyectosCodigo']);
+    Route::post('StoreDocumentacionRed', [DocumentosController::class, 'StoreDocumentacionRed']);
+    Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
+    Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
+
+
+    //CONTABILIDAD
+    //control de gasolina
+    Route::get('placas-carros', [ControlGasolinaController::class, 'placas']);
+    Route::get('conductores', [ControlGasolinaController::class, 'conductores']);
+    Route::post('dataControlGasolina', [ControlGasolinaController::class, 'dataControlGasolina']);
+
+    //link descargas apk (funcion en ruta)
+    Route::get('link-descargas', [ApkController::class, 'index']);
 });
 
+Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
+Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado'])
+    ->name('descargar.apk.firmado');

@@ -24,11 +24,11 @@ return new class extends Migration
             $table->date('fecha_salida')->nullable();
             $table->time('hora_salida')->nullable();
             $table->time('horas_laborales')->nullable();
-            $table->tinyInteger('tipo_obra'); //1 apartamentos 2 casas
-            $table->string('obra_id');
+            $table->unsignedBigInteger('obra_id'); //ubicacion
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('obra_id')->references('id')->on('bodegas_area');
         });
     }
 
