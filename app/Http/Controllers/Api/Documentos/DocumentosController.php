@@ -535,9 +535,10 @@ class DocumentosController extends Controller
             }
 
             // Si ambas tienen datos, combinarlas
-            $data = $dataApt->merge($dataCasas)
+            $data = $dataApt->concat($dataCasas)
                 ->sortBy('descripcion_proyecto')
                 ->values();
+
 
             return response()->json([
                 'status' => 'success',
@@ -1057,7 +1058,6 @@ class DocumentosController extends Controller
                     'fecha_confirmacion' => now(), // Agregar fecha de confirmación para el padre
                     'usuario_id' => Auth::id(),
                 ]);
-
             }
         } catch (\Exception $e) {
             logger()->error('Error al actualizar estado del padre: ' . $e->getMessage(), [
