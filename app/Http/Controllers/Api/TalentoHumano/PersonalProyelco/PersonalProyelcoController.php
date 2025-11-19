@@ -405,7 +405,6 @@ class PersonalProyelcoController extends Controller
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            info('Error al inactivar empleado:', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'status' => 'error',

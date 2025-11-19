@@ -144,7 +144,6 @@ class DocumentosController extends Controller
 
             if (is_object($fecha_entrega) && method_exists($fecha_entrega, 'format')) {
                 $fechaBase = $fecha_entrega;
-                info("Fecha ya es objeto Carbon/DateTime");
             } else if (is_string($fecha_entrega)) {
                 // PRIMERO: Intentar formato Y-m-d (2026-11-05)
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_entrega)) {
@@ -166,10 +165,8 @@ class DocumentosController extends Controller
                 throw new Exception("Formato de fecha no reconocido: " . gettype($fecha_entrega));
             }
         } catch (\Exception $e) {
-            info("Error al parsear fecha '$fecha_entrega': " . $e->getMessage());
             // Usar fecha actual como fallback
             $fechaBase = \Carbon\Carbon::now();
-            info("Usando fecha fallback: " . $fechaBase->format('Y-m-d'));
         }
 
         $cronograma = [];
@@ -281,7 +278,6 @@ class DocumentosController extends Controller
                 DB::table('documentacion_operadores')->insert($registro);
             }
         } catch (\Exception $e) {
-            info("Error al insertar cronograma: " . $e->getMessage());
             throw $e; // Relanzar la excepción para ver el error completo
         }
 
@@ -535,9 +531,10 @@ class DocumentosController extends Controller
             }
 
             // Si ambas tienen datos, combinarlas
-            $data = $dataApt->merge($dataCasas)
+            $data = $dataApt->concat($dataCasas)
                 ->sortBy('descripcion_proyecto')
                 ->values();
+
 
             return response()->json([
                 'status' => 'success',
@@ -657,7 +654,6 @@ class DocumentosController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
-            info("Error al confirmar documento: " . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -753,7 +749,6 @@ class DocumentosController extends Controller
                         'estado' => 1, // Disponible
                         'fecha_actual' => now(),
                     ]);
-                    info("Siguiente actividad principal habilitada después de grupo simultáneo: {$siguienteActividad->actividad_id}");
                 }
             }
         }
@@ -788,10 +783,8 @@ class DocumentosController extends Controller
                             ]);
                         }
                     }
-                    info("Grupo simultáneo habilitado para actividad: {$siguienteActividad->actividad_id}");
                 }
 
-                info("Siguiente actividad habilitada: {$siguienteActividad->actividad_id}");
             }
         }
     }
@@ -812,7 +805,6 @@ class DocumentosController extends Controller
                     'fecha_actual' => now(),
                 ]);
 
-                info("Actividad {$actividad_id} habilitada");
             }
         }
     }
@@ -842,15 +834,12 @@ class DocumentosController extends Controller
             ]);
 
             $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
-            info("Fecha actualizada para actividad ID {$actividad->id}: {$tipoAjuste} " . abs($diasDiferencia) . " días");
         }
 
-        info("Total de actividades actualizadas: " . $actividadesSiguientes->count());
     }
 
     private function documentosOrganismos($data)
     {
-        info("organismo--------");
         $etapa = $data->etapaProyecto;
         $nombre_etapa = $data->nombre_etapa;
         $codigoDocumentos = $data->codigoDocumentos;
@@ -882,23 +871,19 @@ class DocumentosController extends Controller
             $operador = $operadoresMap[$nombreOrganismo] ?? null;
 
             if (!$nombreOrganismo || !$operador) {
-                info("Organismo no válido ID: $organismoId");
                 continue;
             }
 
-            info("Procesando organismo: $nombreOrganismo (ID: $organismoId, Operador: $operador)");
 
             // Obtener TODAS las actividades para este operador
             $actividadesOperador = $dataActividades
                 ->where('operador', $operador)
                 ->sortBy('id');
 
-            info("Total actividades encontradas para $nombreOrganismo: " . $actividadesOperador->count());
 
             $orden = 1;
 
             foreach ($actividadesOperador as $actividad) {
-                info("Procesando actividad ID: {$actividad->id} - {$actividad->actividad} - Tipo: {$actividad->tipo}");
 
                 // Determinar el tipo para documentos_organismos
                 $tipoDocumento = '';
@@ -942,15 +927,12 @@ class DocumentosController extends Controller
                 ]);
 
                 $documentosInsertados[] = $documentoId;
-                info("Insertada actividad ID: $documentoId - Tipo: $tipoDocumento - Depende de: " . ($actividadDependeId ?? 'Ninguno'));
 
                 $orden++;
             }
 
-            info("Organismo $nombreOrganismo procesado con " . $actividadesOperador->count() . " actividades");
         }
 
-        info("Total de documentos insertados: " . count($documentosInsertados));
 
         return [
             'success' => true,
@@ -1029,7 +1011,6 @@ class DocumentosController extends Controller
             $documentoPadre = DocumentosOrganismos::where('actividad_id', $actividadDependeId)
                 ->where('codigo_documento', $codigo) // Asumiendo que el padre es tipo principal
                 ->first();
-            info($documentoPadre);
 
 
             if (!$documentoPadre) {
@@ -1057,7 +1038,6 @@ class DocumentosController extends Controller
                     'fecha_confirmacion' => now(), // Agregar fecha de confirmación para el padre
                     'usuario_id' => Auth::id(),
                 ]);
-
             }
         } catch (\Exception $e) {
             logger()->error('Error al actualizar estado del padre: ' . $e->getMessage(), [

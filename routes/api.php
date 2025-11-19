@@ -214,6 +214,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('administar-activos', ActivosController::class);
     Route::get('administar-activosBaja', [ActivosController::class, 'indexActivosBaja']);
     Route::get('usuariosAsignacion', [ActivosController::class, 'usuariosAsignacion']);
+    Route::post('bodega-responsable-activo', [ActivosController::class, 'bodegaResponsable']);
+    Route::get('bodega-responsable-activo-delete/{id}', [ActivosController::class, 'bodegaResponsableDelete']);
 
     Route::get('mis-activos-pendientes', [MisActivosController::class, 'index']);
     Route::get('mis-activos', [MisActivosController::class, 'misActivos']);
