@@ -692,10 +692,6 @@ class ProyectosController extends Controller
                 }
             }
 
-            //envio de data para documentos
-            $this->AuxDocumentos($request);
-
-
 
             DB::commit(); // Confirmamos los cambios
 
@@ -1117,11 +1113,6 @@ class ProyectosController extends Controller
                 'message' => 'Rango no válido',
             ], 500);
         }
-
-
-        Log::channel('consecutivos')->info("Usuario-modifica: $usuario Torre $torre Piso $piso Actualizando consecutivos de $desde a $hasta → empezando en $nuevoInicio");
-
-
 
 
         foreach ($consecutivos as $index => $original) {

@@ -148,15 +148,10 @@ class ControlAsistenciasController extends Controller
                         $archivoFoto = basename($archivos[0]);
                         $fotoUrl = asset('storage/SST/' . $archivoFoto);
 
-                        Log::info("Foto encontrada para empleado_id {$empleadoId}: " . $archivoFoto);
                         break; // Salir del loop cuando encuentre una foto
                     }
                 }
 
-                if (!$fotoUrl) {
-                    Log::info("No se encontró foto para empleado_id: " . $empleadoId);
-                    Log::info("Archivos en SST: " . json_encode(scandir($rutaBase)));
-                }
             }
 
             // Construir la respuesta

@@ -267,7 +267,6 @@ class FichaObraController extends Controller
             ], 200);
         } catch (Exception $e) {
             DB::rollBack();
-            info('Error en store: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -330,126 +329,66 @@ class FichaObraController extends Controller
 
 
 
-    // public function update(Request $request, $id)
-    // {
-    //     DB::beginTransaction();
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             // ... tus validaciones existentes ...
-    //             'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json(['errors' => $validator->errors()], 400);
-    //         }
-
-    //         // Buscar el empleado existente
-    //         $personal = FichaObra::findOrFail($id);
-
-    //         // Actualizar datos
-    //         $personal->rh = $request->tipo_sangre;
-    //         $personal->hijos = $request->numero_hijos;
-    //         $personal->eps = $request->eps;
-    //         $personal->afp = $request->pension;
-    //         $personal->contratista_id = $request->contratista_id;
-
-    //         // Procesar la foto si existe
-    //         if ($request->hasFile('foto')) {
-    //             $foto = $request->file('foto');
-
-    //             // Eliminar foto anterior si existe
-    //             if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
-    //                 Storage::disk('public')->delete($personal->foto);
-    //                 info('Foto anterior eliminada: ' . $personal->foto);
-    //             }
-
-    //             // Generar nombre único para el archivo
-    //             $nombreArchivo = 'empleado_' . $personal->id  .  '.' . $foto->getClientOriginalExtension();
-    //             // Guardar nueva foto
-    //             $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
-    //         }
-    //         $personal->save();
-
-
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'message' => 'Empleado actualizado exitosamente',
-    //             'data' => $personal
-    //         ], 200);
-    //     } catch (Exception $e) {
-    //         DB::rollBack();
-    //         info('Error en update: ' . $e->getMessage());
-
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
     public function update(Request $request, $id)
-{
-    DB::beginTransaction();
-    try {
-        $validator = Validator::make($request->all(), [
-            // ... tus validaciones existentes ...
-            'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
-        ]);
+    {
+        DB::beginTransaction();
+        try {
+            $validator = Validator::make($request->all(), [
+                // ... tus validaciones existentes ...
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
-
-        // Buscar el empleado existente
-        $personal = FichaObra::findOrFail($id);
-
-        // Actualizar datos
-        $personal->rh = $request->tipo_sangre;
-        $personal->hijos = $request->numero_hijos;
-        $personal->eps = $request->eps;
-        $personal->afp = $request->pension;
-        $personal->contratista_id = $request->contratista_id;
-
-        // Procesar la foto si existe
-        if ($request->hasFile('foto')) {
-            $foto = $request->file('foto');
-
-            // Eliminar foto anterior si existe
-            if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
-                Storage::disk('public')->delete($personal->foto);
-                info('Foto anterior eliminada: ' . $personal->foto);
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // Generar nombre único para el archivo
-            $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
-            
-            // Guardar nueva foto
-            $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
-            
-            // 🔹 GUARDAR LA RUTA EN EL MODELO
-            
+            // Buscar el empleado existente
+            $personal = FichaObra::findOrFail($id);
+
+            // Actualizar datos
+            $personal->rh = $request->tipo_sangre;
+            $personal->hijos = $request->numero_hijos;
+            $personal->eps = $request->eps;
+            $personal->afp = $request->pension;
+            $personal->contratista_id = $request->contratista_id;
+
+            // Procesar la foto si existe
+            if ($request->hasFile('foto')) {
+                $foto = $request->file('foto');
+
+                // Eliminar foto anterior si existe
+                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+                    Storage::disk('public')->delete($personal->foto);
+                }
+
+                // Generar nombre único para el archivo
+                $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+
+                // Guardar nueva foto
+                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+
+                // 🔹 GUARDAR LA RUTA EN EL MODELO
+
+            }
+
+            $personal->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Empleado actualizado exitosamente',
+                'data' => $personal
+            ], 200);
+        } catch (Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $personal->save();
-
-        DB::commit();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Empleado actualizado exitosamente',
-            'data' => $personal
-        ], 200);
-    } catch (Exception $e) {
-        DB::rollBack();
-
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
-        ], 500);
     }
-}
 
     public function destroy($id)
     {
