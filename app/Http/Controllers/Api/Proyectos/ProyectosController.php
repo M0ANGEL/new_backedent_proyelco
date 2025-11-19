@@ -1115,11 +1115,6 @@ class ProyectosController extends Controller
         }
 
 
-        Log::channel('consecutivos')->info("Usuario-modifica: $usuario Torre $torre Piso $piso Actualizando consecutivos de $desde a $hasta → empezando en $nuevoInicio");
-
-
-
-
         foreach ($consecutivos as $index => $original) {
             $nuevo = $nuevoInicio + $index;
 

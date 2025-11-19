@@ -251,9 +251,10 @@ class GestionProyectosCasasController extends Controller
     public function IniciarManzana(Request $request)
     {
 
+        info($request->all());
         // Validar los datos de entrada
         $validated = $request->validate([
-            'proyecto' => 'required|exists:proyecto,id',
+            'proyecto' => 'required|exists:proyectos_casas,id',
             'manzana' => 'required'
         ]);
 
@@ -280,7 +281,7 @@ class GestionProyectosCasasController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Torre iniciada correctamente',
+                'message' => 'Manzana iniciada correctamente',
                 'data' => [
                     'proyecto_id' => $proyectoId,
                     'manzana' => $manzana,
@@ -350,299 +351,162 @@ class GestionProyectosCasasController extends Controller
         }
     }
 
-    // private function procesarEtapa1($info, $proyecto)
-    // {
-    //     $manzana = $info->manzana;
-    //     $orden_proceso = $info->orden_proceso;
-    //     $piso = $info->piso;
-    //     $etapa = $info->etapa;
-    //     $casa = $info->casa;
-
-    //     // Buscar el siguiente proceso en la misma etapa
-    //     $siguiente = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //         ->where('manzana', $manzana)
-    //         ->where('etapa', $etapa)
-    //         ->where('casa', $casa)
-    //         ->where('orden_proceso', $orden_proceso + 1)
-    //         ->first();
-
-    //     /* nuevo: calcular si la casa es de 1 o 2 pisos */
-    //     $totalProcesosEtapa1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //         ->where('manzana', $manzana)
-    //         ->where('casa', $casa)
-    //         ->where('etapa', 1)
-    //         ->count();
-
-    //     $pisos = $totalProcesosEtapa1 > 4 ? 2 : 1;
-    //     // === NUEVAS REGLAS SEGÚN PISOS ===
-
-    //     // Si la casa es de 2 pisos
-    //     if ($pisos == 2) {
-
-    //         // Piso 1 -> habilitar destapada y prolongación cuando losa entre pisos esté confirmada
-    //         if (
-    //             strtolower($info->proceso->nombre_proceso) == 'losa entre pisos'
-    //             && $info->estado == ProcesoEstados::CONFIRMADO
-    //         ) {
-    //             $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //                 ->where('manzana', $manzana)
-    //                 ->where('casa', $casa)
-    //                 ->where('etapa', 2)
-    //                 ->where('piso', 1)
-    //                 ->whereHas('proceso', function ($q) {
-    //                     $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-    //                 })
-    //                 ->where('estado', ProcesoEstados::PENDIENTE)
-    //                 ->get();
-
-    //             foreach ($procesosEtapa2Piso1 as $proceso) {
-    //                 info($proceso);
-    //                 $todosPendientes = $proceso->validacion == 1 && $proceso->estado_validacion == 0;
-
-    //                 if ($todosPendientes) {
-    //                     return; // espera validación externa
-    //                 }
-    //                 $proceso->estado = ProcesoEstados::HABILITADO;
-    //                 $proceso->fecha_habilitado = now();
-    //                 $proceso->save();
-    //                 $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1', [
-    //                     'proceso_id' => $proceso->id
-    //                 ]);
-    //             }
-    //         }
-
-    //         // Piso 2 -> habilitar destapada y prolongación cuando muros segundo piso esté confirmado
-    //         if (
-    //             strtolower($info->proceso->nombre_proceso) == 'muros segundo piso'
-    //             && $info->estado == ProcesoEstados::CONFIRMADO
-    //         ) {
-    //             $procesosEtapa2Piso2 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //                 ->where('manzana', $manzana)
-    //                 ->where('casa', $casa)
-    //                 ->where('etapa', 2)
-    //                 ->where('piso', 2)
-    //                 ->whereHas('proceso', function ($q) {
-    //                     $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-    //                 })
-    //                 ->where('estado', ProcesoEstados::PENDIENTE)
-    //                 ->get();
-
-    //             foreach ($procesosEtapa2Piso2 as $proceso) {
-    //                 $todosPendientes = $proceso->every(fn($apt) => $apt->validacion == 1 && $apt->estado_validacion == 0);
-
-    //                 if ($todosPendientes) {
-    //                     return; // espera validación externa
-    //                 }
-
-    //                 $proceso->estado = ProcesoEstados::HABILITADO;
-    //                 $proceso->fecha_habilitado = now();
-    //                 $proceso->save();
-    //                 $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 2', [
-    //                     'proceso_id' => $proceso->id
-    //                 ]);
-    //             }
-    //         }
-    //     }
-
-    //     // Si la casa es de 1 piso
-    //     if ($pisos == 1) {
-    //         // Cuando se cumpla el último proceso de etapa 1
-    //         if (!$siguiente && $info->estado == ProcesoEstados::CONFIRMADO) {
-    //             $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-    //                 ->where('manzana', $manzana)
-    //                 ->where('casa', $casa)
-    //                 ->where('etapa', 2)
-    //                 ->where('piso', 1)
-    //                 ->whereHas('proceso', function ($q) {
-    //                     $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-    //                 })
-    //                 ->where('estado', ProcesoEstados::PENDIENTE)
-    //                 ->get();
-
-    //             foreach ($procesosEtapa2Piso1 as $proceso) {
-    //                 $proceso->estado = ProcesoEstados::HABILITADO;
-    //                 $proceso->fecha_habilitado = now();
-    //                 $proceso->save();
-    //                 $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1 (casa 1 piso)', [
-    //                     'proceso_id' => $proceso->id
-    //                 ]);
-    //             }
-    //         }
-    //     }
-
-    //     // Lógica original de habilitar el siguiente proceso en etapa 1
-    //     if ($siguiente) {
-    //         if ($siguiente->estado == ProcesoEstados::PENDIENTE) {
-    //             $siguiente->estado = ProcesoEstados::HABILITADO;
-    //             $siguiente->fecha_habilitado = now();
-    //             $siguiente->save();
-
-    //             $this->logProceso('Proceso habilitado en etapa 1', [
-    //                 'proceso_id' => $siguiente->id,
-    //                 'orden_proceso' => $siguiente->orden_proceso
-    //             ]);
-    //         }
-    //     }/*  else {
-    //         $this->habilitarInicioEtapa2($proyecto, $manzana, $casa);
-    //     } */
-    // }
-
     private function procesarEtapa1($info, $proyecto)
-{
-    $manzana = $info->manzana;
-    $orden_proceso = $info->orden_proceso;
-    $piso = $info->piso;
-    $etapa = $info->etapa;
-    $casa = $info->casa;
+    {
+        $manzana = $info->manzana;
+        $orden_proceso = $info->orden_proceso;
+        $piso = $info->piso;
+        $etapa = $info->etapa;
+        $casa = $info->casa;
 
-    // Buscar el siguiente proceso en la misma etapa
-    $siguiente = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-        ->where('manzana', $manzana)
-        ->where('etapa', $etapa)
-        ->where('casa', $casa)
-        ->where('orden_proceso', $orden_proceso + 1)
-        ->first();
+        // Buscar el siguiente proceso en la misma etapa
+        $siguiente = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
+            ->where('manzana', $manzana)
+            ->where('etapa', $etapa)
+            ->where('casa', $casa)
+            ->where('orden_proceso', $orden_proceso + 1)
+            ->first();
 
-    /* nuevo: calcular si la casa es de 1 o 2 pisos */
-    $totalProcesosEtapa1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-        ->where('manzana', $manzana)
-        ->where('casa', $casa)
-        ->where('etapa', 1)
-        ->count();
+        /* nuevo: calcular si la casa es de 1 o 2 pisos */
+        $totalProcesosEtapa1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
+            ->where('manzana', $manzana)
+            ->where('casa', $casa)
+            ->where('etapa', 1)
+            ->count();
 
-    $pisos = $totalProcesosEtapa1 > 4 ? 2 : 1;
-    
-    // === NUEVAS REGLAS SEGÚN PISOS ===
+        $pisos = $totalProcesosEtapa1 > 4 ? 2 : 1;
 
-    // Si la casa es de 2 pisos
-    if ($pisos == 2) {
+        // === NUEVAS REGLAS SEGÚN PISOS ===
 
-        // Piso 1 -> habilitar destapada y prolongación cuando losa entre pisos esté confirmada
-        if (
-            strtolower($info->proceso->nombre_proceso) == 'losa entre pisos'
-            && $info->estado == ProcesoEstados::CONFIRMADO
-        ) {
-            $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-                ->where('manzana', $manzana)
-                ->where('casa', $casa)
-                ->where('etapa', 2)
-                ->where('piso', 1)
-                ->whereHas('proceso', function ($q) {
-                    $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-                })
-                ->where('estado', ProcesoEstados::PENDIENTE)
-                ->get();
+        // Si la casa es de 2 pisos
+        if ($pisos == 2) {
 
-            foreach ($procesosEtapa2Piso1 as $proceso) {
-                // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
-                if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
-                    $this->logProceso('Validación pendiente - proceso no habilitado', [
-                        'proceso_id' => $proceso->id,
-                        'proceso_nombre' => $proceso->proceso->nombre_proceso
+            // Piso 1 -> habilitar destapada y prolongación cuando losa entre pisos esté confirmada
+            if (
+                strtolower($info->proceso->nombre_proceso) == 'losa entre pisos'
+                && $info->estado == ProcesoEstados::CONFIRMADO
+            ) {
+                $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
+                    ->where('manzana', $manzana)
+                    ->where('casa', $casa)
+                    ->where('etapa', 2)
+                    ->where('piso', 1)
+                    ->whereHas('proceso', function ($q) {
+                        $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
+                    })
+                    ->where('estado', ProcesoEstados::PENDIENTE)
+                    ->get();
+
+                foreach ($procesosEtapa2Piso1 as $proceso) {
+                    // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
+                    if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
+                        $this->logProceso('Validación pendiente - proceso no habilitado', [
+                            'proceso_id' => $proceso->id,
+                            'proceso_nombre' => $proceso->proceso->nombre_proceso
+                        ]);
+                        continue; // No habilita este proceso pero continúa con los demás
+                    }
+
+                    $proceso->estado = ProcesoEstados::HABILITADO;
+                    $proceso->fecha_habilitado = now();
+                    $proceso->save();
+                    $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1', [
+                        'proceso_id' => $proceso->id
                     ]);
-                    continue; // No habilita este proceso pero continúa con los demás
                 }
-                
-                $proceso->estado = ProcesoEstados::HABILITADO;
-                $proceso->fecha_habilitado = now();
-                $proceso->save();
-                $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1', [
-                    'proceso_id' => $proceso->id
-                ]);
+            }
+
+            // Piso 2 -> habilitar destapada y prolongación cuando muros segundo piso esté confirmado
+            if (
+                strtolower($info->proceso->nombre_proceso) == 'muros segundo piso'
+                && $info->estado == ProcesoEstados::CONFIRMADO
+            ) {
+                $procesosEtapa2Piso2 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
+                    ->where('manzana', $manzana)
+                    ->where('casa', $casa)
+                    ->where('etapa', 2)
+                    ->where('piso', 2)
+                    ->whereHas('proceso', function ($q) {
+                        $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
+                    })
+                    ->where('estado', ProcesoEstados::PENDIENTE)
+                    ->get();
+
+                foreach ($procesosEtapa2Piso2 as $proceso) {
+                    // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
+                    if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
+                        $this->logProceso('Validación pendiente - proceso no habilitado', [
+                            'proceso_id' => $proceso->id,
+                            'proceso_nombre' => $proceso->proceso->nombre_proceso
+                        ]);
+                        continue; // No habilita este proceso pero continúa con los demás
+                    }
+
+                    $proceso->estado = ProcesoEstados::HABILITADO;
+                    $proceso->fecha_habilitado = now();
+                    $proceso->save();
+                    $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 2', [
+                        'proceso_id' => $proceso->id
+                    ]);
+                }
             }
         }
 
-        // Piso 2 -> habilitar destapada y prolongación cuando muros segundo piso esté confirmado
-        if (
-            strtolower($info->proceso->nombre_proceso) == 'muros segundo piso'
-            && $info->estado == ProcesoEstados::CONFIRMADO
-        ) {
-            $procesosEtapa2Piso2 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-                ->where('manzana', $manzana)
-                ->where('casa', $casa)
-                ->where('etapa', 2)
-                ->where('piso', 2)
-                ->whereHas('proceso', function ($q) {
-                    $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-                })
-                ->where('estado', ProcesoEstados::PENDIENTE)
-                ->get();
+        // Si la casa es de 1 piso
+        if ($pisos == 1) {
+            // Cuando se cumpla el último proceso de etapa 1
+            if (!$siguiente && $info->estado == ProcesoEstados::CONFIRMADO) {
+                $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
+                    ->where('manzana', $manzana)
+                    ->where('casa', $casa)
+                    ->where('etapa', 2)
+                    ->where('piso', 1)
+                    ->whereHas('proceso', function ($q) {
+                        $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
+                    })
+                    ->where('estado', ProcesoEstados::PENDIENTE)
+                    ->get();
 
-            foreach ($procesosEtapa2Piso2 as $proceso) {
-                // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
-                if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
-                    $this->logProceso('Validación pendiente - proceso no habilitado', [
-                        'proceso_id' => $proceso->id,
-                        'proceso_nombre' => $proceso->proceso->nombre_proceso
+                foreach ($procesosEtapa2Piso1 as $proceso) {
+                    // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
+                    if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
+                        $this->logProceso('Validación pendiente - proceso no habilitado', [
+                            'proceso_id' => $proceso->id,
+                            'proceso_nombre' => $proceso->proceso->nombre_proceso
+                        ]);
+                        continue; // No habilita este proceso pero continúa con los demás
+                    }
+
+                    $proceso->estado = ProcesoEstados::HABILITADO;
+                    $proceso->fecha_habilitado = now();
+                    $proceso->save();
+                    $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1 (casa 1 piso)', [
+                        'proceso_id' => $proceso->id
                     ]);
-                    continue; // No habilita este proceso pero continúa con los demás
                 }
+            }
+        }
 
-                $proceso->estado = ProcesoEstados::HABILITADO;
-                $proceso->fecha_habilitado = now();
-                $proceso->save();
-                $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 2', [
-                    'proceso_id' => $proceso->id
+        // ✅ Lógica original de habilitar el siguiente proceso en etapa 1 - SE MANTIENE SIEMPRE
+        if ($siguiente && $siguiente->estado == ProcesoEstados::PENDIENTE) {
+            // Verificar si el siguiente proceso requiere validación
+            if ($siguiente->validacion == 1 && $siguiente->estado_validacion == 0) {
+                $this->logProceso('Validación pendiente - siguiente proceso no habilitado', [
+                    'proceso_id' => $siguiente->id,
+                    'proceso_nombre' => $siguiente->proceso->nombre_proceso
+                ]);
+            } else {
+                $siguiente->estado = ProcesoEstados::HABILITADO;
+                $siguiente->fecha_habilitado = now();
+                $siguiente->save();
+
+                $this->logProceso('Proceso habilitado en etapa 1', [
+                    'proceso_id' => $siguiente->id,
+                    'orden_proceso' => $siguiente->orden_proceso
                 ]);
             }
         }
     }
-
-    // Si la casa es de 1 piso
-    if ($pisos == 1) {
-        // Cuando se cumpla el último proceso de etapa 1
-        if (!$siguiente && $info->estado == ProcesoEstados::CONFIRMADO) {
-            $procesosEtapa2Piso1 = ProyectoCasaDetalle::where('proyecto_casa_id', $proyecto->id)
-                ->where('manzana', $manzana)
-                ->where('casa', $casa)
-                ->where('etapa', 2)
-                ->where('piso', 1)
-                ->whereHas('proceso', function ($q) {
-                    $q->whereIn(DB::raw('LOWER(nombre_proceso)'), ['destapada', 'prolongacion']);
-                })
-                ->where('estado', ProcesoEstados::PENDIENTE)
-                ->get();
-
-            foreach ($procesosEtapa2Piso1 as $proceso) {
-                // ✅ MODIFICACIÓN: Si validación es 0, no habilitar pero continuar con siguiente proceso
-                if ($proceso->validacion == 1 && $proceso->estado_validacion == 0) {
-                    $this->logProceso('Validación pendiente - proceso no habilitado', [
-                        'proceso_id' => $proceso->id,
-                        'proceso_nombre' => $proceso->proceso->nombre_proceso
-                    ]);
-                    continue; // No habilita este proceso pero continúa con los demás
-                }
-                
-                $proceso->estado = ProcesoEstados::HABILITADO;
-                $proceso->fecha_habilitado = now();
-                $proceso->save();
-                $this->logProceso('Habilitado destapada/prolongación en etapa 2 piso 1 (casa 1 piso)', [
-                    'proceso_id' => $proceso->id
-                ]);
-            }
-        }
-    }
-
-    // ✅ Lógica original de habilitar el siguiente proceso en etapa 1 - SE MANTIENE SIEMPRE
-    if ($siguiente && $siguiente->estado == ProcesoEstados::PENDIENTE) {
-        // Verificar si el siguiente proceso requiere validación
-        if ($siguiente->validacion == 1 && $siguiente->estado_validacion == 0) {
-            $this->logProceso('Validación pendiente - siguiente proceso no habilitado', [
-                'proceso_id' => $siguiente->id,
-                'proceso_nombre' => $siguiente->proceso->nombre_proceso
-            ]);
-        } else {
-            $siguiente->estado = ProcesoEstados::HABILITADO;
-            $siguiente->fecha_habilitado = now();
-            $siguiente->save();
-
-            $this->logProceso('Proceso habilitado en etapa 1', [
-                'proceso_id' => $siguiente->id,
-                'orden_proceso' => $siguiente->orden_proceso
-            ]);
-        }
-    }
-}
 
 
 

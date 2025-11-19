@@ -265,7 +265,6 @@ class MaterialesSolicitudesController extends Controller
             }
         }
 
-        info($dataArray);
 
         return response()->json([
             'status' => 'success',

@@ -33,5 +33,6 @@ class Activo extends Model
         'estado',
         'tipo_ubicacion',
         'ubicacion_actual_id',
+        'bodega_responsable',
     ];
 }

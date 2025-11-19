@@ -41,6 +41,7 @@ class ActivosController extends Controller
                     'activo.created_at',
                     'activo.updated_at',
                     'activo.marca',
+                    'activo.bodega_responsable',
                     'activo.serial',
                     'categoria_activos.nombre as categoria',
                     'subcategoria_activos.nombre as subcategoria',
@@ -150,7 +151,6 @@ class ActivosController extends Controller
             ], 500);
         }
     }
-
 
     public function indexActivosBaja()
     {
@@ -349,7 +349,6 @@ class ActivosController extends Controller
         }
     }
 
-
     public function destroy($id)
     {
         $categoria = Activo::find($id);
@@ -399,5 +398,54 @@ class ActivosController extends Controller
             ->where('activo.id', $id)
             ->first($id);
         return view('activos.qr', compact('activo'));
+    }
+
+    public function bodegaResponsable(Request $request)
+    {
+        $request->validate([
+            'activo_id' => 'required|exists:activo,id',
+            'bodega_id' => 'required' // Asumiendo que existe tabla bodegas
+        ]);
+
+        try {
+            $activo = Activo::findOrFail($request->activo_id);
+
+            $activo->update([
+                'bodega_responsable' => $request->bodega_id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Bodega responsable asignada correctamente',
+                'data' => $activo
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al asignar bodega responsable'
+            ], 500);
+        }
+    }
+
+    public function bodegaResponsableDelete($id)
+    {
+        try {
+            $activo = Activo::findOrFail($id);
+
+            $activo->update([
+                'bodega_responsable' => null
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Bodega responsable eliminada correctamente',
+                'data' => $activo
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar bodega responsable'
+            ], 500);
+        }
     }
 }

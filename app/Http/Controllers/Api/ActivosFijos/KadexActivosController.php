@@ -18,6 +18,31 @@ use Svg\Tag\Rect;
 
 class KadexActivosController extends Controller
 {
+    // public function index()
+    // {
+    //     //consulta a la bd los clientes
+    //     $clientes = DB::connection('mysql')
+    //         ->table('activo')
+    //         ->join('users', 'activo.user_id', '=', 'users.id')
+    //         ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
+    //         ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
+    //         ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+    //         ->select(
+    //             'activo.*',
+    //             'users.nombre as usuario',
+    //             'categoria_activos.nombre as categoria',
+    //             'subcategoria_activos.nombre as subcategoria',
+    //             'bodegas_area.nombre as bodega_actual'
+    //         )
+    //         ->whereIn('activo.aceptacion', ["0", "3"]) //todo los activos que no esten en transito de aceptacion
+    //         ->get();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $clientes
+    //     ]);
+    // }
+
     public function index()
     {
         //consulta a la bd los clientes
@@ -27,12 +52,18 @@ class KadexActivosController extends Controller
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
             ->join('bodegas_area', 'activo.ubicacion_actual_id', '=', 'bodegas_area.id')
+            ->leftJoin('kadex_activos', function ($join) {
+                $join->on('activo.id', '=', 'kadex_activos.activo_id')
+                    ->where('kadex_activos.mensajero', 1);
+            })
             ->select(
                 'activo.*',
                 'users.nombre as usuario',
                 'categoria_activos.nombre as categoria',
                 'subcategoria_activos.nombre as subcategoria',
-                'bodegas_area.nombre as bodega_actual'
+                'bodegas_area.nombre as bodega_actual',
+                'kadex_activos.mensajero as tiene_mensajero',
+                'kadex_activos.id as kadex_id'
             )
             ->whereIn('activo.aceptacion', ["0", "3"]) //todo los activos que no esten en transito de aceptacion
             ->get();
@@ -98,6 +129,7 @@ class KadexActivosController extends Controller
                 $activoData->usuarios_asignados = $request->filled('usuarios') ? json_encode($request->usuarios) : null;
                 $activoData->ubicacion_destino_id = $request->ubicacion_destino;
                 $activoData->usuarios_confirmaron = null;
+                $activoData->bodega_responsable = null;
                 $activoData->save();
             } else {
                 //aqui tomamos los datos del traslado
@@ -134,6 +166,7 @@ class KadexActivosController extends Controller
                 $activoData->usuarios_asignados = $userSolicitaActivo ? json_encode($userSolicitaActivo) : null;
                 $activoData->ubicacion_destino_id = $solicitud->bodega_solicita;
                 $activoData->usuarios_confirmaron = null;
+                $activoData->bodega_responsable = null;
                 $activoData->save();
 
                 $solicitud->estado = 1;
@@ -403,45 +436,6 @@ class KadexActivosController extends Controller
         ]);
     }
 
-    // public function historico()
-    // {
-    //     $clientes = DB::connection('mysql')
-    //         ->table('kadex_activos')
-    //         ->join('users', 'kadex_activos.user_id', '=', 'users.id')
-    //         ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
-    //         ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
-    //         ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-    //         ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
-    //         ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
-    //         ->select(
-    //             'kadex_activos.*',
-    //             'users.nombre as usuario',
-    //             'categoria_activos.nombre as categoria',
-    //             'subcategoria_activos.nombre as subcategoria',
-    //             'bodega_origen.nombre as bodega_origen',
-    //             'bodega_destino.nombre as bodega_destino',
-    //             'activo.numero_activo',
-    //             'activo.valor',
-    //             'activo.condicion',
-    //             'activo.descripcion',
-    //         )
-    //         ->orderBy('id', 'asc')
-    //         ->get();
-
-    //     foreach ($clientes as $proyecto) {
-    //         $encargadoIds = json_decode($proyecto->usuarios_asignados, true) ?? [];
-
-    //         $proyecto->usuariosAsignados = DB::table('users')
-    //             ->whereIn('id', $encargadoIds)
-    //             ->pluck('nombre');
-    //     }
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $clientes
-    //     ]);
-    // }
-
     public function historico(Request $request)
     {
         try {
@@ -700,6 +694,7 @@ class KadexActivosController extends Controller
             $cliente->tipo_ubicacion = 1;
             $cliente->observacion = $request->observacion;
             $cliente->aceptacion = 2;
+            $cliente->mensajero = $request->requiere_mensajero;
             $cliente->save(); // se guarda para obtener el ID
 
             $activoData->aceptacion = 0; //se pone el activo en estado 1 ya que esta en envio de aceptacion
@@ -731,8 +726,8 @@ class KadexActivosController extends Controller
             ->join('activo', 'kadex_activos.activo_id', '=', 'activo.id')
             ->join('categoria_activos', 'activo.categoria_id', '=', 'categoria_activos.id')
             ->join('subcategoria_activos', 'activo.subcategoria_id', '=', 'subcategoria_activos.id')
-            ->join('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
-            ->join('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
+            ->Leftjoin('bodegas_area as bodega_origen', 'kadex_activos.ubicacion_actual_id', '=', 'bodega_origen.id')
+            ->Leftjoin('bodegas_area as bodega_destino', 'kadex_activos.ubicacion_destino_id', '=', 'bodega_destino.id')
             ->select(
                 'kadex_activos.*',
                 'users.nombre as usuario',
@@ -746,7 +741,6 @@ class KadexActivosController extends Controller
                 'activo.descripcion',
             )
             ->orderBy('id', 'asc')
-            ->where('kadex_activos.aceptacion', 1)
             ->where('kadex_activos.mensajero', 1) //0 no 1 si 2 confirmador
             ->get();
 
@@ -759,8 +753,6 @@ class KadexActivosController extends Controller
     public function mensajeroEntrega(Request $request)
     {
         try {
-            info('Solicitud de mensajero entrega:', $request->all());
-
             // Validar los datos recibidos
             $request->validate([
                 'id' => 'required|exists:kadex_activos,id',
@@ -779,8 +771,6 @@ class KadexActivosController extends Controller
             $data->mensajero = 2; // esta confirmado
             $data->observacionMensajer = 'Mensajero: ' . Auth::user()->nombre . ' [ ' . $request->observacion . ' ]';
             $data->save();
-
-            info("Entrega confirmada por mensajero. Activo ID: {$request->id}, Usuario: " . Auth::user()->nombre);
 
             return response()->json([
                 'status' => 'success',
