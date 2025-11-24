@@ -32,6 +32,9 @@ class Kernel extends ConsoleKernel
         $schedule->job(new \App\Jobs\VerificarAptsSinFechaFinJob)
             ->dailyAt('00:00')
             ->timezone('America/Bogota');
+        // job de cerrar asistencia
+        $schedule->job(new \App\Jobs\CerrarAsistenciasJob)
+            ->dailyAt('23:59:59');
     }
 
 
