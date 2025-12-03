@@ -30,7 +30,7 @@ return new class extends Migration
             $table->decimal('cantidad', 15, 4)->nullable();
             $table->string('subcapitulo')->nullable();
             $table->decimal('cant_apu', 15, 4)->nullable();
-            $table->decimal('cant_total', 15, 4)->nullable(); //es la multiplicacion de cantidad de acometida por la cantida de apu
+            $table->decimal('cant_restante', 15, 4)->nullable(); //es la multiplicacion de cantidad de acometida por la cantida de apu
             $table->decimal('rend', 15, 4)->nullable();
             $table->integer('iva')->default(0);
             $table->decimal('valor_sin_iva', 20, 4)->nullable();
@@ -40,7 +40,7 @@ return new class extends Migration
 
             $table->foreign('user_id')->references('id')->on('users');
 
-              //idnex de mejor consulta
+            //idnex de mejor consulta
             $table->index('codigo_proyecto');
             $table->index('codigo');
             $table->index('nivel');
