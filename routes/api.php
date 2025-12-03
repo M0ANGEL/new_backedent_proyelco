@@ -334,6 +334,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-documentos-organismo', [DocumentosController::class, 'indexORGANISMOS']);
     Route::get('gestion-documentosDetalle/{codigo_documento}', [DocumentosController::class, 'detalleDocumentos']);
     Route::get('documentos-adjuntos/{documentoId}', [DocumentosController::class, 'obtenerAdjuntos']);
+    Route::get('documentos-adjuntos-organismos/{documentoId}', [DocumentosController::class, 'obtenerAdjuntosOrganismos']);
     Route::get('proyectoName/{codigo_proyecto}', [DocumentosController::class, 'proyectoName']);
     Route::post('detalleDocumentosOrganismos', [DocumentosController::class, 'detalleDocumentosOrganismos']);
     Route::get('gestion-documentos-proyectos', [DocumentosController::class, 'proyectosCodigo']);

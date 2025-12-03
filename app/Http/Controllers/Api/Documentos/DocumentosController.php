@@ -7,6 +7,7 @@ use App\Models\ActividadesOrganismos;
 use App\Models\Documentos;
 use App\Models\DocumentosAdjuntos;
 use App\Models\DocumentosOrganismos;
+use App\Models\DocumentosOrganismosAdjuntos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
 use Exception;
@@ -425,7 +426,6 @@ class DocumentosController extends Controller
             ->orderBy('orden')
             ->get();
 
-        info($data);
 
         return response()->json([
             'status' => 'success',
@@ -1076,68 +1076,104 @@ class DocumentosController extends Controller
         ];
     }
 
-    public function confirmarDocumentoOrganismo(Request $request)
-    {
-        // Validar los datos de entrada
-        $validated = $request->validate([
-            'id' => 'required|integer|exists:documentos_organismos,id',
-            'observacion' => 'nullable|string|max:500',
-        ]);
+ public function confirmarDocumentoOrganismo(Request $request)
+{
+    // Validar los datos de entrada
+    $validated = $request->validate([
+        'id' => 'required|integer|exists:documentos_organismos,id',
+        'observacion' => 'nullable|string|max:500',
+        'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1073741824', // hasta 1GB
+    ]);
 
-        try {
-            // Buscar el documento
-            $documento = DocumentosOrganismos::find($validated['id']);
+    try {
+        // Buscar el documento
+        $documento = DocumentosOrganismos::find($validated['id']);
 
-            if (!$documento) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Documento no encontrado'
-                ], 404);
-            }
-
-            // Verificar que el documento no esté ya confirmado
-            if ($documento->estado == 2) {
-                return response()->json([
-                    'status' => 'warning',
-                    'message' => 'El documento ya está confirmado'
-                ], 422);
-            }
-
-            // Actualizar el documento
-            $documento->update([
-                'estado' => 2, // Completado
-                'observacion' => $validated['observacion'] ?? null,
-                'fecha_confirmacion' => $validated['fecha_confirmacion'] ?? now(),
-                'usuario_id' => $validated['usuario_id'] ?? Auth::id(),
-            ]);
-
-            // Recargar el modelo para obtener los datos actualizados
-            $documento->refresh();
-
-            // Verificar si el documento tiene un padre (usando actividad_depende_id) y actualizarlo si todos los hijos están en estado 2
-            if ($documento->actividad_depende_id) {
-                $this->actualizarEstadoPadre($documento->actividad_depende_id, $documento->codigo_documento);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Documento confirmado exitosamente',
-                'data' => $documento
-            ], 200);
-        } catch (\Exception $e) {
-            // Log del error
-            logger()->error('Error al confirmar documento organismo: ' . $e->getMessage(), [
-                'request' => $validated,
-                'user_id' => Auth::id(),
-                'exception' => $e
-            ]);
-
+        if (!$documento) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error interno del servidor al confirmar el documento'
-            ], 500);
+                'message' => 'Documento no encontrado'
+            ], 404);
         }
+
+        // Verificar que el documento no esté ya confirmado
+        if ($documento->estado == 2) {
+            return response()->json([
+                'status' => 'warning',
+                'message' => 'El documento ya está confirmado'
+            ], 422);
+        }
+
+        // Actualizar el documento
+        $documento->update([
+            'estado' => 2, // Completado
+            'observacion' => $validated['observacion'] ?? null,
+            'fecha_confirmacion' => now(),
+            'usuario_id' => Auth::id(),
+        ]);
+
+        $archivosGuardados = [];
+
+        // Subir archivos (si existen)
+        if ($request->hasFile('archivos')) {
+            foreach ($request->file('archivos') as $archivo) {
+
+                // Generar nombre único
+                $nombreArchivo = $documento->id . '-' . time() . '-' . uniqid() . '.' . $archivo->getClientOriginalExtension();
+
+                // Guardar archivo en storage
+                $archivo->storeAs('public/documentacion/organismos', $nombreArchivo);
+
+                // Obtener ruta pública
+                $rutaPublica = Storage::url('documentacion/organismos/' . $nombreArchivo);
+
+                // Guardar en tabla documentos_organismos_adjuntos
+                \App\Models\DocumentosOrganismosAdjuntos::create([
+                    'documento_id' => $documento->id,
+                    'ruta_archivo' => $rutaPublica,
+                    'nombre_original' => $archivo->getClientOriginalName(),
+                    'extension' => $archivo->getClientOriginalExtension(),
+                    'tamano' => $archivo->getSize(),
+                ]);
+
+                // Agregar a array de respuesta
+                $archivosGuardados[] = [
+                    'nombre' => $archivo->getClientOriginalName(),
+                    'ruta' => $rutaPublica,
+                    'mime' => $archivo->getMimeType(),
+                ];
+            }
+        }
+
+        // Recargar el modelo para obtener los datos actualizados
+        $documento->refresh();
+
+        // Verificar si el documento tiene un padre y actualizarlo si todos los hijos están en estado 2
+        if ($documento->actividad_depende_id) {
+            $this->actualizarEstadoPadre($documento->actividad_depende_id, $documento->codigo_documento);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Documento confirmado y archivos subidos exitosamente',
+            'data' => $documento,
+            'archivos' => $archivosGuardados,
+        ], 200);
+
+    } catch (\Exception $e) {
+        logger()->error('Error al confirmar documento organismo: ' . $e->getMessage(), [
+            'request' => $validated,
+            'user_id' => Auth::id(),
+            'exception' => $e
+        ]);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error interno del servidor al confirmar el documento'
+        ], 500);
     }
+}
+
 
     private function actualizarEstadoPadre($actividadDependeId, $codigo)
     {
@@ -1205,6 +1241,12 @@ class DocumentosController extends Controller
     public function obtenerAdjuntos($documentoId)
     {
         $data =  DocumentosAdjuntos::where('documento_id', $documentoId)->get();
+        return response()->json($data);
+    }
+
+    public function obtenerAdjuntosOrganismos($documentoId)
+    {
+        $data =  DocumentosOrganismosAdjuntos::where('documento_id', $documentoId)->get();
         return response()->json($data);
     }
 }
