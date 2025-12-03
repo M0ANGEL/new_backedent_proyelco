@@ -381,7 +381,6 @@ class MaterialesSolicitudesController extends Controller
             $response['message'] = 'No se pudo actualizar ningún item';
         }
 
-        info('Resultado de la actualización:', $response);
 
         return response()->json($response);
     }

@@ -193,7 +193,6 @@ class ControlAsistenciasController extends Controller
     public function registrarMarcacion(Request $request)
     {
 
-        info($request->all());
         // Validar los datos requeridos
         $validator = Validator::make($request->all(), [
             'cedula' => 'required|string',

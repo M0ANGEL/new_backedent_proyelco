@@ -251,7 +251,6 @@ class GestionProyectosCasasController extends Controller
     public function IniciarManzana(Request $request)
     {
 
-        info($request->all());
         // Validar los datos de entrada
         $validated = $request->validate([
             'proyecto' => 'required|exists:proyectos_casas,id',
