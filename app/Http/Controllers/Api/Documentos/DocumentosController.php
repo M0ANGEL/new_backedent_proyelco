@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Documentos;
 use App\Http\Controllers\Controller;
 use App\Models\ActividadesOrganismos;
 use App\Models\Documentos;
+use App\Models\DocumentosAdjuntos;
 use App\Models\DocumentosOrganismos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
@@ -12,6 +13,7 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentosController extends Controller
 {
@@ -418,10 +420,12 @@ class DocumentosController extends Controller
     public function detalleDocumentos($codigo_documento)
     {
 
-        $data = Documentos::with('actividad') // Asegúrate de tener esta relación
+        $data = Documentos::with('actividad')
             ->where('codigo_documento', $codigo_documento)
             ->orderBy('orden')
             ->get();
+
+        info($data);
 
         return response()->json([
             'status' => 'success',
@@ -554,20 +558,128 @@ class DocumentosController extends Controller
 
     //EMCALI ETAPA 1
 
+    // public function confirmarDocumento(Request $request)
+    // {
+
+    //     try {
+    //         $request->validate([
+    //             'id' => 'required|exists:documentacion_operadores,id',
+    //             'codigo_proyecto' => 'required|string',
+    //             'codigo_documento' => 'required|string',
+    //             'etapa' => 'required|integer',
+    //             'actividad_id' => 'required|integer',
+    //             'observacion' => 'required|string',
+
+    //             // Aquí se ajusta a 1GB
+    //             'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576',
+    //         ]);
+
+
+    //         // Guardar el archivo
+    //         if ($request->hasFile('archivos')) {
+
+    //             foreach ($request->file('archivos') as $archivo) {
+
+    //                 $nombreArchivo = $request->codigo_proyecto . '-' .
+    //                     $request->codigo_documento . '-' .
+    //                     $request->etapa . '-' .
+    //                     $request->actividad_id . '-' .
+    //                     time() . '-' .
+    //                     uniqid() . '.' .
+    //                     $archivo->getClientOriginalExtension();
+
+    //                 $ruta = $archivo->storeAs(
+    //                     'public/documentacion/red',
+    //                     $nombreArchivo
+    //                 );
+
+    //                 // Guardarlo en la tabla documentos_adjuntos
+    //                 DocumentosAdjuntos::create([
+    //                     'documento_id' => $request->id,
+    //                     'ruta_archivo' => 'storage/documentacion/red/' . $nombreArchivo,
+    //                     'nombre_original' => $archivo->getClientOriginalName(),
+    //                     'extension' => $archivo->getClientOriginalExtension(),
+    //                     'tamano' => $archivo->getSize(),
+    //                 ]);
+    //             }
+    //         }
+
+
+    //         // 1. Obtener la actividad actual y calcular la diferencia de días
+    //         $actividadActual = Documentos::find($request->id);
+
+    //         // Calcular diferencia de días (positivo = retraso, negativo = adelanto)
+    //         $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
+    //         $fechaHoy = now();
+    //         $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
+
+
+    //         // 2. Actualizar la actividad actual a estado 2 (Completado)
+    //         $actividadActual->update([
+    //             'estado' => 2, // Completado
+    //             'observacion' => $request->observacion,
+    //             'fecha_confirmacion' => now(),
+    //             'fecha_actual' => now(),
+    //             'usuario_id' => Auth::id(),
+    //         ]);
+
+    //         // 3. Actualizar fechas de actividades siguientes según la diferencia de días
+    //         if ($diasDiferencia != 0) {
+    //             $this->actualizarFechasSiguientes(
+    //                 $request->codigo_proyecto,
+    //                 $request->codigo_documento,
+    //                 $request->etapa,
+    //                 $actividadActual->orden,
+    //                 $diasDiferencia
+    //             );
+    //         }
+
+    //         // 4. Aplicar reglas específicas para actividades 1-9
+    //         $this->aplicarReglasEspeciales(
+    //             $request->codigo_proyecto,
+    //             $request->codigo_documento,
+    //             $request->etapa,
+    //             $request->actividad_id,
+    //             $actividadActual->orden
+    //         );
+
+    //         // 5. Para actividades desde la 9 en adelante, aplicar lógica normal de flujo
+    //         if ($request->actividad_id >= 9) {
+    //             $this->aplicarLogicaNormalFlujo(
+    //                 $request->codigo_proyecto,
+    //                 $request->codigo_documento,
+    //                 $request->etapa,
+    //                 $actividadActual
+    //             );
+    //         }
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Actividad confirmada exitosamente' .
+    //                 ($diasDiferencia != 0 ?
+    //                     ($diasDiferencia > 0 ?
+    //                         " con {$diasDiferencia} días de retraso aplicados" :
+    //                         " con " . abs($diasDiferencia) . " días de adelanto aplicados")
+    //                     : ""),
+    //             'data' => [
+    //                 'actual' => $actividadActual,
+    //                 'dias_diferencia' => $diasDiferencia,
+    //                 'ajuste_aplicado' => $diasDiferencia != 0
+    //             ]
+    //         ]);
+    //     } catch (\Exception $e) {
+
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
     public function confirmarDocumento(Request $request)
     {
         try {
-            // Validar los datos recibidos
-            // $request->validate([
-            //     'id' => 'required|exists:documentacion_operadores,id',
-            //     'codigo_proyecto' => 'required|string',
-            //     'codigo_documento' => 'required|string',
-            //     'etapa' => 'required|integer',
-            //     'actividad_id' => 'required|integer',
-            //     'observacion' => 'required|string',
-            //     'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
-            // ]);
-
+            // Validación de campos y múltiples archivos
             $request->validate([
                 'id' => 'required|exists:documentacion_operadores,id',
                 'codigo_proyecto' => 'required|string',
@@ -576,53 +688,66 @@ class DocumentosController extends Controller
                 'actividad_id' => 'required|integer',
                 'observacion' => 'required|string',
 
-                // Aquí se ajusta a 1GB
-                'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576',
+                // Array de archivos
+                'archivos' => 'array',
+                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
             ]);
 
+            $archivosGuardados = [];
 
-            // Guardar el archivo
-            $rutaArchivo = null;
-            if ($request->hasFile('archivo')) {
-                $archivo = $request->file('archivo');
+            // Guardar archivos si existen
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $archivo) {
 
-                // Generar nombre del archivo según el formato requerido
-                $nombreArchivo = $request->codigo_proyecto . '-' .
-                    $request->codigo_documento . '-' .
-                    $request->etapa . '-' .
-                    $request->actividad_id . '.' .
-                    $archivo->getClientOriginalExtension();
+                    // Generar nombre único para cada archivo
+                    $nombreArchivo = $request->codigo_proyecto . '-' .
+                        $request->codigo_documento . '-' .
+                        $request->etapa . '-' .
+                        $request->actividad_id . '-' .
+                        time() . '-' .
+                        uniqid() . '.' .
+                        $archivo->getClientOriginalExtension();
 
-                /* la foto se guarda con codigo_proyecto-codigo_documento-etapa-actividad_id.ex */
+                    // Guardar archivo en storage
+                    $archivo->storeAs('public/documentacion/red', $nombreArchivo);
 
-                // Guardar en la ruta especificada
-                $ruta = $archivo->storeAs(
-                    'public/documentacion/red',
-                    $nombreArchivo
-                );
+                    // Obtener ruta pública
+                    $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
 
-                $rutaArchivo = 'storage/documentacion/red/' . $nombreArchivo;
+                    // Guardar en tabla documentos_adjuntos
+                    DocumentosAdjuntos::create([
+                        'documento_id' => $request->id,
+                        'ruta_archivo' => $rutaPublica,
+                        'nombre_original' => $archivo->getClientOriginalName(),
+                        'extension' => $archivo->getClientOriginalExtension(),
+                        'tamano' => $archivo->getSize(),
+                    ]);
+
+                    // Agregar a array de respuesta
+                    $archivosGuardados[] = [
+                        'nombre' => $archivo->getClientOriginalName(),
+                        'ruta' => $rutaPublica,
+                        'mime' => $archivo->getMimeType(),
+                    ];
+                }
             }
 
-            // 1. Obtener la actividad actual y calcular la diferencia de días
+            // 1. Obtener la actividad actual y calcular diferencia de días
             $actividadActual = Documentos::find($request->id);
-
-            // Calcular diferencia de días (positivo = retraso, negativo = adelanto)
             $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
             $fechaHoy = now();
             $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
 
-
-            // 2. Actualizar la actividad actual a estado 2 (Completado)
+            // 2. Actualizar actividad a estado 2 (Completado)
             $actividadActual->update([
-                'estado' => 2, // Completado
+                'estado' => 2,
                 'observacion' => $request->observacion,
                 'fecha_confirmacion' => now(),
                 'fecha_actual' => now(),
                 'usuario_id' => Auth::id(),
             ]);
 
-            // 3. Actualizar fechas de actividades siguientes según la diferencia de días
+            // 3. Actualizar fechas de actividades siguientes
             if ($diasDiferencia != 0) {
                 $this->actualizarFechasSiguientes(
                     $request->codigo_proyecto,
@@ -642,7 +767,7 @@ class DocumentosController extends Controller
                 $actividadActual->orden
             );
 
-            // 5. Para actividades desde la 9 en adelante, aplicar lógica normal de flujo
+            // 5. Para actividades >= 9, aplicar lógica normal
             if ($request->actividad_id >= 9) {
                 $this->aplicarLogicaNormalFlujo(
                     $request->codigo_proyecto,
@@ -652,6 +777,7 @@ class DocumentosController extends Controller
                 );
             }
 
+            // 6. Respuesta completa incluyendo archivos subidos
             return response()->json([
                 'status' => 'success',
                 'message' => 'Actividad confirmada exitosamente' .
@@ -659,15 +785,15 @@ class DocumentosController extends Controller
                         ($diasDiferencia > 0 ?
                             " con {$diasDiferencia} días de retraso aplicados" :
                             " con " . abs($diasDiferencia) . " días de adelanto aplicados")
-                        : ""),
+                        : ""
+                    ),
                 'data' => [
                     'actual' => $actividadActual,
                     'dias_diferencia' => $diasDiferencia,
-                    'ajuste_aplicado' => $diasDiferencia != 0
+                    'archivos' => $archivosGuardados, // ← aquí van todos los archivos subidos
                 ]
             ]);
         } catch (\Exception $e) {
-
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
@@ -1055,5 +1181,30 @@ class DocumentosController extends Controller
                 'exception' => $e
             ]);
         }
+    }
+
+
+    public function proyectoName($codigo_proyecto)
+    {
+        // Buscar primero en Proyectos
+        $data = Proyectos::where('codigo_proyecto', $codigo_proyecto)
+            ->select('descripcion_proyecto')
+            ->first();
+
+        // Si no existe, buscar en ProyectoCasa
+        if (!$data) {
+            $data = ProyectoCasa::where('codigo_proyecto', $codigo_proyecto)
+                ->select('descripcion_proyecto')
+                ->first();
+        }
+
+        return response()->json($data);
+    }
+
+
+    public function obtenerAdjuntos($documentoId)
+    {
+        $data =  DocumentosAdjuntos::where('documento_id', $documentoId)->get();
+        return response()->json($data);
     }
 }
