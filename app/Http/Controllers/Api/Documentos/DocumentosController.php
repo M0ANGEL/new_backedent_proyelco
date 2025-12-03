@@ -558,6 +558,16 @@ class DocumentosController extends Controller
     {
         try {
             // Validar los datos recibidos
+            // $request->validate([
+            //     'id' => 'required|exists:documentacion_operadores,id',
+            //     'codigo_proyecto' => 'required|string',
+            //     'codigo_documento' => 'required|string',
+            //     'etapa' => 'required|integer',
+            //     'actividad_id' => 'required|integer',
+            //     'observacion' => 'required|string',
+            //     'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+            // ]);
+
             $request->validate([
                 'id' => 'required|exists:documentacion_operadores,id',
                 'codigo_proyecto' => 'required|string',
@@ -565,8 +575,11 @@ class DocumentosController extends Controller
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
                 'observacion' => 'required|string',
-                'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+
+                // Aquí se ajusta a 1GB
+                'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576',
             ]);
+
 
             // Guardar el archivo
             $rutaArchivo = null;
@@ -784,7 +797,6 @@ class DocumentosController extends Controller
                         }
                     }
                 }
-
             }
         }
     }
@@ -804,7 +816,6 @@ class DocumentosController extends Controller
                     'estado' => 1,
                     'fecha_actual' => now(),
                 ]);
-
             }
         }
     }
@@ -835,7 +846,6 @@ class DocumentosController extends Controller
 
             $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
         }
-
     }
 
     private function documentosOrganismos($data)
@@ -930,7 +940,6 @@ class DocumentosController extends Controller
 
                 $orden++;
             }
-
         }
 
 

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string("marca",50)->nullable();
             $table->string("serial",100)->nullable();
             $table->tinyInteger('estado')->default(1); //1 activo 0 inactivo 2 de baja 
-            $table->tinyInteger('aceptacion')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado 
+            $table->tinyInteger('aceptacion')->default(0);  //0 sin asignar 1 en sin aceptar 2 asignado  3 rechazado
             $table->tinyInteger('tipo_ubicacion')->default(1); // 1 administrativas 2 obras
             $table->string('ubicacion_actual_id',5); //relacion con ubicacion
             $table->string('ubicacion_destino_id',5)->nullable(); //relacion con ubicacion

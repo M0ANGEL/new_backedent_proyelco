@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Excel;
 
 class ActivosController extends Controller
 {
@@ -447,5 +448,327 @@ class ActivosController extends Controller
                 'message' => 'Error al eliminar bodega responsable'
             ], 500);
         }
+    }
+
+
+
+    // public function reporteActivo(Request $request)
+    // {
+    //     $request->validate([
+    //         'fecha_inicio' => 'required|date',
+    //         'fecha_fin' => 'required|date|after_or_equal:fecha_inicio'
+    //     ]);
+
+    //     $fechaInicio = $request->fecha_inicio;
+    //     $fechaFin = $request->fecha_fin;
+
+    //     // Validar que no sea más de 4 meses
+    //     $start = Carbon::parse($fechaInicio);
+    //     $end = Carbon::parse($fechaFin);
+
+    //     if ($start->diffInMonths($end) > 4) {
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'El rango de fechas no puede ser mayor a 4 meses'
+    //         ], 400);
+    //     }
+
+    //     $totalPersonalProyelco = Activo::where('estado', 1)->count();
+
+    //     $asistencias = DB::connection('mysql')
+    //         ->table('asistencias_th')
+    //         //empleado
+    //         ->leftJoin('empleados_proyelco_th as ep', function ($join) {
+    //             $join->on('asistencias_th.empleado_id', '=', 'ep.id')
+    //                 ->where('asistencias_th.tipo_empleado', 1);
+    //         })
+    //         ->leftJoin('empleados_th as et', function ($join) {
+    //             $join->on('asistencias_th.empleado_id', '=', 'et.id')
+    //                 ->where('asistencias_th.tipo_empleado', 2);
+    //         })
+    //         //proyecto - AHORA SOLO CON bodegas_area
+    //         ->leftJoin('bodegas_area as ba', 'asistencias_th.obra_id', '=', 'ba.id')
+    //         //cargo
+    //         ->leftJoin('cargos_th as c', function ($join) {
+    //             $join->on('ep.cargo_id', '=', 'c.id')
+    //                 ->orOn('et.cargo_id', '=', 'c.id');
+    //         })
+    //         //contratista
+    //         ->leftJoin('ficha_th as f', 'asistencias_th.identificacion', '=', 'f.identificacion')
+    //         ->leftJoin('contratistas_th as cont', 'f.contratista_id', '=', 'cont.id')
+    //         ->select(
+    //             // Datos básicos de asistencias_th
+    //             'asistencias_th.id',
+    //             'asistencias_th.fecha_ingreso',
+    //             'asistencias_th.hora_ingreso',
+    //             'asistencias_th.fecha_salida',
+    //             'asistencias_th.hora_salida',
+    //             'asistencias_th.horas_laborales',
+    //             'asistencias_th.tipo_empleado',
+
+    //             // Datos del empleado
+    //             DB::raw("
+    //         CASE 
+    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.nombre_completo
+    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.nombre_completo
+    //         END as nombre_completo
+    //     "),
+    //             DB::raw("
+    //         CASE 
+    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.identificacion
+    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.identificacion
+    //         END as identificacion
+    //     "),
+    //             DB::raw("
+    //         CASE 
+    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.tipo_documento
+    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.tipo_documento
+    //         END as tipo_documento
+    //     "),
+    //             DB::raw("
+    //         CASE 
+    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.telefono_celular
+    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.telefono_celular
+    //         END as telefono_celular
+    //     "),
+
+    //             // Información de la obra - AHORA SOLO DESDE bodegas_area
+    //             'ba.nombre as nombre_obra',
+
+    //             // Información del contratista
+    //             'cont.contratista as nombre_contratista',
+    //             'cont.nit as nit_contratista',
+
+    //             // Cargo del empleado
+    //             'c.cargo',
+
+    //             // Tipo de empleado como texto
+    //             DB::raw("
+    //         CASE 
+    //             WHEN asistencias_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
+    //             WHEN asistencias_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
+    //             ELSE 'Desconocido'
+    //         END as tipo_empleado_texto
+    //     ")
+    //         )
+    //         ->whereBetween('asistencias_th.fecha_ingreso', [$fechaInicio, $fechaFin])
+    //         ->orderBy('asistencias_th.fecha_ingreso', 'desc')
+    //         ->orderBy('asistencias_th.hora_ingreso', 'desc')
+    //         ->get();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $asistencias,
+    //         'totalPersonalProyelco' => $totalPersonalProyelco
+    //     ]);
+    // }
+
+
+    public function exportarActivosExcel(Request $request)
+    {
+        try {
+            // Validar los filtros recibidos
+            $validated = $request->validate([
+                'search' => 'nullable|string|max:255',
+                'responsable' => 'nullable|string|max:255',
+                'estado' => 'nullable|string|in:1,2',
+                'condicion' => 'nullable|string|in:1,2,3',
+                'tipo_activo' => 'nullable|string|in:1,2',
+                'categoria' => 'nullable|string|max:255',
+                'aceptacion' => 'nullable|string|in:0,1,2,3,4',
+                'bodega_responsable' => 'nullable',
+                'fecha_inicio' => 'nullable|date',
+                'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            ]);
+
+            // Preparar filtros para la consulta
+            $filtros = $this->prepararFiltros($validated);
+
+            // Obtener la consulta base con relaciones
+            $query = ActivoFijo::with([
+                'categoria' => function($q) {
+                    $q->select('id', 'nombre');
+                },
+                'subcategoria' => function($q) {
+                    $q->select('id', 'nombre');
+                },
+                'bodegaActual' => function($q) {
+                    $q->select('id', 'nombre');
+                },
+                'bodegaResponsable' => function($q) {
+                    $q->select('id', 'nombre');
+                },
+                'usuariosAsignados' => function($q) {
+                    $q->with(['usuario' => function($q2) {
+                        $q2->select('id', 'nombre');
+                    }]);
+                }
+            ]);
+
+            // Aplicar filtros
+            $query = $this->aplicarFiltros($query, $filtros);
+
+            // Contar total de registros filtrados
+            $totalRegistros = $query->count();
+
+            // Si no hay registros, retornar error
+            if ($totalRegistros === 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se encontraron activos con los filtros especificados'
+                ], 404);
+            }
+
+            // Generar nombre del archivo
+            $fecha = now()->format('Ymd_His');
+            $nombreArchivo = "activos_filtrados_{$fecha}.xlsx";
+
+            // Exportar a Excel
+            return Excel::download(new ActivosFijosExport($query), $nombreArchivo);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error de validación',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error al exportar activos a Excel: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error interno del servidor al generar el reporte'
+            ], 500);
+        }
+    }
+
+    /**
+     * Preparar los filtros para la consulta
+     */
+    private function prepararFiltros(array $validated): array
+    {
+        $filtros = [];
+
+        // Búsqueda general
+        if (!empty($validated['search'])) {
+            $filtros['search'] = $validated['search'];
+        }
+
+        // Búsqueda por responsable
+        if (!empty($validated['responsable'])) {
+            $filtros['responsable'] = $validated['responsable'];
+        }
+
+        // Filtro por estado (1: Activo, 2: Inactivo)
+        if (!empty($validated['estado'])) {
+            $filtros['estado'] = $validated['estado'];
+        }
+
+        // Filtro por condición (1: Bueno, 2: Regular, 3: Malo)
+        if (!empty($validated['condicion'])) {
+            $filtros['condicion'] = $validated['condicion'];
+        }
+
+        // Filtro por tipo de activo (1: Mayores, 2: Menores)
+        if (!empty($validated['tipo_activo'])) {
+            $filtros['tipo_activo'] = $validated['tipo_activo'];
+        }
+
+        // Filtro por categoría (texto)
+        if (!empty($validated['categoria'])) {
+            $filtros['categoria'] = $validated['categoria'];
+        }
+
+        // Filtro por estado de traslado (0: Sin trasladar, 1: Pendiente, 2: Aceptado, 3: Sin trasladar, 4: Mantenimiento)
+        if (!empty($validated['aceptacion'])) {
+            $filtros['aceptacion'] = $validated['aceptacion'];
+        }
+
+        // Filtro por bodega responsable (puede ser array)
+        if (!empty($validated['bodega_responsable'])) {
+            $filtros['bodega_responsable'] = $validated['bodega_responsable'];
+        }
+
+        // Filtro por fechas (rango de creación)
+        if (!empty($validated['fecha_inicio']) && !empty($validated['fecha_fin'])) {
+            $filtros['fecha_inicio'] = $validated['fecha_inicio'];
+            $filtros['fecha_fin'] = $validated['fecha_fin'];
+        }
+
+        return $filtros;
+    }
+
+    /**
+     * Aplicar filtros a la consulta
+     */
+    private function aplicarFiltros($query, array $filtros)
+    {
+        // Búsqueda general en múltiples campos
+        if (!empty($filtros['search'])) {
+            $search = $filtros['search'];
+            $query->where(function($q) use ($search) {
+                $q->where('numero_activo', 'like', "%{$search}%")
+                  ->orWhere('descripcion', 'like', "%{$search}%")
+                  ->orWhere('marca', 'like', "%{$search}%")
+                  ->orWhere('serial', 'like', "%{$search}%")
+                  ->orWhere('observacion', 'like', "%{$search}%");
+            });
+        }
+
+        // Búsqueda por responsable (a través de la relación usuariosAsignados)
+        if (!empty($filtros['responsable'])) {
+            $responsable = $filtros['responsable'];
+            $query->whereHas('usuariosAsignados.usuario', function($q) use ($responsable) {
+                $q->where('nombre', 'like', "%{$responsable}%");
+            });
+        }
+
+        // Filtro por estado
+        if (!empty($filtros['estado'])) {
+            $query->where('estado', $filtros['estado']);
+        }
+
+        // Filtro por condición
+        if (!empty($filtros['condicion'])) {
+            $query->where('condicion', $filtros['condicion']);
+        }
+
+        // Filtro por tipo de activo
+        if (!empty($filtros['tipo_activo'])) {
+            $query->where('tipo_activo', $filtros['tipo_activo']);
+        }
+
+        // Filtro por categoría
+        if (!empty($filtros['categoria'])) {
+            $query->whereHas('categoria', function($q) use ($filtros) {
+                $q->where('nombre', 'like', "%{$filtros['categoria']}%");
+            });
+        }
+
+        // Filtro por estado de traslado
+        if (!empty($filtros['aceptacion'])) {
+            $query->where('aceptacion', $filtros['aceptacion']);
+        }
+
+        // Filtro por bodega responsable (puede ser array de IDs)
+        if (!empty($filtros['bodega_responsable'])) {
+            if (is_array($filtros['bodega_responsable'])) {
+                $query->whereIn('bodega_responsable', $filtros['bodega_responsable']);
+            } else {
+                $query->where('bodega_responsable', $filtros['bodega_responsable']);
+            }
+        }
+
+        // Filtro por rango de fechas (fecha de creación)
+        if (!empty($filtros['fecha_inicio']) && !empty($filtros['fecha_fin'])) {
+            $query->whereBetween('created_at', [
+                $filtros['fecha_inicio'] . ' 00:00:00',
+                $filtros['fecha_fin'] . ' 23:59:59'
+            ]);
+        }
+
+        // Ordenar por fecha de creación descendente
+        $query->orderBy('created_at', 'desc');
+
+        return $query;
     }
 }

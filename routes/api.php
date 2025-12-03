@@ -311,6 +311,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //rutas apra dar debaja empelado proyelco
     Route::get('/activos/verificar-pendientes/{empleadoId}', [PersonalProyelcoController::class, 'checkActivosPendientes']);
+    Route::post('/activos-fijos/exportar-excel',[ActivosController::class,'reporteActivo']);
 
     // Inactivar empleado
     Route::post('/personal/{id}/inactivar', [PersonalProyelcoController::class, 'inactivarPersonal']);
@@ -324,6 +325,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
     Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
+    Route::post('proyecion-material-update', [MaterialesSolicitudesController::class, 'MaterialPudate']);
+    Route::post('solicitud-maetiral-ingenieros', [MaterialesSolicitudesController::class, 'solicitudMaterialIngenieros']);
 
     //docuemntacion de proyectos
     Route::get('gestion-documentos-emcali', [DocumentosController::class, 'indexEmcali']);
