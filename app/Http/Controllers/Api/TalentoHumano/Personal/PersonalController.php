@@ -157,7 +157,7 @@ class PersonalController extends Controller
 
             //validar que la cedula sea unica en personal_proyelco, excluyendo el registro actual
             $cedulaUnicaProyelco = PersonalProyelco::where('identificacion', $request->identificacion)
-                ->where('id', '!=', $id) // ignorar el registro actual
+                // ->where('id', '!=', $id) // ignorar el registro actual
                 ->select('nombre_completo')
                 ->first();
 
