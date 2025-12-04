@@ -323,7 +323,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
     Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
     Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
-    Route::post('cargueProyecion', [MaterialesSolicitudesController::class, 'cargueProyecion']);
+    Route::post('cargueProyeccion', [MaterialesSolicitudesController::class, 'cargueProyeccion']);
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
     Route::post('proyecion-material-update', [MaterialesSolicitudesController::class, 'MaterialPudate']);
     Route::post('solicitud-maetiral-ingenieros', [MaterialesSolicitudesController::class, 'solicitudMaterialIngenieros']);
