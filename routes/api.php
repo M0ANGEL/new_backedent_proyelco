@@ -311,7 +311,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //rutas apra dar debaja empelado proyelco
     Route::get('/activos/verificar-pendientes/{empleadoId}', [PersonalProyelcoController::class, 'checkActivosPendientes']);
-    Route::post('/activos-fijos/exportar-excel',[ActivosController::class,'reporteActivo']);
+    Route::post('/activos-fijos/exportar-excel', [ActivosController::class, 'reporteActivo']);
 
     // Inactivar empleado
     Route::post('/personal/{id}/inactivar', [PersonalProyelcoController::class, 'inactivarPersonal']);
@@ -351,6 +351,20 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //link descargas apk (funcion en ruta)
     Route::get('link-descargas', [ApkController::class, 'index']);
+
+
+
+    //Solicitudes de historial de material
+    Route::get('getHistorialCcambiosProyeccion/{codigo}', [MaterialesSolicitudesController::class, 'getHistorialProyeccion']);
+    Route::post('generar-excel-version', [MaterialesSolicitudesController::class, 'generarExcelHistorial']);
+
+
+
+    Route::get('getHistorialSolicitudes/{codigo}', [MaterialesSolicitudesController::class, 'getHistorialSolicitudes']);
+    Route::post('generar-excel-solicitud', [MaterialesSolicitudesController::class, 'generarExcelSolicitud']);
+    Route::post('actualizar-solicitud-sinco', [MaterialesSolicitudesController::class, 'actualizarSolicitudSinco']);
+    Route::post('subir-pdf-solicitud', [MaterialesSolicitudesController::class, 'subirPDFSolicitud']);
+    Route::post('verificar-pdf-solicitud', [MaterialesSolicitudesController::class, 'verificarPdfSolicitud']);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);

@@ -13,11 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('solicitud_material', function (Blueprint $table) {
-             $table->id();
+        Schema::create('cambios_proyeccion_historial', function (Blueprint $table) {
+            $table->id();
             $table->unsignedBigInteger('user_id')->nullable()->comment('Usuario que realizó la modificación');
-            $table->string('numero_solicitud')->comment('Numero Unico de solicitud_erp para ver el orden');
-            $table->string('numero_solicitud_sinco')->nullable()->comment('Numero Unico de solicitud_erp');
+            $table->string('version_edicion')->comment('Versión o número de edición');
             $table->string('codigo_proyecto');
             $table->string('codigo_item');
             $table->string('codigo_insumo')->comment('Código del ítem');
@@ -27,11 +26,16 @@ return new class extends Migration
             $table->string('um')->comment('Unidad de medida');
 
             // Campos de cantidad
-            $table->decimal('cant_unitaria', 15, 4)->comment('Cantidad por unidad');
-            $table->decimal('cant_solicitada', 15, 4)->comment('Cantidad solicitada');
-            $table->decimal('cant_total', 15, 4)->comment('Cantidad total, es la multiplicacin de la cantidad por cant_retante');
+            $table->decimal('cant_old', 15, 4)->comment('Cantidad anterior');
+            $table->decimal('cant_modificada', 15, 4)->comment('Cantidad modificada');
+            $table->decimal('cant_final', 15, 4)->comment('Cantidad final');
 
-            $table->dateTime('fecha_solicitud')->comment('Fecha y hora que se solicita');
+            // Campos de cantidad APU
+            $table->decimal('cant_apu_old', 15, 4)->comment('Cantidad APU anterior');
+            $table->decimal('cant_apu_modificada', 15, 4)->comment('Cantidad APU modificada');
+            $table->decimal('cant_apu_final', 15, 4)->comment('Cantidad APU final');
+
+            $table->dateTime('fecha_modificacion')->comment('Fecha y hora de la modificación');
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users');
@@ -39,7 +43,7 @@ return new class extends Migration
             // Índices recomendados para mejor performance
             $table->index(['codigo_proyecto']);
             $table->index(['codigo_insumo']);
-            $table->index(['fecha_solicitud']);
+            $table->index(['fecha_modificacion']);
         });
     }
 
@@ -50,6 +54,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('solicitud_material');
+        Schema::dropIfExists('cambios_proyeccion_historial');
     }
 };
