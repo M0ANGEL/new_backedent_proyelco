@@ -20,6 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->nullable(); // usuario que carga el archivo
             $table->string('codigo_proyecto'); // código de proyecto ya que es único por casas o apartamentos
             $table->string('codigo'); // código de ítem
+            $table->string('codigo_insumo')->nullable(); // código del inusmo
             $table->text('descripcion');
             $table->string('padre')->nullable();
 
