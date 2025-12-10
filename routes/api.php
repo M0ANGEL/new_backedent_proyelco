@@ -365,6 +365,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('actualizar-solicitud-sinco', [MaterialesSolicitudesController::class, 'actualizarSolicitudSinco']);
     Route::post('subir-pdf-solicitud', [MaterialesSolicitudesController::class, 'subirPDFSolicitud']);
     Route::post('verificar-pdf-solicitud', [MaterialesSolicitudesController::class, 'verificarPdfSolicitud']);
+
+
+    //porcentajes de documentacion para ver en proyectos vista rapida
+    Route::get('estado-tramites-adminitrador',[DocumentosController::class , 'estadoTramitesAdmin']);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
