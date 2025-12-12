@@ -46,6 +46,7 @@ use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
 use App\Http\Controllers\AuthMarcacionController;
 use App\Http\Controllers\ContratistasController;
+use App\Http\Controllers\PoerBiController;
 use App\Models\LinkDescargaAPK;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
@@ -369,6 +370,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //porcentajes de documentacion para ver en proyectos vista rapida
     Route::get('estado-tramites-adminitrador',[DocumentosController::class , 'estadoTramitesAdmin']);
+
+    //manejos rutas informes powerBi
+    Route::post('manejo-informes-powerBi',[PoerBiController::class, 'Rutas']);
+    Route::apiResource('administrar-rutas-powerBi',PoerBiController::class);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
