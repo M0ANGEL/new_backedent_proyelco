@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Documentos\DocumentosController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
+use App\Http\Controllers\Api\LectorRFID\LectorRFIDController;
 use App\Http\Controllers\Api\Materiales\MaterialesSolicitudesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
@@ -369,15 +370,16 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
 
     //porcentajes de documentacion para ver en proyectos vista rapida
-    Route::get('estado-tramites-adminitrador',[DocumentosController::class , 'estadoTramitesAdmin']);
+    Route::get('estado-tramites-adminitrador', [DocumentosController::class, 'estadoTramitesAdmin']);
 
     //manejos rutas informes powerBi
-    Route::post('manejo-informes-powerBi',[PoerBiController::class, 'Rutas']);
-    Route::apiResource('administrar-rutas-powerBi',PoerBiController::class);
+    Route::post('manejo-informes-powerBi', [PoerBiController::class, 'Rutas']);
+    Route::apiResource('administrar-rutas-powerBi', PoerBiController::class);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
 Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado'])
     ->name('descargar.apk.firmado');
 
-    
+//api de rfid
+Route::post('rfid', [LectorRFIDController::class, 'registrarMarcacionRFID']);

@@ -19,6 +19,7 @@ class FichaObra extends Model
         'hijos',
         'eps',
         'afp',
-        'contratista_id'
+        'contratista_id',
+        'rfid'
     ];
 }
