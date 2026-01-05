@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Api\Documentos;
 use App\Http\Controllers\Controller;
 use App\Models\ActividadesOrganismos;
 use App\Models\Documentos;
+use App\Models\DocumentosAdjuntos;
 use App\Models\DocumentosOrganismos;
+use App\Models\DocumentosOrganismosAdjuntos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentosController extends Controller
 {
@@ -313,30 +316,61 @@ class DocumentosController extends Controller
     //CREAR DOCUMENTACION (FIN)
 
     //GESTION DE CONTUL DE PROYECTOS Y ACTIVIDADES INICIO
-
-    //CONSULTA DOCUMENTACION EMCALI
     public function indexEmcali()
     {
-        // Obtener proyectos de apartamentos con su documentación del operador 1
-        $proyectosApartamentos = Proyectos::with(['documentacion' => function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->where('operador', 1) // Filtro por operador 1 (EMCALI)
-                ->distinct();
-        }])->whereHas('documentacion', function ($query) {
-            $query->where('operador', 1); // Filtro en whereHas también
-        })->get();
+        $usuario = Auth::user();
+        $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
+        $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
 
-        // Obtener proyectos de casas con su documentación del operador 1
-        $proyectosCasas = ProyectoCasa::with(['documentacion' => function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->where('operador', 1) // Filtro por operador 1 (EMCALI)
-                ->distinct();
-        }])->whereHas('documentacion', function ($query) {
-            $query->where('operador', 1); // Filtro en whereHas también
-        })->get();
+        $data = collect([]);
 
-        // Combinar ambos resultados
-        $data = $proyectosApartamentos->merge($proyectosCasas);
+        $documentacionQuery = function ($query) {
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+                ->where('operador', 1)
+                ->distinct();
+        };
+
+        if ($tieneRolPermitido) {
+            // Trae todos los proyectos
+            $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+                ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+                ->get();
+
+            $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+                ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+                ->get();
+
+            $data = $proyectosApartamentos->merge($proyectosCasas);
+        } else {
+            // Solo proyectos asignados al usuario
+            $userId = Auth::id();
+
+            $proyectosAsignados = DB::table('proyecto')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            $proyectosCasaAsignados = DB::table('proyectos_casas')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            $proyectosAsignadosTotales = array_merge($proyectosAsignados, $proyectosCasaAsignados);
+
+            if (!empty($proyectosAsignadosTotales)) {
+                $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+                    ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+                    ->whereIn('codigo_proyecto', $proyectosAsignados)
+                    ->get();
+
+                $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+                    ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+                    ->whereIn('codigo_proyecto', $proyectosCasaAsignados)
+                    ->get();
+
+                $data = $proyectosApartamentos->merge($proyectosCasas);
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -347,26 +381,58 @@ class DocumentosController extends Controller
     //CONSULTA DOCUMENTACION CELSIA
     public function indexCelsia()
     {
-        // Obtener proyectos de apartamentos con su documentación del operador 1
-        $proyectosApartamentos = Proyectos::with(['documentacion' => function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->where('operador', 2) // Filtro por operador 1 (CELSIA)
-                ->distinct();
-        }])->whereHas('documentacion', function ($query) {
-            $query->where('operador', 2); // Filtro en whereHas también
-        })->get();
+        $usuario = Auth::user();
+        $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
+        $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
 
-        // Obtener proyectos de casas con su documentación del operador 1
-        $proyectosCasas = ProyectoCasa::with(['documentacion' => function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->where('operador', 2) // Filtro por operador 2 (CELSIA)
-                ->distinct();
-        }])->whereHas('documentacion', function ($query) {
-            $query->where('operador', 2); // Filtro en whereHas también
-        })->get();
+        $data = collect([]);
 
-        // Combinar ambos resultados
-        $data = $proyectosApartamentos->merge($proyectosCasas);
+        // Función reutilizable para la relación documentacion
+        $documentacionQuery = function ($query) {
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+                ->where('operador', 2) // Operador CELSIA
+                ->distinct();
+        };
+
+        if ($tieneRolPermitido) {
+            // Trae todos los proyectos
+            $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+                ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+                ->get();
+
+            $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+                ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+                ->get();
+
+            $data = $proyectosApartamentos->merge($proyectosCasas);
+        } else {
+            // Solo proyectos asignados al usuario
+            $userId = Auth::id();
+
+            $proyectosAsignados = DB::table('proyecto')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            $proyectosCasaAsignados = DB::table('proyectos_casas')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            if (!empty($proyectosAsignados) || !empty($proyectosCasaAsignados)) {
+                $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+                    ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+                    ->whereIn('codigo_proyecto', $proyectosAsignados)
+                    ->get();
+
+                $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+                    ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+                    ->whereIn('codigo_proyecto', $proyectosCasaAsignados)
+                    ->get();
+
+                $data = $proyectosApartamentos->merge($proyectosCasas);
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -377,35 +443,58 @@ class DocumentosController extends Controller
     //CONSULTA DOCUMENTACION ORGANISMOS
     public function indexORGANISMOS($operador = null)
     {
-        $query = Proyectos::with(['documentosOrganismos' => function ($query) use ($operador) {
+        $usuario = Auth::user();
+        $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
+        $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
+
+        $data = collect([]);
+
+        // Función reutilizable para la relación documentosOrganismos
+        $documentosQuery = function ($query) use ($operador) {
             $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->when($operador, function ($q) use ($operador) {
-                    $q->where('operador', $operador);
-                })
+                ->when($operador, fn($q) => $q->where('operador', $operador))
                 ->distinct();
-        }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
-            if ($operador) {
-                $query->where('operador', $operador);
+        };
+
+        if ($tieneRolPermitido) {
+            // Trae todos los proyectos
+            $proyectosApartamentos = Proyectos::with(['documentosOrganismos' => $documentosQuery])
+                ->whereHas('documentosOrganismos', fn($q) => $operador ? $q->where('operador', $operador) : $q)
+                ->get();
+
+            $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => $documentosQuery])
+                ->whereHas('documentosOrganismos', fn($q) => $operador ? $q->where('operador', $operador) : $q)
+                ->get();
+
+            $data = $proyectosApartamentos->merge($proyectosCasas);
+        } else {
+            // Solo proyectos asignados al usuario
+            $userId = Auth::id();
+
+            $proyectosAsignados = DB::table('proyecto')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            $proyectosCasaAsignados = DB::table('proyectos_casas')
+                ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+                ->pluck('codigo_proyecto')
+                ->toArray();
+
+            if (!empty($proyectosAsignados) || !empty($proyectosCasaAsignados)) {
+                $proyectosApartamentos = Proyectos::with(['documentosOrganismos' => $documentosQuery])
+                    ->whereHas('documentosOrganismos', fn($q) => $operador ? $q->where('operador', $operador) : $q)
+                    ->whereIn('codigo_proyecto', $proyectosAsignados)
+                    ->get();
+
+                $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => $documentosQuery])
+                    ->whereHas('documentosOrganismos', fn($q) => $operador ? $q->where('operador', $operador) : $q)
+                    ->whereIn('codigo_proyecto', $proyectosCasaAsignados)
+                    ->get();
+
+                $data = $proyectosApartamentos->merge($proyectosCasas);
             }
-        });
-
-        $proyectosApartamentos = $query->get();
-
-        // Similar para ProyectoCasa...
-        $proyectosCasas = ProyectoCasa::with(['documentosOrganismos' => function ($query) use ($operador) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
-                ->when($operador, function ($q) use ($operador) {
-                    $q->where('operador', $operador);
-                })
-                ->distinct();
-        }])->whereHas('documentosOrganismos', function ($query) use ($operador) {
-            if ($operador) {
-                $query->where('operador', $operador);
-            }
-        })->get();
-
-        $data = $proyectosApartamentos->merge($proyectosCasas);
-        // $data = $proyectosApartamentos;
+        }
 
         return response()->json([
             'status' => 'success',
@@ -418,10 +507,11 @@ class DocumentosController extends Controller
     public function detalleDocumentos($codigo_documento)
     {
 
-        $data = Documentos::with('actividad') // Asegúrate de tener esta relación
+        $data = Documentos::with('actividad')
             ->where('codigo_documento', $codigo_documento)
             ->orderBy('orden')
             ->get();
+
 
         return response()->json([
             'status' => 'success',
@@ -550,14 +640,10 @@ class DocumentosController extends Controller
         }
     }
 
-    //GESTION DE CONTUL DE PROYECTOS Y ACTIVIDADES FIN
-
-    //EMCALI ETAPA 1
-
     public function confirmarDocumento(Request $request)
     {
         try {
-            // Validar los datos recibidos
+            // Validación de campos y múltiples archivos
             $request->validate([
                 'id' => 'required|exists:documentacion_operadores,id',
                 'codigo_proyecto' => 'required|string',
@@ -565,51 +651,67 @@ class DocumentosController extends Controller
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
                 'observacion' => 'required|string',
-                'archivo' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+
+                // Array de archivos
+                'archivos' => 'array',
+                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
             ]);
 
-            // Guardar el archivo
-            $rutaArchivo = null;
-            if ($request->hasFile('archivo')) {
-                $archivo = $request->file('archivo');
+            $archivosGuardados = [];
 
-                // Generar nombre del archivo según el formato requerido
-                $nombreArchivo = $request->codigo_proyecto . '-' .
-                    $request->codigo_documento . '-' .
-                    $request->etapa . '-' .
-                    $request->actividad_id . '.' .
-                    $archivo->getClientOriginalExtension();
+            // Guardar archivos si existen
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $archivo) {
 
-                /* la foto se guarda con codigo_proyecto-codigo_documento-etapa-actividad_id.ex */
+                    // Generar nombre único para cada archivo
+                    $nombreArchivo = $request->codigo_proyecto . '-' .
+                        $request->codigo_documento . '-' .
+                        $request->etapa . '-' .
+                        $request->actividad_id . '-' .
+                        time() . '-' .
+                        uniqid() . '.' .
+                        $archivo->getClientOriginalExtension();
 
-                // Guardar en la ruta especificada
-                $ruta = $archivo->storeAs(
-                    'public/documentacion/red',
-                    $nombreArchivo
-                );
+                    // Guardar archivo en storage
+                    $archivo->storeAs('public/documentacion/red', $nombreArchivo);
 
-                $rutaArchivo = 'storage/documentacion/red/' . $nombreArchivo;
+                    // Obtener ruta pública
+                    $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
+
+                    // Guardar en tabla documentos_adjuntos
+                    DocumentosAdjuntos::create([
+                        'documento_id' => $request->id,
+                        'ruta_archivo' => $rutaPublica,
+                        'nombre_original' => $archivo->getClientOriginalName(),
+                        'extension' => $archivo->getClientOriginalExtension(),
+                        'tamano' => $archivo->getSize(),
+                    ]);
+
+                    // Agregar a array de respuesta
+                    $archivosGuardados[] = [
+                        'nombre' => $archivo->getClientOriginalName(),
+                        'ruta' => $rutaPublica,
+                        'mime' => $archivo->getMimeType(),
+                    ];
+                }
             }
 
-            // 1. Obtener la actividad actual y calcular la diferencia de días
+            // 1. Obtener la actividad actual y calcular diferencia de días
             $actividadActual = Documentos::find($request->id);
-
-            // Calcular diferencia de días (positivo = retraso, negativo = adelanto)
             $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
             $fechaHoy = now();
             $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
 
-
-            // 2. Actualizar la actividad actual a estado 2 (Completado)
+            // 2. Actualizar actividad a estado 2 (Completado)
             $actividadActual->update([
-                'estado' => 2, // Completado
+                'estado' => 2,
                 'observacion' => $request->observacion,
                 'fecha_confirmacion' => now(),
                 'fecha_actual' => now(),
                 'usuario_id' => Auth::id(),
             ]);
 
-            // 3. Actualizar fechas de actividades siguientes según la diferencia de días
+            // 3. Actualizar fechas de actividades siguientes
             if ($diasDiferencia != 0) {
                 $this->actualizarFechasSiguientes(
                     $request->codigo_proyecto,
@@ -629,7 +731,7 @@ class DocumentosController extends Controller
                 $actividadActual->orden
             );
 
-            // 5. Para actividades desde la 9 en adelante, aplicar lógica normal de flujo
+            // 5. Para actividades >= 9, aplicar lógica normal
             if ($request->actividad_id >= 9) {
                 $this->aplicarLogicaNormalFlujo(
                     $request->codigo_proyecto,
@@ -639,6 +741,7 @@ class DocumentosController extends Controller
                 );
             }
 
+            // 6. Respuesta completa incluyendo archivos subidos
             return response()->json([
                 'status' => 'success',
                 'message' => 'Actividad confirmada exitosamente' .
@@ -646,15 +749,15 @@ class DocumentosController extends Controller
                         ($diasDiferencia > 0 ?
                             " con {$diasDiferencia} días de retraso aplicados" :
                             " con " . abs($diasDiferencia) . " días de adelanto aplicados")
-                        : ""),
+                        : ""
+                    ),
                 'data' => [
                     'actual' => $actividadActual,
                     'dias_diferencia' => $diasDiferencia,
-                    'ajuste_aplicado' => $diasDiferencia != 0
+                    'archivos' => $archivosGuardados, // ← aquí van todos los archivos subidos
                 ]
             ]);
         } catch (\Exception $e) {
-
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
@@ -784,7 +887,6 @@ class DocumentosController extends Controller
                         }
                     }
                 }
-
             }
         }
     }
@@ -804,7 +906,6 @@ class DocumentosController extends Controller
                     'estado' => 1,
                     'fecha_actual' => now(),
                 ]);
-
             }
         }
     }
@@ -835,7 +936,6 @@ class DocumentosController extends Controller
 
             $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
         }
-
     }
 
     private function documentosOrganismos($data)
@@ -930,7 +1030,6 @@ class DocumentosController extends Controller
 
                 $orden++;
             }
-
         }
 
 
@@ -947,6 +1046,7 @@ class DocumentosController extends Controller
         $validated = $request->validate([
             'id' => 'required|integer|exists:documentos_organismos,id',
             'observacion' => 'nullable|string|max:500',
+            'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1073741824', // hasta 1GB
         ]);
 
         try {
@@ -972,25 +1072,58 @@ class DocumentosController extends Controller
             $documento->update([
                 'estado' => 2, // Completado
                 'observacion' => $validated['observacion'] ?? null,
-                'fecha_confirmacion' => $validated['fecha_confirmacion'] ?? now(),
-                'usuario_id' => $validated['usuario_id'] ?? Auth::id(),
+                'fecha_confirmacion' => now(),
+                'usuario_id' => Auth::id(),
             ]);
+
+            $archivosGuardados = [];
+
+            // Subir archivos (si existen)
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $archivo) {
+
+                    // Generar nombre único
+                    $nombreArchivo = $documento->id . '-' . time() . '-' . uniqid() . '.' . $archivo->getClientOriginalExtension();
+
+                    // Guardar archivo en storage
+                    $archivo->storeAs('public/documentacion/organismos', $nombreArchivo);
+
+                    // Obtener ruta pública
+                    $rutaPublica = Storage::url('documentacion/organismos/' . $nombreArchivo);
+
+                    // Guardar en tabla documentos_organismos_adjuntos
+                    \App\Models\DocumentosOrganismosAdjuntos::create([
+                        'documento_id' => $documento->id,
+                        'ruta_archivo' => $rutaPublica,
+                        'nombre_original' => $archivo->getClientOriginalName(),
+                        'extension' => $archivo->getClientOriginalExtension(),
+                        'tamano' => $archivo->getSize(),
+                    ]);
+
+                    // Agregar a array de respuesta
+                    $archivosGuardados[] = [
+                        'nombre' => $archivo->getClientOriginalName(),
+                        'ruta' => $rutaPublica,
+                        'mime' => $archivo->getMimeType(),
+                    ];
+                }
+            }
 
             // Recargar el modelo para obtener los datos actualizados
             $documento->refresh();
 
-            // Verificar si el documento tiene un padre (usando actividad_depende_id) y actualizarlo si todos los hijos están en estado 2
+            // Verificar si el documento tiene un padre y actualizarlo si todos los hijos están en estado 2
             if ($documento->actividad_depende_id) {
                 $this->actualizarEstadoPadre($documento->actividad_depende_id, $documento->codigo_documento);
             }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Documento confirmado exitosamente',
-                'data' => $documento
+                'message' => 'Documento confirmado y archivos subidos exitosamente',
+                'data' => $documento,
+                'archivos' => $archivosGuardados,
             ], 200);
         } catch (\Exception $e) {
-            // Log del error
             logger()->error('Error al confirmar documento organismo: ' . $e->getMessage(), [
                 'request' => $validated,
                 'user_id' => Auth::id(),
@@ -1003,6 +1136,7 @@ class DocumentosController extends Controller
             ], 500);
         }
     }
+
 
     private function actualizarEstadoPadre($actividadDependeId, $codigo)
     {
@@ -1046,5 +1180,104 @@ class DocumentosController extends Controller
                 'exception' => $e
             ]);
         }
+    }
+
+
+    public function proyectoName($codigo_proyecto)
+    {
+        // Buscar primero en Proyectos
+        $data = Proyectos::where('codigo_proyecto', $codigo_proyecto)
+            ->select('descripcion_proyecto')
+            ->first();
+
+        // Si no existe, buscar en ProyectoCasa
+        if (!$data) {
+            $data = ProyectoCasa::where('codigo_proyecto', $codigo_proyecto)
+                ->select('descripcion_proyecto')
+                ->first();
+        }
+
+        return response()->json($data);
+    }
+
+
+    public function obtenerAdjuntos($documentoId)
+    {
+        $data =  DocumentosAdjuntos::where('documento_id', $documentoId)->get();
+        return response()->json($data);
+    }
+
+    public function obtenerAdjuntosOrganismos($documentoId)
+    {
+        $data =  DocumentosOrganismosAdjuntos::where('documento_id', $documentoId)->get();
+        return response()->json($data);
+    }
+
+
+    //ESTADO Y PROCENTAJES DE LA DOCUMENTACION POR PROYECTO
+    public function estadoTramitesAdmin()
+    {
+        $documentos = Documentos::select('codigo_proyecto', 'estado', 'operador')->get();
+        $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
+
+        // Función para documentos (agrupado por proyecto)
+        $calcularPorcentajesDocumentos = function ($coleccion) {
+            return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+                $total = $items->count();
+                $completos = $items->where('estado', 2)->count();
+
+                return [
+                    'tipo' => 'documentos',
+                    'codigo_proyecto' => $proyecto,
+                    'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                    'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                ];
+            })->values();
+        };
+
+        // Función para organismos (estructura anidada: proyecto -> operadores)
+        $calcularPorcentajesOrganismos = function ($coleccion) {
+            $resultados = [];
+
+            // Agrupar por proyecto
+            $porProyecto = $coleccion->groupBy('codigo_proyecto');
+
+            foreach ($porProyecto as $proyecto => $itemsProyecto) {
+                $proyectoData = [
+                    'codigo_proyecto' => $proyecto,
+                    'tipo' => 'organismos',
+                    'operadores' => []
+                ];
+
+                // Agrupar por operador dentro del proyecto
+                $porOperador = $itemsProyecto->groupBy('operador');
+
+                foreach ($porOperador as $operador => $items) {
+                    $total = $items->count();
+                    $completos = $items->where('estado', 2)->count();
+
+                    $proyectoData['operadores'][] = [
+                        'operador' => $operador,
+                        'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                        'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                        'total' => $total,
+                        'completados' => $completos,
+                        'pendientes' => $total - $completos
+                    ];
+                }
+
+                $resultados[] = $proyectoData;
+            }
+
+            return collect($resultados);
+        };
+
+        return response()->json([
+            'status' => 'success',
+            'porcentajes' => [
+                'documentos' => $calcularPorcentajesDocumentos($documentos),
+                'organismos' => $calcularPorcentajesOrganismos($organismos)
+            ]
+        ]);
     }
 }

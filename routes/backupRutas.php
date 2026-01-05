@@ -18,7 +18,6 @@ use App\Http\Controllers\Api\Documentos\DocumentosController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\EmpxUsuController;
 use App\Http\Controllers\Api\GestionPerfilesController;
-use App\Http\Controllers\Api\LectorRFID\LectorRFIDController;
 use App\Http\Controllers\Api\Materiales\MaterialesSolicitudesController;
 use App\Http\Controllers\Api\Proveedores\ProveedoresController;
 use App\Http\Controllers\Api\Proyectos\GestionProyectosCasasController;
@@ -47,7 +46,6 @@ use App\Http\Controllers\Auth\HorarioAdicionalesController;
 use App\Http\Controllers\Auth\HorariosController;
 use App\Http\Controllers\AuthMarcacionController;
 use App\Http\Controllers\ContratistasController;
-use App\Http\Controllers\PoerBiController;
 use App\Models\LinkDescargaAPK;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
@@ -367,19 +365,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('actualizar-solicitud-sinco', [MaterialesSolicitudesController::class, 'actualizarSolicitudSinco']);
     Route::post('subir-pdf-solicitud', [MaterialesSolicitudesController::class, 'subirPDFSolicitud']);
     Route::post('verificar-pdf-solicitud', [MaterialesSolicitudesController::class, 'verificarPdfSolicitud']);
-
-
-    //porcentajes de documentacion para ver en proyectos vista rapida
-    Route::get('estado-tramites-adminitrador', [DocumentosController::class, 'estadoTramitesAdmin']);
-
-    //manejos rutas informes powerBi
-    Route::post('manejo-informes-powerBi', [PoerBiController::class, 'Rutas']);
-    Route::apiResource('administrar-rutas-powerBi', PoerBiController::class);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
 Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado'])
     ->name('descargar.apk.firmado');
 
-//api de rfid
-Route::post('rfid', [LectorRFIDController::class, 'registrarMarcacionRFID']);
+    

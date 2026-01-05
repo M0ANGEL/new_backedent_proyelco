@@ -72,16 +72,12 @@ class ControlAsistenciasController extends Controller
             $usuario = User::where('cedula', $empleado->identificacion)->first();
 
             // Si el usuario NO existe o su rol NO es "INGENIERO OBRA", se valida si está registrado en otra obra
-            if (!$usuario || $usuario->rol !== "INGENIERO OBRA") {
-
+            if (!$usuario || ($usuario->rol !== "Ingeniero Obra" && $usuario->rol !== "sst")) {
                 if ($ultimaAsistencia) {
-                    // Si ya tiene registro de entrada pero no tiene salida
                     if ($ultimaAsistencia->fecha_ingreso && !$ultimaAsistencia->fecha_salida) {
 
-                        // Si el registro pertenece a otra obra diferente
                         if ($ultimaAsistencia->obra_id !== $request->obra_id) {
 
-                            // Obtener el nombre del proyecto donde está registrado actualmente
                             $proyecto = DB::connection('mysql')
                                 ->table('bodegas_area')
                                 ->select('nombre')
@@ -151,7 +147,6 @@ class ControlAsistenciasController extends Controller
                         break; // Salir del loop cuando encuentre una foto
                     }
                 }
-
             }
 
             // Construir la respuesta
@@ -193,7 +188,6 @@ class ControlAsistenciasController extends Controller
     public function registrarMarcacion(Request $request)
     {
 
-        info($request->all());
         // Validar los datos requeridos
         $validator = Validator::make($request->all(), [
             'cedula' => 'required|string',
@@ -447,277 +441,6 @@ class ControlAsistenciasController extends Controller
             'totalPersonalProyelco' => $totalPersonalProyelco
         ]);
     }
-
-    // public function exportReporteCompletoAsistenciasTH(Request $request)
-    // {
-    //     try {
-    //         $request->validate([
-    //             'fecha_inicio' => 'required|date',
-    //             'fecha_fin' => 'required|date|after_or_equal:fecha_inicio'
-    //         ]);
-
-    //         $fechaInicio = $request->fecha_inicio;
-    //         $fechaFin = $request->fecha_fin;
-
-    //         // Validar que no sea más de 4 meses
-    //         $start = Carbon::parse($fechaInicio);
-    //         $end = Carbon::parse($fechaFin);
-
-    //         if ($start->diffInMonths($end) > 4) {
-    //             throw new \Exception('El rango de fechas no puede ser mayor a 4 meses');
-    //         }
-
-    //         // ===== PARTE 1: ASISTENCIAS REGISTRADAS =====
-    //         $asistenciasRegistradas = DB::connection('mysql')
-    //             ->table('asistencias_th')
-    //             ->leftJoin('empleados_proyelco_th as ep', function ($join) {
-    //                 $join->on('asistencias_th.empleado_id', '=', 'ep.id')
-    //                     ->where('asistencias_th.tipo_empleado', 1);
-    //             })
-    //             ->leftJoin('empleados_th as et', function ($join) {
-    //                 $join->on('asistencias_th.empleado_id', '=', 'et.id')
-    //                     ->where('asistencias_th.tipo_empleado', 2);
-    //             })
-    //             ->leftJoin('bodegas_area as ba', 'asistencias_th.obra_id', '=', 'ba.id')
-    //             ->leftJoin('cargos_th as c', function ($join) {
-    //                 $join->on('ep.cargo_id', '=', 'c.id')
-    //                     ->orOn('et.cargo_id', '=', 'c.id');
-    //             })
-    //             ->leftJoin('ficha_th as f', 'asistencias_th.identificacion', '=', 'f.identificacion')
-    //             ->leftJoin('contratistas_th as cont', 'f.contratista_id', '=', 'cont.id')
-    //             ->select(
-    //                 'asistencias_th.id',
-    //                 'asistencias_th.fecha_ingreso',
-    //                 'asistencias_th.hora_ingreso',
-    //                 'asistencias_th.fecha_salida',
-    //                 'asistencias_th.hora_salida',
-    //                 'asistencias_th.horas_laborales',
-    //                 'asistencias_th.tipo_empleado',
-    //                 'asistencias_th.empleado_id',
-
-    //                 DB::raw("
-    //             CASE 
-    //                 WHEN asistencias_th.tipo_empleado = 1 THEN ep.nombre_completo
-    //                 WHEN asistencias_th.tipo_empleado = 2 THEN et.nombre_completo
-    //             END as nombre_completo
-    //         "),
-    //                 DB::raw("
-    //             CASE 
-    //                 WHEN asistencias_th.tipo_empleado = 1 THEN ep.identificacion
-    //                 WHEN asistencias_th.tipo_empleado = 2 THEN et.identificacion
-    //             END as identificacion
-    //         "),
-    //                 DB::raw("
-    //             CASE 
-    //                 WHEN asistencias_th.tipo_empleado = 1 THEN ep.tipo_documento
-    //                 WHEN asistencias_th.tipo_empleado = 2 THEN et.tipo_documento
-    //             END as tipo_documento
-    //         "),
-    //                 DB::raw("
-    //             CASE 
-    //                 WHEN asistencias_th.tipo_empleado = 1 THEN ep.telefono_celular
-    //                 WHEN asistencias_th.tipo_empleado = 2 THEN et.telefono_celular
-    //             END as telefono_celular
-    //         "),
-    //                 'ba.nombre as nombre_obra',
-    //                 'cont.contratista as nombre_contratista',
-    //                 'c.cargo',
-    //                 DB::raw("
-    //             CASE 
-    //                 WHEN asistencias_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
-    //                 WHEN asistencias_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
-    //                 ELSE 'Desconocido'
-    //             END as tipo_empleado_texto
-    //         ")
-    //             )
-    //             ->whereBetween('asistencias_th.fecha_ingreso', [$fechaInicio, $fechaFin])
-    //             ->orderBy('asistencias_th.fecha_ingreso', 'desc')
-    //             ->orderBy('asistencias_th.hora_ingreso', 'desc')
-    //             ->get();
-
-    //         // ===== CALCULAR HORAS POR EMPLEADO PARA NUEVA HOJA =====
-    //         $horasCalculadasData = [];
-    //         $empleadosProcesados = [];
-
-    //         foreach ($asistenciasRegistradas as $asistencia) {
-    //             $key = $asistencia->empleado_id . '_' . $asistencia->identificacion;
-
-    //             // Solo procesar cada empleado una vez
-    //             if (in_array($key, $empleadosProcesados)) {
-    //                 continue;
-    //             }
-
-    //             $empleadosProcesados[] = $key;
-
-    //             // Obtener todas las asistencias de este empleado en el rango de fechas
-    //             $asistenciasEmpleado = DB::connection('mysql')
-    //                 ->table('asistencias_th')
-    //                 ->where('empleado_id', $asistencia->empleado_id)
-    //                 ->where('tipo_empleado', $asistencia->tipo_empleado)
-    //                 ->whereBetween('fecha_ingreso', [$fechaInicio, $fechaFin])
-    //                 ->orderBy('fecha_ingreso', 'asc')
-    //                 ->orderBy('hora_ingreso', 'asc')
-    //                 ->get();
-
-    //             // Encontrar primera entrada y última salida
-    //             $primerIngreso = null;
-    //             $ultimaSalida = null;
-    //             $tieneSalidaCompleta = true;
-
-    //             foreach ($asistenciasEmpleado as $registro) {
-    //                 if (!$primerIngreso) {
-    //                     $primerIngreso = [
-    //                         'fecha' => $registro->fecha_ingreso,
-    //                         'hora' => $registro->hora_ingreso
-    //                     ];
-    //                 }
-
-    //                 if ($registro->hora_salida) {
-    //                     $ultimaSalida = [
-    //                         'fecha' => $registro->fecha_salida,
-    //                         'hora' => $registro->hora_salida
-    //                     ];
-    //                 } else {
-    //                     $tieneSalidaCompleta = false;
-    //                 }
-    //             }
-
-    //             // Calcular horas si tiene salida completa
-    //             $horasCalculadas = 'Sin calcular';
-    //             if ($tieneSalidaCompleta && $primerIngreso && $ultimaSalida) {
-    //                 $horaIngreso = Carbon::parse($primerIngreso['fecha'] . ' ' . $primerIngreso['hora']);
-    //                 $horaSalida = Carbon::parse($ultimaSalida['fecha'] . ' ' . $ultimaSalida['hora']);
-
-    //                 $diferenciaMinutos = $horaIngreso->diffInMinutes($horaSalida);
-
-    //                 // Restar 1 hora (60 minutos) para almuerzo
-    //                 $diferenciaMinutos -= 60;
-
-    //                 if ($diferenciaMinutos > 0) {
-    //                     $horas = floor($diferenciaMinutos / 60);
-    //                     $minutos = $diferenciaMinutos % 60;
-    //                     $horasCalculadas = sprintf("%02d:%02d", $horas, $minutos);
-    //                 } else {
-    //                     $horasCalculadas = '00:00';
-    //                 }
-    //             }
-
-    //             $horasCalculadasData[] = [
-    //                 'N°' => count($horasCalculadasData) + 1,
-    //                 'Nombre Completo' => $asistencia->nombre_completo,
-    //                 'Identificación' => $asistencia->identificacion,
-    //                 'Tipo Documento' => $asistencia->tipo_documento,
-    //                 'Cargo' => $asistencia->cargo,
-    //                 'Ubicación' => $asistencia->nombre_obra ?: 'Sin obra asignada',
-    //                 'Contratista' => $asistencia->nombre_contratista ?: 'No asignado',
-    //                 'Primera Entrada' => $primerIngreso ? Carbon::parse($primerIngreso['fecha'])->format('d-m-Y') . ' ' . $primerIngreso['hora'] : 'N/A',
-    //                 'Última Salida' => $ultimaSalida ? Carbon::parse($ultimaSalida['fecha'])->format('d-m-Y') . ' ' . $ultimaSalida['hora'] : 'N/A',
-    //                 'Horas Calculadas' => $horasCalculadas,
-    //                 'Estado' => $tieneSalidaCompleta ? 'COMPLETADO' : 'EN CURSO'
-    //             ];
-    //         }
-
-    //         // ===== PARTE 2: EMPLEADOS SIN ASISTENCIA (SOLO PROYELCO) =====
-    //         $empleadosProyelco = DB::connection('mysql')
-    //             ->table('empleados_proyelco_th')
-    //             ->where('estado', 1)
-    //             ->select(
-    //                 'id',
-    //                 'nombre_completo',
-    //                 'identificacion',
-    //                 'tipo_documento',
-    //                 'telefono_celular',
-    //                 'cargo_id'
-    //             )
-    //             ->get();
-
-    //         // Obtener IDs de empleados que SÍ tienen asistencia en el rango
-    //         $empleadosConAsistencia = DB::connection('mysql')
-    //             ->table('asistencias_th')
-    //             ->whereBetween('fecha_ingreso', [$fechaInicio, $fechaFin])
-    //             ->where('tipo_empleado', 1)
-    //             ->pluck('empleado_id')
-    //             ->toArray();
-
-    //         // Filtrar empleados que NO tienen asistencia
-    //         $empleadosSinAsistencia = $empleadosProyelco->filter(function ($empleado) use ($empleadosConAsistencia) {
-    //             return !in_array($empleado->id, $empleadosConAsistencia);
-    //         });
-
-    //         // Preparar datos para Excel - HOJA 1: ASISTENCIAS REGISTRADAS (MANTENER ORIGINAL)
-    //         $excelDataAsistencias = [];
-    //         foreach ($asistenciasRegistradas as $index => $asistencia) {
-    //             $estado = ($asistencia->hora_salida && $asistencia->fecha_salida) ? 'COMPLETADA' : 'EN CURSO';
-
-    //             $excelDataAsistencias[] = [
-    //                 'N°' => $index + 1,
-    //                 'Tipo' => 'ASISTENCIA REGISTRADA',
-    //                 'Estado' => $estado,
-    //                 'Fecha Ingreso' => Carbon::parse($asistencia->fecha_ingreso)->format('d-m-Y'),
-    //                 'Hora Ingreso' => $asistencia->hora_ingreso,
-    //                 'Fecha Salida' => $asistencia->fecha_salida ? Carbon::parse($asistencia->fecha_salida)->format('d-m-Y') : 'En curso',
-    //                 'Hora Salida' => $asistencia->hora_salida ?: 'En curso',
-    //                 'Horas Laboradas' => $asistencia->horas_laborales ?: 'No calculada',
-    //                 'Nombre Completo' => $asistencia->nombre_completo,
-    //                 'Identificación' => $asistencia->identificacion,
-    //                 'Tipo Documento' => $asistencia->tipo_documento,
-    //                 'Teléfono' => $asistencia->telefono_celular,
-    //                 'Cargo' => $asistencia->cargo,
-    //                 'Ubicación' => $asistencia->nombre_obra ?: 'Sin obra asignada',
-    //                 'Contratista' => $asistencia->nombre_contratista ?: 'No asignado',
-    //                 'Tipo Empleado' => $asistencia->tipo_empleado_texto,
-    //             ];
-    //         }
-
-    //         // Preparar datos para Excel - HOJA 2: SIN ASISTENCIA (MANTENER ORIGINAL)
-    //         $excelDataSinAsistencia = [];
-    //         foreach ($empleadosSinAsistencia as $index => $empleado) {
-    //             $cargo = DB::connection('mysql')
-    //                 ->table('cargos_th')
-    //                 ->where('id', $empleado->cargo_id)
-    //                 ->value('cargo');
-
-    //             $excelDataSinAsistencia[] = [
-    //                 'N°' => $index + 1,
-    //                 'Tipo' => 'SIN ASISTENCIA',
-    //                 'Estado' => 'SIN REGISTRO',
-    //                 'Fecha Ingreso' => 'N/A',
-    //                 'Hora Ingreso' => 'N/A',
-    //                 'Fecha Salida' => 'N/A',
-    //                 'Hora Salida' => 'N/A',
-    //                 'Horas Laboradas' => 'N/A',
-    //                 'Nombre Completo' => $empleado->nombre_completo,
-    //                 'Identificación' => $empleado->identificacion,
-    //                 'Tipo Documento' => $empleado->tipo_documento,
-    //                 'Teléfono' => $empleado->telefono_celular,
-    //                 'Cargo' => $cargo ?: 'No asignado',
-    //                 'Ubicación' => 'Sin Ubicación',
-    //                 'Contratista' => 'Proyelco S.A.S',
-    //                 'Tipo Empleado' => 'Empleado Proyelco',
-    //             ];
-    //         }
-
-    //         // Combinar ambos conjuntos de datos para la primera hoja
-    //         $excelDataCompleto = array_merge($excelDataAsistencias, $excelDataSinAsistencia);
-
-    //         $fileName = 'reporte_completo_asistencias_' . Carbon::now()->format('Y_m_d_His') . '.xlsx';
-
-    //         if (ob_get_length()) {
-    //             ob_end_clean();
-    //         }
-
-    //         // Devolver múltiples hojas
-    //         return Excel::download(new ReporteCompletoConCalculoHorasExport(
-    //             $excelDataCompleto,
-    //             $horasCalculadasData
-    //         ), $fileName);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => $e->getMessage()
-    //         ], 400);
-    //     }
-    // }
 
     public function exportReporteCompletoAsistenciasTH(Request $request)
     {

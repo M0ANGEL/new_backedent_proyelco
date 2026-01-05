@@ -4,13 +4,18 @@ namespace App\Http\Controllers\Api\Proyectos;
 
 use App\Http\Controllers\Controller;
 use App\Models\AnulacionApt;
+use App\Models\Clientes;
 use App\Models\ProcesosProyectos;
 use App\Models\ProyectoCasa;
 use App\Models\ProyectoCasaDetalle;
+use App\Models\Proyectos;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class ProcesoEstados
 {
@@ -251,7 +256,6 @@ class GestionProyectosCasasController extends Controller
     public function IniciarManzana(Request $request)
     {
 
-        info($request->all());
         // Validar los datos de entrada
         $validated = $request->validate([
             'proyecto' => 'required|exists:proyectos_casas,id',
@@ -1026,5 +1030,147 @@ class GestionProyectosCasasController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    //edicion 
+    public function show($id)
+    {
+        $proyecto = DB::connection('mysql')
+            ->table('proyectos_casas')
+            ->join('tipos_de_proyectos', 'proyectos_casas.tipoProyecto_id', '=', 'tipos_de_proyectos.id')
+            ->join('clientes', 'proyectos_casas.cliente_id', '=', 'clientes.id')
+            ->where('proyectos_casas.id', $id)
+            ->select(
+                'proyectos_casas.*',
+                'clientes.emp_nombre',
+                'clientes.nit'
+            )
+            ->first();
+
+        // Ahora traemos todos los procesos relacionados con el proyecto
+        $procesos = DB::connection('mysql')
+            ->table('cambio_procesos_x_proyecto')
+            ->join('procesos_proyectos', 'cambio_procesos_x_proyecto.proceso', '=', 'procesos_proyectos.id')
+            ->where('proyecto_id', $id)
+            ->select(
+                'cambio_procesos_x_proyecto.proyecto_id',
+                'cambio_procesos_x_proyecto.numero',
+                'cambio_procesos_x_proyecto.proceso',
+                'procesos_proyectos.nombre_proceso'
+            )
+            ->get();
+
+        // Unimos todo en la respuesta
+        return response()->json([
+            'proyecto' => $proyecto,
+            'procesos' => $procesos
+        ], 200);
+    }
+
+    public function update(Request $request, $id)
+    {
+
+        try {
+            $validator = Validator::make($request->all(), [
+                'encargado_id' => ['required', 'array'],
+                'ingeniero_id' => ['required', 'array'],
+                'emp_nombre' => ['required', 'string'],
+                'nit' => ['required', 'string'],
+                'descripcion_proyecto' => ['required', 'string'],
+                'fecha_inicio' => ['required', 'string'],
+                'codigo_proyecto' => ['required', 'string'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            // validar que el codigo del proyecto no este usado por otro
+            $validacion = $this->validarCodigoUnico($request->codigo_proyecto, $id);
+
+            if ($validacion['existe']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $validacion['mensaje'],
+                ], 409);
+            }
+
+            $cliente = Clientes::where('nit', $request->nit)->first();
+            if (!$cliente) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error: Cliente no encontrado',
+                ], 404);
+            }
+
+            // actualizar el proyecto actual
+            $updateProyecto = ProyectoCasa::findOrFail($id);
+            $updateProyecto->cliente_id = $cliente->id;
+            $updateProyecto->descripcion_proyecto = $request->descripcion_proyecto;
+            $updateProyecto->fecha_inicio = Carbon::parse($request->fecha_inicio);
+            $updateProyecto->codigo_proyecto = $request->codigo_proyecto;
+
+            $updateProyecto->usuarios_notificacion = $request->filled('usuarios_notificacion') ? json_encode($request->usuarios_notificacion) : null;
+            $updateProyecto->encargado_id = $request->filled('encargado_id') ? json_encode($request->encargado_id) : null;
+            $updateProyecto->ingeniero_id = $request->filled('ingeniero_id') ? json_encode($request->ingeniero_id) : null;
+            $updateProyecto->save();
+
+
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $cliente
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error: ' . $e->getMessage(),
+                'code' => $e->getCode()
+            ], 500);
+        }
+    }
+
+
+    private function validarCodigoUnico($codigo, $id = null)
+    {
+        // Verificar en ProyectoCasa
+        $queryCasa = ProyectoCasa::where('codigo_proyecto', $codigo);
+
+        if ($id) {
+            // Excluir solo el proyecto actual que se está editando
+            $queryCasa->where('id', '!=', $id);
+        }
+
+        $proyectoCasa = $queryCasa->first();
+
+        if ($proyectoCasa) {
+            return [
+                'existe' => true,
+                'mensaje' => 'Este código está en uso por el proyecto casa: ' . $proyectoCasa->descripcion_proyecto,
+                'tipo' => 'casa'
+            ];
+        }
+
+        // Verificar en Proyectos (tabla general)
+        $queryProyecto = Proyectos::where('codigo_proyecto', $codigo);
+
+        if ($id) {
+            // IMPORTANTE: Aquí también debes excluir si corresponde
+            // Pero depende de si el proyecto actual es de tipo "casa" o "general"
+            // Si siempre es de tipo "casa", no necesitas excluir aquí
+            // $queryProyecto->where('id', '!=', $id);
+        }
+
+        $proyecto = $queryProyecto->first();
+
+        if ($proyecto) {
+            return [
+                'existe' => true,
+                'mensaje' => 'Este código está en uso por el proyecto: ' . $proyecto->descripcion_proyecto,
+                'tipo' => 'proyecto'
+            ];
+        }
+
+        return ['existe' => false];
     }
 }

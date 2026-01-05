@@ -238,9 +238,6 @@ class ProyectosController extends Controller
 
     public function store(Request $request)
     {
-
-
-
         DB::beginTransaction();
         try {
 
@@ -756,7 +753,7 @@ class ProyectosController extends Controller
                 'codigo_proyecto' => ['required', 'string'],
                 'activador_pordia_apt' => ['required', 'string'],
                 'minimoApt' => ['required', 'string'],
-                'procesos' => ['required', 'array'],
+                'procesos' => ['array'],
             ]);
 
             if ($validator->fails()) {
@@ -764,16 +761,14 @@ class ProyectosController extends Controller
             }
 
             // validar que el codigo del proyecto no este usado por otro
-            $proyectoUnico = Proyectos::where('codigo_proyecto', $request->codigo_proyecto)
-                ->select('descripcion_proyecto')
-                ->where('id', '!=', $id)
-                ->first();
-            if ($proyectoUnico) {
+            $validacion = $this->validarCodigoUnico($request->codigo_proyecto, $id);
+            if ($validacion['existe']) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Error: Este codigo  no esta disponible. esta en uso por el proyecto:   ' .  $proyectoUnico->descripcion_proyecto,
-                ], 404);
+                    'message' => $validacion['mensaje'],
+                ], 409);
             }
+
 
             $cliente = Clientes::where('nit', $request->nit)->first();
             if (!$cliente) {
@@ -817,6 +812,42 @@ class ProyectosController extends Controller
                 'code' => $e->getCode()
             ], 500);
         }
+    }
+
+    private function validarCodigoUnico($codigo, $id = null)
+    {
+        // Si estamos EDITANDO un Proyecto Apartamento, solo excluimos de la tabla de Apartamentos
+        // NO excluimos de las otras tablas porque son proyectos diferentes
+
+        // 1. Verificar en Proyectos Apartamentos (la tabla actual)
+        $queryApartamentos = Proyectos::where('codigo_proyecto', $codigo);
+        if ($id) {
+            // Solo excluir si es el mismo proyecto Apartamento
+            $queryApartamentos->where('id', '!=', $id);
+        }
+        $proyectoApartamento = $queryApartamentos->first();
+
+        if ($proyectoApartamento) {
+            return [
+                'existe' => true,
+                'mensaje' => 'Este código está en uso por el proyecto apartamento: ' . $proyectoApartamento->descripcion_proyecto,
+                'tipo' => 'apartamento'
+            ];
+        }
+
+        // 2. Verificar en Proyectos Casa (NO excluir, son proyectos diferentes)
+        // Si estamos EDITANDO un apartamento, NO es una casa, así que no excluimos
+        $proyectoCasa = ProyectoCasa::where('codigo_proyecto', $codigo)->first();
+
+        if ($proyectoCasa) {
+            return [
+                'existe' => true,
+                'mensaje' => 'Este código está en uso por el proyecto casa: ' . $proyectoCasa->descripcion_proyecto,
+                'tipo' => 'casa'
+            ];
+        }
+
+        return ['existe' => false];
     }
 
     public function destroy($id)
@@ -1539,6 +1570,4 @@ class ProyectosController extends Controller
             'data' => $proyectosUnificados
         ]);
     }
-
-
 }

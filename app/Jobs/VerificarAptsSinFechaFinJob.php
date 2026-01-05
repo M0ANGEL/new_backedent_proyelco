@@ -24,8 +24,8 @@ class VerificarAptsSinFechaFinJob implements ShouldQueue
         $festivos = Festivos::pluck('festivo_fecha')->toArray();
         $hoy = Carbon::now();
 
-        // Obtener todos los proyectos
-        $proyectos = Proyectos::all();
+        // Obtener todos los proyectos los que sean estado 1, signifa proyectos que estan en proceso
+        $proyectos = Proyectos::where("estado",1)->get();
 
         foreach ($proyectos as $proyecto) {
             $ultimoDetalle = $proyecto->detalles()

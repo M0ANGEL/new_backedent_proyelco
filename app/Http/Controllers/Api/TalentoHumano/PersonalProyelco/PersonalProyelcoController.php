@@ -303,7 +303,7 @@ class PersonalProyelcoController extends Controller
 
             // Consultar activos pendientes del empleado
             // Usando JSON_CONTAINS para buscar en el array JSON
-            $activosPendientes = Activo::whereRaw("JSON_CONTAINS(usuarios_confirmaron, '\"{$usuario->id}\"')")
+            $activosPendientes = Activo::whereRaw("JSON_CONTAINS(usuarios_asignados, '\"{$usuario->id}\"')")
                 ->where('estado', '1') // Asumiendo que tienes un campo estado
                 ->get();
 
@@ -331,9 +331,6 @@ class PersonalProyelcoController extends Controller
         }
     }
 
-    /**
-     * Inactivar empleado (DeletePersonal)
-     */
     public function inactivarPersonal(Request $request, $id)
     {
         DB::beginTransaction();
@@ -381,7 +378,7 @@ class PersonalProyelcoController extends Controller
             }
 
 
-            //inactivar usuario de arp
+            //inactivar usuario de erp
 
             $usuario = User::where('cedula', $empleado->identificacion)->first();
             if ($usuario) {

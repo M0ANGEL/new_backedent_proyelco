@@ -28,7 +28,7 @@ return new class extends Migration
             $table->integer('apt');
             $table->integer('pisosCambiarProceso');
             $table->json('usuarios_notificacion',10)->nullable();
-            $table->tinyInteger('estado')->default(1);
+            $table->tinyInteger('estado')->default(1); //1 en proceso, 0 inactivo, 2 termiando(dos cuando todo los procesos esten ok)
             $table->integer('activador_pordia_apt')->nullable();
             $table->date('fecha_ini_proyecto')->nullable(); //fecha en la que inicia el proyecto
             $table->timestamps();
