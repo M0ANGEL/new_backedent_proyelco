@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\TalentoHumano\FichaObra;
 
 use App\Http\Controllers\Controller;
+use App\Models\EmpleadoProyelco;
 use App\Models\FichaObra;
 use App\Models\Personal;
 use App\Models\PersonalProyelco;
+use App\Models\Rfid;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,8 +17,6 @@ use Illuminate\Support\Facades\Storage;
 
 class FichaObraController extends Controller
 {
-
-
     public function index()
     {
         $personales = DB::connection('mysql')
@@ -58,6 +58,7 @@ class FichaObraController extends Controller
                 'ficha_th.afp',
                 'ficha_th.contratista_id',
                 'ficha_th.estado',
+                'ficha_th.rfid',
                 'ficha_th.created_at',
                 'ficha_th.updated_at',
 
@@ -180,7 +181,6 @@ class FichaObraController extends Controller
 
     public function store(Request $request)
     {
-        DB::beginTransaction();
 
         try {
             $validator = Validator::make($request->all(), [
@@ -226,6 +226,8 @@ class FichaObraController extends Controller
                     ], 404);
                 }
             }
+
+            DB::beginTransaction();
 
             $datosDelEmpelado = $car == 0 ? $proyelco : $empleado;
 
@@ -275,11 +277,6 @@ class FichaObraController extends Controller
         }
     }
 
-    // public function show($id)
-    // {
-    //     return response()->json(FichaObra::find($id), 200);
-    // }
-
     public function show($id)
     {
         $empleado = FichaObra::find($id);
@@ -326,8 +323,6 @@ class FichaObraController extends Controller
 
         return null;
     }
-
-
 
     public function update(Request $request, $id)
     {
@@ -396,5 +391,88 @@ class FichaObraController extends Controller
 
         $Personal->estado = !$Personal->estado;
         $Personal->update();
+    }
+
+    public function rfid()
+    {
+        $data = DB::connection('mysql')
+            ->table('rfid')
+            ->where("estado", 1)
+            ->get();
+
+
+        return response()->json([
+            "status" => "success",
+            "data" => $data
+        ]);
+    }
+
+    public function rfidUpdate(Request $request)
+    {
+        // ✅ Validaciones ANTES
+        $validator = Validator::make($request->all(), [
+            'userCedula' => 'required|string',
+            'rfidCodigo' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        // ✅ Validaciones de negocio ANTES
+        $rfidEnUso = FichaObra::where('rfid', $request->rfidCodigo)->first();
+        if ($rfidEnUso) {
+            $empleado = EmpleadoProyelco::where(
+                'identificacion',
+                $rfidEnUso->identificacion
+            )->first();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Esta tarjeta RFID ya está vinculada a: ' .
+                    ($empleado->nombre_completo ?? 'Desconocido'),
+            ], 409);
+        }
+
+        $usuario = FichaObra::where('identificacion', $request->userCedula)->first();
+        if (!$usuario) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Usuario no encontrado',
+            ], 404);
+        }
+
+        // 🔒 SOLO aquí abrimos la transacción
+        DB::beginTransaction();
+
+        try {
+            $usuario->rfid = $request->rfidCodigo;
+            $usuario->save();
+
+            // $rfidEstado = Rfid::where('codigo', $request->rfidCodigo)->firstOrFail();
+            // $rfidEstado->estado = 2;
+            // $rfidEstado->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'RFID asignada exitosamente',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al asignar RFID: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function rfidDelete($id){
+        //llega el id de la ficha
+        $usuario = FichaObra::where("id",$id)->first();
+        $usuario->rfid = null;
+        $usuario->save();
     }
 }

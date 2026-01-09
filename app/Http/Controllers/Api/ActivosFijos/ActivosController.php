@@ -83,9 +83,9 @@ class ActivosController extends Controller
                 }
             }
 
-            // Cache y paginación
+            // Cache y paginación 60 = 1 minuto 300 = 5 minutos
             $cacheKey = 'activos_page_' . $page . '_' . $perPage . '_' . md5($search . $responsable);
-            $activos = Cache::remember($cacheKey, 300, function () use ($query, $perPage, $page) {
+            $activos = Cache::remember($cacheKey, 6, function () use ($query, $perPage, $page) {
                 return $query->paginate($perPage, ['*'], 'page', $page);
             });
 

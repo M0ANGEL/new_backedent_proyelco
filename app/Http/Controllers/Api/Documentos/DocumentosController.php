@@ -319,13 +319,13 @@ class DocumentosController extends Controller
     public function indexEmcali()
     {
         $usuario = Auth::user();
-        $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
+        $rolesPermitidos = ['Directora Proyectos', 'Tramites', 'Administrador']; //roles permitidos para ver todo los tramites sin filtros
         $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
 
         $data = collect([]);
 
         $documentacionQuery = function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador', 'nombre_etapa')
                 ->where('operador', 1)
                 ->distinct();
         };
@@ -389,7 +389,7 @@ class DocumentosController extends Controller
 
         // Función reutilizable para la relación documentacion
         $documentacionQuery = function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador')
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador','nombre_etapa')
                 ->where('operador', 2) // Operador CELSIA
                 ->distinct();
         };
@@ -1278,6 +1278,27 @@ class DocumentosController extends Controller
                 'documentos' => $calcularPorcentajesDocumentos($documentos),
                 'organismos' => $calcularPorcentajesOrganismos($organismos)
             ]
+        ]);
+    }
+
+
+    //consular docuemtos disponibles
+    public function DocumentosDisponibles($codigo)
+    {
+        $data = DB::connection('mysql')
+            ->table('documentacion_operadores')
+            ->join('actividades_documentos', 'documentacion_operadores.actividad_id', '=', 'actividades_documentos.id')
+            ->where('documentacion_operadores.codigo_documento', $codigo)
+            ->where('documentacion_operadores.estado', 1)
+            ->select(
+                // Datos básicos de ficha_th
+                'actividades_documentos.actividad',
+            )
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data
         ]);
     }
 }
