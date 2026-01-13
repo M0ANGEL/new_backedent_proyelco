@@ -343,6 +343,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('StoreDocumentacionRed', [DocumentosController::class, 'StoreDocumentacionRed']);
     Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
     Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
+    //Buscar los proyectos que estan disponibles
+    Route::get('dodumentos-disponibles/{codigo}',[DocumentosController::class, 'DocumentosDisponibles']);
 
 
     //CONTABILIDAD
@@ -383,3 +385,6 @@ Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado
 
 //api de rfid
 Route::post('rfid', [LectorRFIDController::class, 'registrarMarcacionRFID']);
+Route::get('rfid-disponibles',[FichaObraController::class,'rfid']);
+Route::post('rfid-update',[FichaObraController::class,'rfidUpdate']);
+Route::get('rfid-delete/{id}',[FichaObraController::class,'rfidDelete']);
