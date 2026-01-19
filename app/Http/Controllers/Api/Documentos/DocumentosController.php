@@ -86,7 +86,7 @@ class DocumentosController extends Controller
 
         //OPERADORES DE RED
         //APARTAMENTOS
-        if ($tipoProyecto_id == 1) {
+        // if ($tipoProyecto_id == 1) {
             if ($etapa == '1') {
                 if ($operador == "1") { //emcali
                     $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
@@ -103,10 +103,10 @@ class DocumentosController extends Controller
                     $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
                 }
             }
-        } else if ($tipoProyecto_id == 2) {
-            //CASAS - Implementar lógica para casas si es necesario
-            $cronogramaGenerado = [];
-        }
+        // } else if ($tipoProyecto_id == 2) {
+        //     //CASAS - Implementar lógica para casas si es necesario
+        //     $cronogramaGenerado = [];
+        // }
 
         // ✅ AGREGAR ESTE RETURN AL FINAL - Respuesta de éxito
         return response()->json([
