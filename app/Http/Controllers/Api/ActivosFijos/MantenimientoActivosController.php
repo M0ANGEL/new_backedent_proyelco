@@ -23,6 +23,7 @@ class MantenimientoActivosController extends Controller
             ->select(
                 'mantenimiento_activos.*',
                 'activo.numero_activo',
+                'activo.descripcion',
             )
             ->get();
 

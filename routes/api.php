@@ -323,7 +323,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //proyectos nombre e id
     Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
-    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
+    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']); 
     Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
     Route::post('cargueProyeccion', [MaterialesSolicitudesController::class, 'cargueProyeccion']);
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
@@ -377,6 +377,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //manejos rutas informes powerBi
     Route::post('manejo-informes-powerBi', [PoerBiController::class, 'Rutas']);
     Route::apiResource('administrar-rutas-powerBi', PoerBiController::class);
+
+
+    //materiales parte logistica
+    Route::get('proyectos-proyeccio-logistica', [MaterialesSolicitudesController::class, 'indexLogisitca']); 
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
