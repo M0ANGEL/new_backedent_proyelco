@@ -381,6 +381,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //materiales parte logistica
     Route::get('proyectos-proyeccio-logistica', [MaterialesSolicitudesController::class, 'indexLogisitca']); 
+    Route::post('TmDisponiblesOrganismos',[DocumentosController::class, 'TmDisponiblesOrganismos']);
+    Route::post('ConfirmarTM',[DocumentosController::class, 'ConfirmarTM']);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
