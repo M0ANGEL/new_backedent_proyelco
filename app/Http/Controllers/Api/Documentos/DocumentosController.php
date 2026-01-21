@@ -10,11 +10,14 @@ use App\Models\DocumentosOrganismos;
 use App\Models\DocumentosOrganismosAdjuntos;
 use App\Models\ProyectoCasa;
 use App\Models\Proyectos;
+use App\Models\TMorganismos;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use PhpParser\Node\Stmt\TryCatch;
 
 class DocumentosController extends Controller
 {
@@ -29,6 +32,7 @@ class DocumentosController extends Controller
         //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
         if ($request->requiereOrganismos == "1") {
             $this->documentosOrganismos($request);
+            $this->CreartTm($request);
         }
 
         // Buscar primero en Proyectos
@@ -87,22 +91,22 @@ class DocumentosController extends Controller
         //OPERADORES DE RED
         //APARTAMENTOS
         // if ($tipoProyecto_id == 1) {
-            if ($etapa == '1') {
-                if ($operador == "1") { //emcali
-                    $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-                } else if ($operador == "2") { //celsia
-                    // Para Celsia
-                    $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-                }
-            } else {
-                //aqui cual quier etapa >1
-                if ($operador == "1") { //emcali
-                    $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-                } else if ($operador == "2") { //celsia
-                    // Para Celsia
-                    $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-                }
+        if ($etapa == '1') {
+            if ($operador == "1") { //emcali
+                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
+            } else if ($operador == "2") { //celsia
+                // Para Celsia
+                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
             }
+        } else {
+            //aqui cual quier etapa >1
+            if ($operador == "1") { //emcali
+                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
+            } else if ($operador == "2") { //celsia
+                // Para Celsia
+                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
+            }
+        }
         // } else if ($tipoProyecto_id == 2) {
         //     //CASAS - Implementar lógica para casas si es necesario
         //     $cronogramaGenerado = [];
@@ -313,6 +317,77 @@ class DocumentosController extends Controller
         return null;
     }
 
+    //creacion de TM de organismos
+    private function CreartTm($data)
+    {
+        $codigoProyecto   = $data->codigo_proyecto;
+        $codigoDocumento  = $data->codigoDocumentos;
+        $usuarioId        = $data->usuarioId;
+        $cantidadTm       = (int) $data->cantidad_tm;
+        $organismos       = $data->organismoInspeccion;
+
+        /**
+         * Configuración fija por operador
+         */
+        $configOperadores = [
+            1 => [ // RETIE
+                'actividad_id' => 28,
+                'hijos' => [34, 35, 36],
+            ],
+            2 => [ // RITEL
+                'actividad_id' => 65,
+                'hijos' => [67],
+            ],
+            3 => [ // RETIALP
+                'actividad_id' => 90,
+                'hijos' => [92],
+            ],
+        ];
+
+        $registrosCreados = [];
+
+        foreach ($organismos as $operador) {
+
+            if (!isset($configOperadores[$operador])) {
+                continue;
+            }
+
+            $actividadId  = $configOperadores[$operador]['actividad_id'];
+            $hijos        = $configOperadores[$operador]['hijos'];
+
+            /**
+             * Crear registros por cantidad de TM
+             */
+            for ($tm = 1; $tm <= $cantidadTm; $tm++) {
+
+                foreach ($hijos as $actividadHijoId) {
+
+                    $registrosCreados[] = [
+                        'codigo_proyecto'       => $codigoProyecto,
+                        'codigo_documento'      => $codigoDocumento,
+                        'user_id'               => $usuarioId,
+                        'actividad_id'          => $actividadId,
+                        'actividad_hijos_id'    => $actividadHijoId,
+                        'tm'                    => $tm,
+                        'estado'                => 1,
+                        'created_at'            => now(),
+                        'updated_at'            => now(),
+                    ];
+                }
+            }
+        }
+        /**
+         * Inserción masiva
+         */
+        DB::table('torres_documentacion_organismos')->insert($registrosCreados);
+
+        return [
+            'success' => true,
+            'total_registros' => count($registrosCreados),
+        ];
+    }
+
+
     //CREAR DOCUMENTACION (FIN)
 
     //GESTION DE CONTUL DE PROYECTOS Y ACTIVIDADES INICIO
@@ -389,7 +464,7 @@ class DocumentosController extends Controller
 
         // Función reutilizable para la relación documentacion
         $documentacionQuery = function ($query) {
-            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador','nombre_etapa')
+            $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador', 'nombre_etapa')
                 ->where('operador', 2) // Operador CELSIA
                 ->distinct();
         };
@@ -1300,5 +1375,76 @@ class DocumentosController extends Controller
             'status' => 'success',
             'data' => $data
         ]);
+    }
+
+    //consultar doumentos por tm en Dictamen de inspección de cada tipo de organismo, retie, retial y ritel
+    public function TmDisponiblesOrganismos(Request $request)
+    {
+        //data
+        $codigo_proyecto = $request->codigo_proyecto;
+        $codigo_documento = $request->codigo_documento;
+        $operador = $request->operador;
+        $actividad_id = 0;
+
+        if ($operador == 1) {
+            $actividad_id = 28;
+        } else if ($operador == 2) {
+            $actividad_id = 65;
+        } else {
+            $actividad_id = 90;
+        }
+
+
+        $data = TMorganismos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('actividad_id', $actividad_id)
+            ->where('codigo_documento', $codigo_documento)
+            ->get();
+
+        //retornamos la data de Tm(torres - mazanas) disponibles para los organismos 
+        return response()->json([
+            'status' => 'succes',
+            'data' => $data
+        ]);
+    }
+
+    public function ConfirmarTM(Request $request)
+    {
+        $request->validate([
+            'codigo_proyecto'       => 'required|string',
+            'codigo_documento'      => 'required|string',
+            'actividad_depende_id'  => 'required|integer',
+            'actividad_id'          => 'required|integer',
+            'tm'                    => 'required',
+        ]);
+
+        try {
+            $tmOrganismo = TMorganismos::where([
+                'codigo_proyecto'      => $request->codigo_proyecto,
+                'actividad_id'         => $request->actividad_depende_id,
+                'codigo_documento'     => $request->codigo_documento,
+                'actividad_hijos_id'   => $request->actividad_id,
+                'tm'                   => $request->tm,
+            ])->firstOrFail();
+
+            $tmOrganismo->update([
+                'estado'    => 2,
+                'user_id'   => Auth::id(),
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'El TM se confirmó correctamente',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No se encontró el TM solicitado',
+            ], 404);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al confirmar el TM',
+            ], 500);
+        }
     }
 }
