@@ -391,6 +391,7 @@ Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado
 
 //api de rfid
 Route::post('rfid', [LectorRFIDController::class, 'registrarMarcacionRFID']);
+Route::post('rfid-create', [LectorRFIDController::class, 'storeRFID']);
 Route::get('rfid-disponibles',[FichaObraController::class,'rfid']);
 Route::post('rfid-update',[FichaObraController::class,'rfidUpdate']);
 Route::get('rfid-delete/{id}',[FichaObraController::class,'rfidDelete']);
