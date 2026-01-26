@@ -515,7 +515,7 @@ class DocumentosController extends Controller
         ]);
     }
 
-    //CONSULTA DOCUMENTACION ORGANISMOS
+    //CONSULTA DOCUMENTACION ORGANISMOS se va a manejar que si alguno del proyecto tiene estado 1 aun no esta completo
     public function indexORGANISMOS($operador = null)
     {
         $usuario = Auth::user();
@@ -1290,71 +1290,260 @@ class DocumentosController extends Controller
 
 
     //ESTADO Y PROCENTAJES DE LA DOCUMENTACION POR PROYECTO
-    public function estadoTramitesAdmin()
-    {
-        $documentos = Documentos::select('codigo_proyecto', 'estado', 'operador')->get();
-        $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
+    // public function estadoTramitesAdmin()
+    // {
+    //     $documentos = Documentos::select('codigo_proyecto', 'estado', 'operador')->get();
+    //     $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
 
-        // Función para documentos (agrupado por proyecto)
-        $calcularPorcentajesDocumentos = function ($coleccion) {
-            return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+    //     // Función para documentos (agrupado por proyecto)
+    //     $calcularPorcentajesDocumentos = function ($coleccion) {
+    //         return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+    //             $total = $items->count();
+    //             $completos = $items->where('estado', 2)->count();
+
+    //             return [
+    //                 'tipo' => 'documentos',
+    //                 'codigo_proyecto' => $proyecto,
+    //                 'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+    //                 'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+    //             ];
+    //         })->values();
+    //     };
+
+    //     // Función para organismos (estructura anidada: proyecto -> operadores)
+    //     $calcularPorcentajesOrganismos = function ($coleccion) {
+    //         $resultados = [];
+
+    //         // Agrupar por proyecto
+    //         $porProyecto = $coleccion->groupBy('codigo_proyecto');
+
+    //         foreach ($porProyecto as $proyecto => $itemsProyecto) {
+    //             $proyectoData = [
+    //                 'codigo_proyecto' => $proyecto,
+    //                 'tipo' => 'organismos',
+    //                 'operadores' => []
+    //             ];
+
+    //             // Agrupar por operador dentro del proyecto
+    //             $porOperador = $itemsProyecto->groupBy('operador');
+
+    //             foreach ($porOperador as $operador => $items) {
+    //                 $total = $items->count();
+    //                 $completos = $items->where('estado', 2)->count();
+
+    //                 $proyectoData['operadores'][] = [
+    //                     'operador' => $operador,
+    //                     'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+    //                     'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+    //                     'total' => $total,
+    //                     'completados' => $completos,
+    //                     'pendientes' => $total - $completos
+    //                 ];
+    //             }
+
+    //             $resultados[] = $proyectoData;
+    //         }
+
+    //         return collect($resultados);
+    //     };
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'porcentajes' => [
+    //             'documentos' => $calcularPorcentajesDocumentos($documentos),
+    //             'organismos' => $calcularPorcentajesOrganismos($organismos)
+    //         ]
+    //     ]);
+    // }
+    // public function estadoTramitesAdmin()
+    // {
+    //     // Asumiendo que tienes un campo 'etapa' en tus modelos
+    //     $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
+    //     $organismos = DocumentosOrganismos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
+
+    //     // Función para documentos agrupados por proyecto y etapa
+    //     $calcularPorcentajesDocumentos = function ($coleccion) {
+    //         return $coleccion->groupBy('codigo_proyecto')->map(function ($itemsProyecto, $proyecto) {
+    //             // Agrupar por etapas dentro del proyecto
+    //             $etapas = $itemsProyecto->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
+    //                 $total = $itemsEtapa->count();
+    //                 $completos = $itemsEtapa->where('estado', 2)->count();
+    //                 $avance = $total > 0 ? round(($completos / $total) * 100, 2) : 0;
+
+    //                 return [
+    //                     'etapa' => $etapa,
+    //                     'avance' => $avance,
+    //                     'atrazo' => 100 - $avance,
+    //                     'detalle' => [
+    //                         'total' => $total,
+    //                         'completados' => $completos,
+    //                         'pendientes' => $total - $completos
+    //                     ]
+    //                 ];
+    //             })->values();
+
+    //             // Calcular promedio general del proyecto
+    //             $avanceProyecto = $etapas->avg('avance') ?? 0;
+
+    //             return [
+    //                 'tipo' => 'documentos',
+    //                 'codigo_proyecto' => $proyecto,
+    //                 'avance_general' => $avanceProyecto,
+    //                 'atrazo_general' => 100 - $avanceProyecto,
+    //                 'etapas' => $etapas,
+    //                 'total_etapas' => $etapas->count()
+    //             ];
+    //         })->values();
+    //     };
+
+    //     // Función para organismos agrupados por proyecto, etapa y operador
+    //     $calcularPorcentajesOrganismos = function ($coleccion) {
+    //         return $coleccion->groupBy('codigo_proyecto')->map(function ($itemsProyecto, $proyecto) {
+    //             // Agrupar por etapas
+    //             $etapas = $itemsProyecto->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
+    //                 // Agrupar por operadores dentro de la etapa
+    //                 $operadores = $itemsEtapa->groupBy('operador')->map(function ($itemsOperador, $operador) {
+    //                     $total = $itemsOperador->count();
+    //                     $completos = $itemsOperador->where('estado', 2)->count();
+    //                     $avance = $total > 0 ? round(($completos / $total) * 100, 2) : 0;
+
+    //                     return [
+    //                         'operador' => $operador,
+    //                         'avance' => $avance,
+    //                         'atrazo' => 100 - $avance,
+    //                         'detalle' => [
+    //                             'total' => $total,
+    //                             'completados' => $completos,
+    //                             'pendientes' => $total - $completos
+    //                         ]
+    //                     ];
+    //                 })->values();
+
+    //                 // Calcular promedio de la etapa
+    //                 $avanceEtapa = $operadores->avg('avance') ?? 0;
+
+    //                 return [
+    //                     'etapa' => $etapa,
+    //                     'avance_etapa' => $avanceEtapa,
+    //                     'atrazo_etapa' => 100 - $avanceEtapa,
+    //                     'operadores' => $operadores,
+    //                     'total_operadores' => $operadores->count()
+    //                 ];
+    //             })->values();
+
+    //             // Calcular promedio general del proyecto
+    //             $avanceGeneral = $etapas->avg('avance_etapa') ?? 0;
+
+    //             return [
+    //                 'tipo' => 'organismos',
+    //                 'codigo_proyecto' => $proyecto,
+    //                 'avance_general' => $avanceGeneral,
+    //                 'atrazo_general' => 100 - $avanceGeneral,
+    //                 'etapas' => $etapas,
+    //                 'total_etapas' => $etapas->count()
+    //             ];
+    //         })->values();
+    //     };
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'resumen' => [
+    //             'total_proyectos_documentos' => $documentos->groupBy('codigo_proyecto')->count(),
+    //             'total_proyectos_organismos' => $organismos->groupBy('codigo_proyecto')->count(),
+    //             'total_documentos' => $documentos->count(),
+    //             'total_organismos' => $organismos->count()
+    //         ],
+    //         'detalle' => [
+    //             'documentos' => $calcularPorcentajesDocumentos($documentos),
+    //             'organismos' => $calcularPorcentajesOrganismos($organismos)
+    //         ]
+    //     ]);
+    // }
+    public function estadoTramitesAdmin()
+{
+    $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
+    $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
+
+    // Función para documentos (agrupado por proyecto y etapa)
+    $calcularPorcentajesDocumentos = function ($coleccion) {
+        return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+            // Agrupar por etapas para calcular porcentajes por etapa
+            $etapas = $items->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
+                $total = $itemsEtapa->count();
+                $completos = $itemsEtapa->where('estado', 2)->count();
+                
+                return [
+                    'etapa' => $etapa,
+                    'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                    'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                    'total' => $total,
+                    'completados' => $completos,
+                    'pendientes' => $total - $completos
+                ];
+            })->values();
+            
+            // Calcular totales del proyecto
+            $total = $items->count();
+            $completos = $items->where('estado', 2)->count();
+
+            return [
+                'tipo' => 'documentos',
+                'codigo_proyecto' => $proyecto,
+                'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                'etapas' => $etapas, // Agregado: detalle por etapas
+                'total' => $total,
+                'completados' => $completos,
+                'pendientes' => $total - $completos
+            ];
+        })->values();
+    };
+
+    // Función para organismos (estructura anidada: proyecto -> operadores)
+    $calcularPorcentajesOrganismos = function ($coleccion) {
+        $resultados = [];
+
+        // Agrupar por proyecto
+        $porProyecto = $coleccion->groupBy('codigo_proyecto');
+
+        foreach ($porProyecto as $proyecto => $itemsProyecto) {
+            $proyectoData = [
+                'codigo_proyecto' => $proyecto,
+                'tipo' => 'organismos',
+                'operadores' => []
+            ];
+
+            // Agrupar por operador dentro del proyecto
+            $porOperador = $itemsProyecto->groupBy('operador');
+
+            foreach ($porOperador as $operador => $items) {
                 $total = $items->count();
                 $completos = $items->where('estado', 2)->count();
 
-                return [
-                    'tipo' => 'documentos',
-                    'codigo_proyecto' => $proyecto,
+                $proyectoData['operadores'][] = [
+                    'operador' => $operador,
                     'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
                     'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                    'total' => $total,
+                    'completados' => $completos,
+                    'pendientes' => $total - $completos
                 ];
-            })->values();
-        };
-
-        // Función para organismos (estructura anidada: proyecto -> operadores)
-        $calcularPorcentajesOrganismos = function ($coleccion) {
-            $resultados = [];
-
-            // Agrupar por proyecto
-            $porProyecto = $coleccion->groupBy('codigo_proyecto');
-
-            foreach ($porProyecto as $proyecto => $itemsProyecto) {
-                $proyectoData = [
-                    'codigo_proyecto' => $proyecto,
-                    'tipo' => 'organismos',
-                    'operadores' => []
-                ];
-
-                // Agrupar por operador dentro del proyecto
-                $porOperador = $itemsProyecto->groupBy('operador');
-
-                foreach ($porOperador as $operador => $items) {
-                    $total = $items->count();
-                    $completos = $items->where('estado', 2)->count();
-
-                    $proyectoData['operadores'][] = [
-                        'operador' => $operador,
-                        'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
-                        'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
-                        'total' => $total,
-                        'completados' => $completos,
-                        'pendientes' => $total - $completos
-                    ];
-                }
-
-                $resultados[] = $proyectoData;
             }
 
-            return collect($resultados);
-        };
+            $resultados[] = $proyectoData;
+        }
 
-        return response()->json([
-            'status' => 'success',
-            'porcentajes' => [
-                'documentos' => $calcularPorcentajesDocumentos($documentos),
-                'organismos' => $calcularPorcentajesOrganismos($organismos)
-            ]
-        ]);
-    }
+        return collect($resultados);
+    };
+
+    return response()->json([
+        'status' => 'success',
+        'porcentajes' => [
+            'documentos' => $calcularPorcentajesDocumentos($documentos),
+            'organismos' => $calcularPorcentajesOrganismos($organismos)
+        ]
+    ]);
+}
 
 
     //consular docuemtos disponibles
@@ -1445,6 +1634,240 @@ class DocumentosController extends Controller
                 'status'  => 'error',
                 'message' => 'Error al confirmar el TM',
             ], 500);
+        }
+    }
+
+
+    /* logica para confirmar documentos de celsia */
+
+    public function confirmarDocumentoCelsia(Request $request)
+    {
+        try {
+            // Validación de campos y múltiples archivos
+            $request->validate([
+                'id' => 'required|exists:documentacion_operadores,id',
+                'codigo_proyecto' => 'required|string',
+                'codigo_documento' => 'required|string',
+                'etapa' => 'required|integer',
+                'actividad_id' => 'required|integer',
+                'observacion' => 'required|string',
+
+                // Array de archivos
+                'archivos' => 'array',
+                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
+            ]);
+
+            $archivosGuardados = [];
+
+            // Guardar archivos si existen
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $archivo) {
+
+                    // Generar nombre único para cada archivo
+                    $nombreArchivo = $request->codigo_proyecto . '-' .
+                        $request->codigo_documento . '-' .
+                        $request->etapa . '-' .
+                        $request->actividad_id . '-' .
+                        time() . '-' .
+                        uniqid() . '.' .
+                        $archivo->getClientOriginalExtension();
+
+                    // Guardar archivo en storage
+                    $archivo->storeAs('public/documentacion/red', $nombreArchivo);
+
+                    // Obtener ruta pública
+                    $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
+
+                    // Guardar en tabla documentos_adjuntos
+                    DocumentosAdjuntos::create([
+                        'documento_id' => $request->id,
+                        'ruta_archivo' => $rutaPublica,
+                        'nombre_original' => $archivo->getClientOriginalName(),
+                        'extension' => $archivo->getClientOriginalExtension(),
+                        'tamano' => $archivo->getSize(),
+                    ]);
+
+                    // Agregar a array de respuesta
+                    $archivosGuardados[] = [
+                        'nombre' => $archivo->getClientOriginalName(),
+                        'ruta' => $rutaPublica,
+                        'mime' => $archivo->getMimeType(),
+                    ];
+                }
+            }
+
+            // 1. Obtener la actividad actual y calcular diferencia de días
+            $actividadActual = Documentos::find($request->id);
+            $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
+            $fechaHoy = now();
+            $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
+
+            // 2. Actualizar actividad a estado 2 (Completado)
+            $actividadActual->update([
+                'estado' => 2,
+                'observacion' => $request->observacion,
+                'fecha_confirmacion' => now(),
+                'fecha_actual' => now(),
+                'usuario_id' => Auth::id(),
+            ]);
+
+            // 3. Actualizar fechas de actividades siguientes
+            if ($diasDiferencia != 0) {
+                $this->actualizarFechasSiguientesCelsia(
+                    $request->codigo_proyecto,
+                    $request->codigo_documento,
+                    $request->etapa,
+                    $actividadActual->orden,
+                    $diasDiferencia
+                );
+            }
+
+            // 4. Aplicar lógica de escalera basada en el orden
+            $this->aplicarLogicaEscaleraCelsia(
+                $request->codigo_proyecto,
+                $request->codigo_documento,
+                $request->etapa,
+                $actividadActual->orden,
+                $actividadActual->actividad_id
+            );
+
+            // 5. Respuesta completa incluyendo archivos subidos
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Actividad confirmada exitosamente' .
+                    ($diasDiferencia != 0 ?
+                        ($diasDiferencia > 0 ?
+                            " con {$diasDiferencia} días de retraso aplicados" :
+                            " con " . abs($diasDiferencia) . " días de adelanto aplicados")
+                        : ""
+                    ),
+                'data' => [
+                    'actual' => $actividadActual,
+                    'dias_diferencia' => $diasDiferencia,
+                    'archivos' => $archivosGuardados,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Función principal para aplicar lógica de escalera
+    private function aplicarLogicaEscaleraCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $actividad_id)
+    {
+        // Caso 1: Ordenes del 1 al 9 (escalera simple)
+        if ($ordenActual >= 1 && $ordenActual <= 9) {
+            // Habilitar solo la siguiente actividad en orden
+            $siguienteOrden = $ordenActual + 1;
+
+            // Para orden 10 hay lógica especial
+            if ($ordenActual == 10) {
+                $siguienteOrden = 11;
+            }
+
+            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
+        }
+
+        // Caso 2: Confirmación de orden 10 - habilitar todas las actividades del 11 al 23
+        elseif ($ordenActual == 10) {
+            $this->habilitarActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, 11, 23);
+        }
+
+        // Caso 3: Actividades del 11 al 23 - verificar si todas están completas para habilitar orden 24
+        elseif ($ordenActual >= 11 && $ordenActual <= 23) {
+            $this->verificarCompletitudGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa);
+        }
+
+        // Caso 4: Orden 24 en adelante - escalera normal
+        elseif ($ordenActual >= 24) {
+            $siguienteOrden = $ordenActual + 1;
+            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
+        }
+    }
+
+    // Función para habilitar solo la siguiente actividad por orden
+    private function habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden)
+    {
+        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('orden', $siguienteOrden)
+            ->first();
+
+        if ($siguienteActividad && $siguienteActividad->estado == 0) {
+            $siguienteActividad->update([
+                'estado' => 1,
+                'fecha_actual' => now(),
+            ]);
+        }
+    }
+
+    // Función para habilitar un rango completo de actividades
+    private function habilitarActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenInicio, $ordenFin)
+    {
+        $actividades = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereBetween('orden', [$ordenInicio, $ordenFin])
+            ->where('estado', 0)
+            ->get();
+
+        foreach ($actividades as $actividad) {
+            $actividad->update([
+                'estado' => 1,
+                'fecha_actual' => now(),
+            ]);
+        }
+    }
+
+    // Función para verificar si todas las actividades del 11 al 23 están completas
+    private function verificarCompletitudGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa)
+    {
+        $actividadesGrupo = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereBetween('orden', [11, 23])
+            ->get();
+
+        // Verificar si TODAS las actividades están en estado 2 (Completado)
+        $todasCompletas = $actividadesGrupo->every(function ($actividad) {
+            return $actividad->estado == 2;
+        });
+
+        if ($todasCompletas) {
+            // Habilitar orden 24
+            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, 24);
+        }
+    }
+
+    // Función para actualizar fechas de actividades siguientes (sin cambios)
+    private function actualizarFechasSiguientesCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia)
+    {
+        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('orden', '>', $ordenActual)
+            ->where('estado', '!=', 2)
+            ->orderBy('orden')
+            ->get();
+
+        foreach ($actividadesSiguientes as $actividad) {
+            $nuevaFechaActual = \Carbon\Carbon::parse($actividad->fecha_actual);
+
+            if ($diasDiferencia > 0) {
+                $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
+            } else {
+                $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
+            }
+
+            $actividad->update([
+                'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
+            ]);
+
+            $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
         }
     }
 }
