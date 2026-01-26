@@ -342,6 +342,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('gestion-documentos-proyectos', [DocumentosController::class, 'proyectosCodigo']);
     Route::post('StoreDocumentacionRed', [DocumentosController::class, 'StoreDocumentacionRed']);
     Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
+    Route::post('gestion-documentos-confirmar-celsia', [DocumentosController::class, 'confirmarDocumentoCelsia']);
     Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
     //Buscar los proyectos que estan disponibles
     Route::get('dodumentos-disponibles/{codigo}',[DocumentosController::class, 'DocumentosDisponibles']);
