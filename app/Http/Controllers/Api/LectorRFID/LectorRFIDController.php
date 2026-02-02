@@ -97,7 +97,7 @@ class LectorRFIDController extends Controller
                         'hora_ingreso' => $horaActualFormatted,
                         'fecha_salida' => null,
                         'hora_salida' => null,
-                        'obra_id' => 1,
+                        'obra_id' => 58,
                         'created_at' => $horaActual,
                         'updated_at' => $horaActual,
                     ]);
