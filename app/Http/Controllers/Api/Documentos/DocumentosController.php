@@ -16,15 +16,15 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use PhpParser\Node\Stmt\TryCatch;
+use Illuminate\Support\Str;
 
 class DocumentosController extends Controller
 {
 
     //CREAR DOCUMENTACION (INICIO)
-    //documentacion
-
     public function StoreDocumentacionRed(Request $request)
     {
 
@@ -317,7 +317,6 @@ class DocumentosController extends Controller
         return null;
     }
 
-    //creacion de TM de organismos
     private function CreartTm($data)
     {
         $codigoProyecto   = $data->codigo_proyecto;
@@ -386,15 +385,82 @@ class DocumentosController extends Controller
             'total_registros' => count($registrosCreados),
         ];
     }
-
-
     //CREAR DOCUMENTACION (FIN)
 
+
+
+
+
     //GESTION DE CONTUL DE PROYECTOS Y ACTIVIDADES INICIO
-    public function indexEmcali()
+    // public function indexEmcali()
+    // {
+    //     $usuario = Auth::user();
+    //     $rolesPermitidos = ['Directora Proyectos', 'Tramites', 'Administrador']; //roles permitidos para ver todo los tramites sin filtros
+    //     $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
+
+    //     $data = collect([]);
+
+    //     $documentacionQuery = function ($query) {
+    //         $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador', 'nombre_etapa')
+    //             ->where('operador', 1)
+    //             ->distinct();
+    //     };
+
+    //     if ($tieneRolPermitido) {
+    //         // Trae todos los proyectos
+    //         $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+    //             ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+    //             ->get();
+
+    //         $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+    //             ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+    //             ->get();
+
+    //         $data = $proyectosApartamentos->merge($proyectosCasas);
+    //     } else {
+    //         // Solo proyectos asignados al usuario
+    //         $userId = Auth::id();
+
+    //         $proyectosAsignados = DB::table('proyecto')
+    //             ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+    //             ->pluck('codigo_proyecto')
+    //             ->toArray();
+
+    //         $proyectosCasaAsignados = DB::table('proyectos_casas')
+    //             ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+    //             ->pluck('codigo_proyecto')
+    //             ->toArray();
+
+    //         $proyectosAsignadosTotales = array_merge($proyectosAsignados, $proyectosCasaAsignados);
+
+    //         if (!empty($proyectosAsignadosTotales)) {
+    //             $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+    //                 ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+    //                 ->whereIn('codigo_proyecto', $proyectosAsignados)
+    //                 ->get();
+
+    //             $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+    //                 ->whereHas('documentacion', fn($q) => $q->where('operador', 1))
+    //                 ->whereIn('codigo_proyecto', $proyectosCasaAsignados)
+    //                 ->get();
+
+    //             $data = $proyectosApartamentos->merge($proyectosCasas);
+    //         }
+    //     }
+
+    //     $data = $data->sortBy('codigo_proyecto')->values();
+
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $data
+    //     ]);
+    // }
+
+    public function indexEmcali() //version para finish y llevar colores de estado de actividades
     {
         $usuario = Auth::user();
-        $rolesPermitidos = ['Directora Proyectos', 'Tramites', 'Administrador']; //roles permitidos para ver todo los tramites sin filtros
+        $rolesPermitidos = ['Directora Proyectos', 'Tramites', 'Administrador'];
         $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
 
         $data = collect([]);
@@ -447,6 +513,31 @@ class DocumentosController extends Controller
             }
         }
 
+        // Procesar los datos para agregar el campo 'finish'
+        $data = $data->map(function ($proyecto) {
+            // Verificar si el proyecto tiene documentación
+            if ($proyecto->documentacion && count($proyecto->documentacion) > 0) {
+                // Procesar cada etapa/documento
+                $proyecto->documentacion = $proyecto->documentacion->map(function ($documento) {
+                    // Verificar si existe al menos una actividad con estado 1 para esta combinación
+                    $tieneActividadesPendientes = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
+                        ->where('codigo_documento', $documento->codigo_documento)
+                        ->where('etapa', $documento->etapa)
+                        ->where('operador', $documento->operador)
+                        ->where('estado', 1) // Estado 1 = pendiente/activo
+                        ->exists();
+
+                    // Si tiene actividades pendientes (estado 1) entonces finish = false
+                    // Si no tiene actividades pendientes entonces finish = true
+                    $documento->finish = !$tieneActividadesPendientes;
+
+                    return $documento;
+                });
+            }
+
+            return $proyecto;
+        })->sortBy('codigo_proyecto')->values();
+
         return response()->json([
             'status' => 'success',
             'data' => $data
@@ -454,7 +545,70 @@ class DocumentosController extends Controller
     }
 
     //CONSULTA DOCUMENTACION CELSIA
-    public function indexCelsia()
+    // public function indexCelsia()
+    // {
+    //     $usuario = Auth::user();
+    //     $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
+    //     $tieneRolPermitido = in_array($usuario->rol, $rolesPermitidos);
+
+    //     $data = collect([]);
+
+    //     // Función reutilizable para la relación documentacion
+    //     $documentacionQuery = function ($query) {
+    //         $query->select('codigo_proyecto', 'codigo_documento', 'etapa', 'operador', 'nombre_etapa')
+    //             ->where('operador', 2) // Operador CELSIA
+    //             ->distinct();
+    //     };
+
+    //     if ($tieneRolPermitido) {
+    //         // Trae todos los proyectos
+    //         $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+    //             ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+    //             ->get();
+
+    //         $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+    //             ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+    //             ->get();
+
+    //         $data = $proyectosApartamentos->merge($proyectosCasas);
+    //     } else {
+    //         // Solo proyectos asignados al usuario
+    //         $userId = Auth::id();
+
+    //         $proyectosAsignados = DB::table('proyecto')
+    //             ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+    //             ->pluck('codigo_proyecto')
+    //             ->toArray();
+
+    //         $proyectosCasaAsignados = DB::table('proyectos_casas')
+    //             ->whereRaw("JSON_CONTAINS(ingeniero_id, '\"$userId\"')")
+    //             ->pluck('codigo_proyecto')
+    //             ->toArray();
+
+    //         if (!empty($proyectosAsignados) || !empty($proyectosCasaAsignados)) {
+    //             $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
+    //                 ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+    //                 ->whereIn('codigo_proyecto', $proyectosAsignados)
+    //                 ->get();
+
+    //             $proyectosCasas = ProyectoCasa::with(['documentacion' => $documentacionQuery])
+    //                 ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
+    //                 ->whereIn('codigo_proyecto', $proyectosCasaAsignados)
+    //                 ->get();
+
+    //             $data = $proyectosApartamentos->merge($proyectosCasas);
+    //         }
+    //     }
+
+    //     $data = $data->sortBy('codigo_proyecto')->values();
+
+    //     return response()->json([
+    //         'status' => 'success',
+    //         'data' => $data
+    //     ]);
+    // }
+
+    public function indexCelsia() //version para finish y llevar colores de estado de actividades
     {
         $usuario = Auth::user();
         $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
@@ -494,7 +648,9 @@ class DocumentosController extends Controller
                 ->pluck('codigo_proyecto')
                 ->toArray();
 
-            if (!empty($proyectosAsignados) || !empty($proyectosCasaAsignados)) {
+            $proyectosAsignadosTotales = array_merge($proyectosAsignados, $proyectosCasaAsignados);
+
+            if (!empty($proyectosAsignadosTotales)) {
                 $proyectosApartamentos = Proyectos::with(['documentacion' => $documentacionQuery])
                     ->whereHas('documentacion', fn($q) => $q->where('operador', 2))
                     ->whereIn('codigo_proyecto', $proyectosAsignados)
@@ -508,6 +664,31 @@ class DocumentosController extends Controller
                 $data = $proyectosApartamentos->merge($proyectosCasas);
             }
         }
+
+        // Procesar los datos para agregar el campo 'finish'
+        $data = $data->map(function ($proyecto) {
+            // Verificar si el proyecto tiene documentación
+            if ($proyecto->documentacion && count($proyecto->documentacion) > 0) {
+                // Procesar cada etapa/documento
+                $proyecto->documentacion = $proyecto->documentacion->map(function ($documento) {
+                    // Verificar si existe al menos una actividad con estado 1 para esta combinación
+                    $tieneActividadesPendientes = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
+                        ->where('codigo_documento', $documento->codigo_documento)
+                        ->where('etapa', $documento->etapa)
+                        ->where('operador', $documento->operador)
+                        ->where('estado', 1) // Estado 1 = pendiente/activo
+                        ->exists();
+
+                    // Si tiene actividades pendientes (estado 1) entonces finish = false
+                    // Si no tiene actividades pendientes entonces finish = true
+                    $documento->finish = !$tieneActividadesPendientes;
+
+                    return $documento;
+                });
+            }
+
+            return $proyecto;
+        })->sortBy('codigo_proyecto')->values();
 
         return response()->json([
             'status' => 'success',
@@ -570,6 +751,8 @@ class DocumentosController extends Controller
                 $data = $proyectosApartamentos->merge($proyectosCasas);
             }
         }
+
+        $data = $data->sortBy('codigo_proyecto')->values();
 
         return response()->json([
             'status' => 'success',
@@ -715,6 +898,311 @@ class DocumentosController extends Controller
         }
     }
 
+
+    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
+
+    // public function confirmarDocumento(Request $request)
+    // {
+    //     try {
+    //         // Validación de campos y múltiples archivos
+    //         $request->validate([
+    //             'id' => 'required|exists:documentacion_operadores,id',
+    //             'codigo_proyecto' => 'required|string',
+    //             'codigo_documento' => 'required|string',
+    //             'etapa' => 'required|integer',
+    //             'actividad_id' => 'required|integer',
+    //             'observacion' => 'required|string',
+
+    //             // Array de archivos
+    //             'archivos' => 'array',
+    //             'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
+    //         ]);
+
+    //         $archivosGuardados = [];
+
+    //         // Guardar archivos si existen
+    //         if ($request->hasFile('archivos')) {
+    //             foreach ($request->file('archivos') as $archivo) {
+
+    //                 // Generar nombre único para cada archivo
+    //                 $nombreArchivo = $request->codigo_proyecto . '-' .
+    //                     $request->codigo_documento . '-' .
+    //                     $request->etapa . '-' .
+    //                     $request->actividad_id . '-' .
+    //                     time() . '-' .
+    //                     uniqid() . '.' .
+    //                     $archivo->getClientOriginalExtension();
+
+    //                 // Guardar archivo en storage
+    //                 $archivo->storeAs('public/documentacion/red', $nombreArchivo);
+
+    //                 // Obtener ruta pública
+    //                 $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
+
+    //                 // Guardar en tabla documentos_adjuntos
+    //                 DocumentosAdjuntos::create([
+    //                     'documento_id' => $request->id,
+    //                     'ruta_archivo' => $rutaPublica,
+    //                     'nombre_original' => $archivo->getClientOriginalName(),
+    //                     'extension' => $archivo->getClientOriginalExtension(),
+    //                     'tamano' => $archivo->getSize(),
+    //                 ]);
+
+    //                 // Agregar a array de respuesta
+    //                 $archivosGuardados[] = [
+    //                     'nombre' => $archivo->getClientOriginalName(),
+    //                     'ruta' => $rutaPublica,
+    //                     'mime' => $archivo->getMimeType(),
+    //                 ];
+    //             }
+    //         }
+
+    //         // 1. Obtener la actividad actual y calcular diferencia de días
+    //         $actividadActual = Documentos::find($request->id);
+    //         $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
+    //         $fechaHoy = now();
+    //         $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
+
+    //         // 2. Actualizar actividad a estado 2 (Completado)
+    //         $actividadActual->update([
+    //             'estado' => 2,
+    //             'observacion' => $request->observacion,
+    //             'fecha_confirmacion' => now(),
+    //             'fecha_actual' => now(),
+    //             'usuario_id' => Auth::id(),
+    //         ]);
+
+    //         // 3. Actualizar fechas de actividades siguientes
+    //         if ($diasDiferencia != 0) {
+    //             $this->actualizarFechasSiguientes(
+    //                 $request->codigo_proyecto,
+    //                 $request->codigo_documento,
+    //                 $request->etapa,
+    //                 $actividadActual->orden,
+    //                 $diasDiferencia
+    //             );
+    //         }
+
+    //         // 4. Aplicar reglas específicas para actividades 1-9
+    //         $this->aplicarReglasEspeciales(
+    //             $request->codigo_proyecto,
+    //             $request->codigo_documento,
+    //             $request->etapa,
+    //             $request->actividad_id,
+    //             $actividadActual->orden
+    //         );
+
+    //         // 5. Para actividades >= 9, aplicar lógica normal
+    //         if ($request->actividad_id >= 9) {
+    //             $this->aplicarLogicaNormalFlujo(
+    //                 $request->codigo_proyecto,
+    //                 $request->codigo_documento,
+    //                 $request->etapa,
+    //                 $actividadActual
+    //             );
+    //         }
+
+    //         // 6. Respuesta completa incluyendo archivos subidos
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Actividad confirmada exitosamente' .
+    //                 ($diasDiferencia != 0 ?
+    //                     ($diasDiferencia > 0 ?
+    //                         " con {$diasDiferencia} días de retraso aplicados" :
+    //                         " con " . abs($diasDiferencia) . " días de adelanto aplicados")
+    //                     : ""
+    //                 ),
+    //             'data' => [
+    //                 'actual' => $actividadActual,
+    //                 'dias_diferencia' => $diasDiferencia,
+    //                 'archivos' => $archivosGuardados, // ← aquí van todos los archivos subidos
+    //             ]
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    // // Función para aplicar reglas específicas de habilitación (solo para actividades 1-9)
+    // private function aplicarReglasEspeciales($codigo_proyecto, $codigo_documento, $etapa, $actividad_id, $ordenActual)
+    // {
+    //     // Regla 1: Si se confirma actividad 1, habilitar simultáneas [2,3,4,5]
+    //     if ($actividad_id == 1) {
+    //         $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5]);
+    //     }
+
+    //     // Regla 2: Si se confirma actividad 3, habilitar actividad 6
+    //     if ($actividad_id == 3) {
+    //         $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6]);
+    //     }
+
+    //     // Regla 3: Si se confirma actividad 6, habilitar actividad 7
+    //     if ($actividad_id == 6) {
+    //         $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7]);
+    //     }
+
+    //     // Regla 4: Para habilitar actividad 8, deben estar confirmadas 2 y 7
+    //     if ($actividad_id == 2 || $actividad_id == 7) {
+    //         $this->verificarHabilitacionActividad8($codigo_proyecto, $codigo_documento, $etapa);
+    //     }
+
+    //     // Regla 5: Si se confirma actividad 8, habilitar actividad 9
+    //     if ($actividad_id == 8) {
+    //         $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9]);
+    //     }
+
+    //     // Para actividades 4 y 5 no se hace nada especial (solo se confirman)
+    // }
+
+    // // Función para verificar habilitación de actividad 8
+    // private function verificarHabilitacionActividad8($codigo_proyecto, $codigo_documento, $etapa)
+    // {
+    //     $actividad2 = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //         ->where('codigo_documento', $codigo_documento)
+    //         ->where('etapa', $etapa)
+    //         ->where('actividad_id', 2)
+    //         ->first();
+
+    //     $actividad7 = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //         ->where('codigo_documento', $codigo_documento)
+    //         ->where('etapa', $etapa)
+    //         ->where('actividad_id', 7)
+    //         ->first();
+
+    //     if (
+    //         $actividad2 && $actividad2->estado == 2 &&
+    //         $actividad7 && $actividad7->estado == 2
+    //     ) {
+    //         $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [8]);
+    //     }
+    // }
+
+    // // Función para aplicar lógica normal de flujo (para actividades 9 en adelante)
+    // private function aplicarLogicaNormalFlujo($codigo_proyecto, $codigo_documento, $etapa, $actividadActual)
+    // {
+    //     // Si es actividad SIMULTÁNEA, verificar si todas las simultáneas están completas
+    //     if ($actividadActual->tipo === 'simultanea') {
+    //         // Obtener todas las actividades simultáneas del mismo grupo
+    //         $actividadesSimultaneas = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //             ->where('codigo_documento', $codigo_documento)
+    //             ->where('etapa', $etapa)
+    //             ->where('actividad_depende_id', $actividadActual->actividad_depende_id)
+    //             ->where('tipo', 'simultanea')
+    //             ->get();
+
+    //         // Verificar si TODAS las actividades simultáneas están completas
+    //         $todasCompletas = $actividadesSimultaneas->every(function ($actividad) {
+    //             return $actividad->estado == 2; // Todas deben estar en estado 2 (Completado)
+    //         });
+
+    //         if ($todasCompletas) {
+    //             // Buscar la siguiente actividad PRINCIPAL después del grupo simultáneo
+    //             $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //                 ->where('codigo_documento', $codigo_documento)
+    //                 ->where('etapa', $etapa)
+    //                 ->where('orden', '>', $actividadesSimultaneas->max('orden'))
+    //                 ->where('tipo', 'principal')
+    //                 ->orderBy('orden')
+    //                 ->first();
+
+    //             if ($siguienteActividad) {
+    //                 $siguienteActividad->update([
+    //                     'estado' => 1, // Disponible
+    //                     'fecha_actual' => now(),
+    //                 ]);
+    //             }
+    //         }
+    //     }
+    //     // Si es actividad PRINCIPAL, habilitar la siguiente actividad normalmente
+    //     else {
+    //         $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //             ->where('codigo_documento', $codigo_documento)
+    //             ->where('etapa', $etapa)
+    //             ->where('orden', $actividadActual->orden + 1)
+    //             ->first();
+
+    //         if ($siguienteActividad) {
+    //             $siguienteActividad->update([
+    //                 'estado' => 1, // Disponible
+    //                 'fecha_actual' => now(),
+    //             ]);
+
+    //             // Si la siguiente actividad es simultánea, habilitar todas las del grupo
+    //             if ($siguienteActividad->tipo === 'simultanea') {
+    //                 $actividadesSimultaneas = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //                     ->where('codigo_documento', $codigo_documento)
+    //                     ->where('etapa', $etapa)
+    //                     ->where('actividad_depende_id', $siguienteActividad->actividad_depende_id)
+    //                     ->where('tipo', 'simultanea')
+    //                     ->get();
+
+    //                 foreach ($actividadesSimultaneas as $actividadSimultanea) {
+    //                     if ($actividadSimultanea->id != $siguienteActividad->id) {
+    //                         $actividadSimultanea->update([
+    //                             'estado' => 1, // Disponible
+    //                             'fecha_actual' => now(),
+    //                         ]);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // Función para habilitar actividades específicas (sin cambios)
+    // private function habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
+    // {
+    //     foreach ($actividades_ids as $actividad_id) {
+    //         $actividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //             ->where('codigo_documento', $codigo_documento)
+    //             ->where('etapa', $etapa)
+    //             ->where('actividad_id', $actividad_id)
+    //             ->first();
+
+    //         if ($actividad && $actividad->estado == 0) {
+    //             $actividad->update([
+    //                 'estado' => 1,
+    //                 'fecha_actual' => now(),
+    //             ]);
+    //         }
+    //     }
+    // }
+
+    // // Función para actualizar fechas de actividades siguientes (sin cambios)
+    // private function actualizarFechasSiguientes($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia)
+    // {
+    //     $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
+    //         ->where('codigo_documento', $codigo_documento)
+    //         ->where('etapa', $etapa)
+    //         ->where('orden', '>', $ordenActual)
+    //         ->where('estado', '!=', 2)
+    //         ->orderBy('orden')
+    //         ->get();
+
+    //     foreach ($actividadesSiguientes as $actividad) {
+    //         $nuevaFechaActual = \Carbon\Carbon::parse($actividad->fecha_actual);
+
+    //         if ($diasDiferencia > 0) {
+    //             $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
+    //         } else {
+    //             $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
+    //         }
+
+    //         $actividad->update([
+    //             'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
+    //         ]);
+
+    //         $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
+    //     }
+    // }
+
+
+
+    /* NUE */
+
     public function confirmarDocumento(Request $request)
     {
         try {
@@ -726,58 +1214,18 @@ class DocumentosController extends Controller
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
                 'observacion' => 'required|string',
-
-                // Array de archivos
                 'archivos' => 'array',
                 'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
             ]);
 
-            $archivosGuardados = [];
+            // 1. Guardar archivos si existen
+            $archivosGuardados = $this->guardarArchivos($request);
 
-            // Guardar archivos si existen
-            if ($request->hasFile('archivos')) {
-                foreach ($request->file('archivos') as $archivo) {
-
-                    // Generar nombre único para cada archivo
-                    $nombreArchivo = $request->codigo_proyecto . '-' .
-                        $request->codigo_documento . '-' .
-                        $request->etapa . '-' .
-                        $request->actividad_id . '-' .
-                        time() . '-' .
-                        uniqid() . '.' .
-                        $archivo->getClientOriginalExtension();
-
-                    // Guardar archivo en storage
-                    $archivo->storeAs('public/documentacion/red', $nombreArchivo);
-
-                    // Obtener ruta pública
-                    $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
-
-                    // Guardar en tabla documentos_adjuntos
-                    DocumentosAdjuntos::create([
-                        'documento_id' => $request->id,
-                        'ruta_archivo' => $rutaPublica,
-                        'nombre_original' => $archivo->getClientOriginalName(),
-                        'extension' => $archivo->getClientOriginalExtension(),
-                        'tamano' => $archivo->getSize(),
-                    ]);
-
-                    // Agregar a array de respuesta
-                    $archivosGuardados[] = [
-                        'nombre' => $archivo->getClientOriginalName(),
-                        'ruta' => $rutaPublica,
-                        'mime' => $archivo->getMimeType(),
-                    ];
-                }
-            }
-
-            // 1. Obtener la actividad actual y calcular diferencia de días
+            // 2. Obtener la actividad actual y calcular diferencia de días
             $actividadActual = Documentos::find($request->id);
-            $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
-            $fechaHoy = now();
-            $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
+            $diasDiferencia = $this->calcularDiferenciaDias($actividadActual);
 
-            // 2. Actualizar actividad a estado 2 (Completado)
+            // 3. Actualizar actividad a estado 2 (Completado)
             $actividadActual->update([
                 'estado' => 2,
                 'observacion' => $request->observacion,
@@ -786,7 +1234,7 @@ class DocumentosController extends Controller
                 'usuario_id' => Auth::id(),
             ]);
 
-            // 3. Actualizar fechas de actividades siguientes
+            // 4. Actualizar fechas de actividades siguientes si hay diferencia
             if ($diasDiferencia != 0) {
                 $this->actualizarFechasSiguientes(
                     $request->codigo_proyecto,
@@ -797,18 +1245,16 @@ class DocumentosController extends Controller
                 );
             }
 
-            // 4. Aplicar reglas específicas para actividades 1-9
-            $this->aplicarReglasEspeciales(
-                $request->codigo_proyecto,
-                $request->codigo_documento,
-                $request->etapa,
-                $request->actividad_id,
-                $actividadActual->orden
-            );
-
-            // 5. Para actividades >= 9, aplicar lógica normal
-            if ($request->actividad_id >= 9) {
-                $this->aplicarLogicaNormalFlujo(
+            // 5. Aplicar lógica de habilitación según etapa
+            if ($request->etapa == 1) {
+                $this->aplicarLogicaEtapa1(
+                    $request->codigo_proyecto,
+                    $request->codigo_documento,
+                    $request->etapa,
+                    $request->actividad_id
+                );
+            } else {
+                $this->aplicarLogicaCascada(
                     $request->codigo_proyecto,
                     $request->codigo_documento,
                     $request->etapa,
@@ -816,20 +1262,14 @@ class DocumentosController extends Controller
                 );
             }
 
-            // 6. Respuesta completa incluyendo archivos subidos
+            // 6. Respuesta completa
             return response()->json([
                 'status' => 'success',
-                'message' => 'Actividad confirmada exitosamente' .
-                    ($diasDiferencia != 0 ?
-                        ($diasDiferencia > 0 ?
-                            " con {$diasDiferencia} días de retraso aplicados" :
-                            " con " . abs($diasDiferencia) . " días de adelanto aplicados")
-                        : ""
-                    ),
+                'message' => $this->generarMensajeExito($diasDiferencia),
                 'data' => [
                     'actual' => $actividadActual,
                     'dias_diferencia' => $diasDiferencia,
-                    'archivos' => $archivosGuardados, // ← aquí van todos los archivos subidos
+                    'archivos' => $archivosGuardados,
                 ]
             ]);
         } catch (\Exception $e) {
@@ -840,152 +1280,223 @@ class DocumentosController extends Controller
         }
     }
 
-    // Función para aplicar reglas específicas de habilitación (solo para actividades 1-9)
-    private function aplicarReglasEspeciales($codigo_proyecto, $codigo_documento, $etapa, $actividad_id, $ordenActual)
+    // ==================== LÓGICA ETAPA 1 ====================
+    private function aplicarLogicaEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id)
     {
-        // Regla 1: Si se confirma actividad 1, habilitar simultáneas [2,3,4,5]
-        if ($actividad_id == 1) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5]);
-        }
+        // Reglas de habilitación para etapa 1
+        $reglas = [
+            1 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5]);
+            },
+            3 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6]);
+            },
+            6 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7]);
+            },
+            2 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7]);
+            },
+            7 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7]);
+            },
+            8 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9]);
+            },
+            9 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [10]);
+            },
+            10 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+            },
+            11 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            12 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            13 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            14 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            15 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            16 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            17 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            18 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            19 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            20 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+            },
+            21 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [22, 23, 24, 25]);
+            },
+            22 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+            },
+            23 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+            },
+            24 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+            },
+            25 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+            },
+            26 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [27]);
+            },
+            27 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [28]);
+            },
+            28 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [29]);
+            },
+            29 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [30]);
+            },
+            30 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [31]);
+            },
+            31 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [32]);
+            },
+            32 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [33]);
+            },
+        ];
 
-        // Regla 2: Si se confirma actividad 3, habilitar actividad 6
-        if ($actividad_id == 3) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6]);
+        // Ejecutar regla si existe
+        if (isset($reglas[$actividad_id])) {
+            $reglas[$actividad_id]();
         }
-
-        // Regla 3: Si se confirma actividad 6, habilitar actividad 7
-        if ($actividad_id == 6) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7]);
-        }
-
-        // Regla 4: Para habilitar actividad 8, deben estar confirmadas 2 y 7
-        if ($actividad_id == 2 || $actividad_id == 7) {
-            $this->verificarHabilitacionActividad8($codigo_proyecto, $codigo_documento, $etapa);
-        }
-
-        // Regla 5: Si se confirma actividad 8, habilitar actividad 9
-        if ($actividad_id == 8) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9]);
-        }
-
-        // Para actividades 4 y 5 no se hace nada especial (solo se confirman)
     }
 
-    // Función para verificar habilitación de actividad 8
-    private function verificarHabilitacionActividad8($codigo_proyecto, $codigo_documento, $etapa)
+    // ==================== LÓGICA ETAPAS DIFERENTES A 1 ====================
+    private function aplicarLogicaCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadActual)
     {
-        $actividad2 = Documentos::where('codigo_proyecto', $codigo_proyecto)
+        // Para etapas diferentes a 1, habilitar la siguiente actividad por orden
+        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
             ->where('codigo_documento', $codigo_documento)
             ->where('etapa', $etapa)
-            ->where('actividad_id', 2)
+            ->where('orden', $actividadActual->orden + 1)
             ->first();
 
-        $actividad7 = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('actividad_id', 7)
-            ->first();
-
-        if (
-            $actividad2 && $actividad2->estado == 2 &&
-            $actividad7 && $actividad7->estado == 2
-        ) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [8]);
+        if ($siguienteActividad && $siguienteActividad->estado == 0) {
+            $siguienteActividad->update([
+                'estado' => 1,
+                'fecha_actual' => now(),
+            ]);
         }
     }
 
-    // Función para aplicar lógica normal de flujo (para actividades 9 en adelante)
-    private function aplicarLogicaNormalFlujo($codigo_proyecto, $codigo_documento, $etapa, $actividadActual)
-    {
-        // Si es actividad SIMULTÁNEA, verificar si todas las simultáneas están completas
-        if ($actividadActual->tipo === 'simultanea') {
-            // Obtener todas las actividades simultáneas del mismo grupo
-            $actividadesSimultaneas = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                ->where('codigo_documento', $codigo_documento)
-                ->where('etapa', $etapa)
-                ->where('actividad_depende_id', $actividadActual->actividad_depende_id)
-                ->where('tipo', 'simultanea')
-                ->get();
-
-            // Verificar si TODAS las actividades simultáneas están completas
-            $todasCompletas = $actividadesSimultaneas->every(function ($actividad) {
-                return $actividad->estado == 2; // Todas deben estar en estado 2 (Completado)
-            });
-
-            if ($todasCompletas) {
-                // Buscar la siguiente actividad PRINCIPAL después del grupo simultáneo
-                $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                    ->where('codigo_documento', $codigo_documento)
-                    ->where('etapa', $etapa)
-                    ->where('orden', '>', $actividadesSimultaneas->max('orden'))
-                    ->where('tipo', 'principal')
-                    ->orderBy('orden')
-                    ->first();
-
-                if ($siguienteActividad) {
-                    $siguienteActividad->update([
-                        'estado' => 1, // Disponible
-                        'fecha_actual' => now(),
-                    ]);
-                }
-            }
-        }
-        // Si es actividad PRINCIPAL, habilitar la siguiente actividad normalmente
-        else {
-            $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                ->where('codigo_documento', $codigo_documento)
-                ->where('etapa', $etapa)
-                ->where('orden', $actividadActual->orden + 1)
-                ->first();
-
-            if ($siguienteActividad) {
-                $siguienteActividad->update([
-                    'estado' => 1, // Disponible
-                    'fecha_actual' => now(),
-                ]);
-
-                // Si la siguiente actividad es simultánea, habilitar todas las del grupo
-                if ($siguienteActividad->tipo === 'simultanea') {
-                    $actividadesSimultaneas = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                        ->where('codigo_documento', $codigo_documento)
-                        ->where('etapa', $etapa)
-                        ->where('actividad_depende_id', $siguienteActividad->actividad_depende_id)
-                        ->where('tipo', 'simultanea')
-                        ->get();
-
-                    foreach ($actividadesSimultaneas as $actividadSimultanea) {
-                        if ($actividadSimultanea->id != $siguienteActividad->id) {
-                            $actividadSimultanea->update([
-                                'estado' => 1, // Disponible
-                                'fecha_actual' => now(),
-                            ]);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Función para habilitar actividades específicas (sin cambios)
+    // ==================== MÉTODOS AUXILIARES ====================
     private function habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
     {
         foreach ($actividades_ids as $actividad_id) {
-            $actividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            Documentos::where('codigo_proyecto', $codigo_proyecto)
                 ->where('codigo_documento', $codigo_documento)
                 ->where('etapa', $etapa)
                 ->where('actividad_id', $actividad_id)
-                ->first();
-
-            if ($actividad && $actividad->estado == 0) {
-                $actividad->update([
+                ->where('estado', 0)
+                ->update([
                     'estado' => 1,
                     'fecha_actual' => now(),
                 ]);
-            }
         }
     }
 
-    // Función para actualizar fechas de actividades siguientes (sin cambios)
+    private function verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, $actividad_a_activar, $actividades_requeridas)
+    {
+        // Contar cuántas actividades requeridas están completadas
+        $completadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereIn('actividad_id', $actividades_requeridas)
+            ->where('estado', 2)
+            ->count();
+
+        // Si todas las requeridas están completadas, activar la siguiente
+        if ($completadas == count($actividades_requeridas)) {
+            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [$actividad_a_activar]);
+        }
+    }
+
+    private function guardarArchivos(Request $request)
+    {
+        if (!$request->hasFile('archivos')) {
+            return [];
+        }
+
+        $archivosGuardados = [];
+
+        foreach ($request->file('archivos') as $archivo) {
+            // Generar nombre único para cada archivo
+            $nombreArchivo = $request->codigo_proyecto . '-' .
+                $request->codigo_documento . '-' .
+                $request->etapa . '-' .
+                $request->actividad_id . '-' .
+                time() . '-' .
+                Str::random(10) . '.' .
+                $archivo->getClientOriginalExtension();
+
+            // Guardar archivo en storage
+            $archivo->storeAs('public/documentacion/red', $nombreArchivo);
+
+            // Obtener ruta pública
+            $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
+
+            // Guardar en tabla documentos_adjuntos
+            DocumentosAdjuntos::create([
+                'documento_id' => $request->id,
+                'ruta_archivo' => $rutaPublica,
+                'nombre_original' => $archivo->getClientOriginalName(),
+                'extension' => $archivo->getClientOriginalExtension(),
+                'tamano' => $archivo->getSize(),
+            ]);
+
+            // Agregar a array de respuesta
+            $archivosGuardados[] = [
+                'nombre' => $archivo->getClientOriginalName(),
+                'ruta' => $rutaPublica,
+                'mime' => $archivo->getMimeType(),
+            ];
+        }
+
+        return $archivosGuardados;
+    }
+
+    private function calcularDiferenciaDias($actividad)
+    {
+        $fechaProyeccion = Carbon::parse($actividad->fecha_proyeccion);
+        $fechaHoy = Carbon::now();
+        return $fechaProyeccion->diffInDays($fechaHoy, false);
+    }
+
+    private function generarMensajeExito($diasDiferencia)
+    {
+        $mensaje = 'Actividad confirmada exitosamente';
+
+        if ($diasDiferencia > 0) {
+            $mensaje .= " con {$diasDiferencia} días de retraso aplicados";
+        } elseif ($diasDiferencia < 0) {
+            $mensaje .= " con " . abs($diasDiferencia) . " días de adelanto aplicados";
+        }
+
+        return $mensaje;
+    }
+
     private function actualizarFechasSiguientes($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia)
     {
         $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
@@ -997,7 +1508,7 @@ class DocumentosController extends Controller
             ->get();
 
         foreach ($actividadesSiguientes as $actividad) {
-            $nuevaFechaActual = \Carbon\Carbon::parse($actividad->fecha_actual);
+            $nuevaFechaActual = Carbon::parse($actividad->fecha_actual);
 
             if ($diasDiferencia > 0) {
                 $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
@@ -1008,10 +1519,17 @@ class DocumentosController extends Controller
             $actividad->update([
                 'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
             ]);
-
-            $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
         }
     }
+
+
+
+
+
+
+    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI FIN
+
+
 
     private function documentosOrganismos($data)
     {
@@ -1289,15 +1807,30 @@ class DocumentosController extends Controller
     }
 
 
-    //ESTADO Y PROCENTAJES DE LA DOCUMENTACION POR PROYECTO
     // public function estadoTramitesAdmin()
     // {
-    //     $documentos = Documentos::select('codigo_proyecto', 'estado', 'operador')->get();
-    //     $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
+    //     $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador','nombre_etapa')->get();
+    //     $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador','nombre_etapa')->get();
 
-    //     // Función para documentos (agrupado por proyecto)
+    //     // Función para documentos (agrupado por proyecto y etapa)
     //     $calcularPorcentajesDocumentos = function ($coleccion) {
     //         return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+    //             // Agrupar por etapas para calcular porcentajes por etapa
+    //             $etapas = $items->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
+    //                 $total = $itemsEtapa->count();
+    //                 $completos = $itemsEtapa->where('estado', 2)->count();
+
+    //                 return [
+    //                     'etapa' => $etapa,
+    //                     'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+    //                     'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+    //                     'total' => $total,
+    //                     'completados' => $completos,
+    //                     'pendientes' => $total - $completos
+    //                 ];
+    //             })->values();
+
+    //             // Calcular totales del proyecto
     //             $total = $items->count();
     //             $completos = $items->where('estado', 2)->count();
 
@@ -1306,6 +1839,10 @@ class DocumentosController extends Controller
     //                 'codigo_proyecto' => $proyecto,
     //                 'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
     //                 'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+    //                 'etapas' => $etapas, // Agregado: detalle por etapas
+    //                 'total' => $total,
+    //                 'completados' => $completos,
+    //                 'pendientes' => $total - $completos
     //             ];
     //         })->values();
     //     };
@@ -1355,195 +1892,102 @@ class DocumentosController extends Controller
     //         ]
     //     ]);
     // }
-    // public function estadoTramitesAdmin()
-    // {
-    //     // Asumiendo que tienes un campo 'etapa' en tus modelos
-    //     $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
-    //     $organismos = DocumentosOrganismos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
 
-    //     // Función para documentos agrupados por proyecto y etapa
-    //     $calcularPorcentajesDocumentos = function ($coleccion) {
-    //         return $coleccion->groupBy('codigo_proyecto')->map(function ($itemsProyecto, $proyecto) {
-    //             // Agrupar por etapas dentro del proyecto
-    //             $etapas = $itemsProyecto->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
-    //                 $total = $itemsEtapa->count();
-    //                 $completos = $itemsEtapa->where('estado', 2)->count();
-    //                 $avance = $total > 0 ? round(($completos / $total) * 100, 2) : 0;
-
-    //                 return [
-    //                     'etapa' => $etapa,
-    //                     'avance' => $avance,
-    //                     'atrazo' => 100 - $avance,
-    //                     'detalle' => [
-    //                         'total' => $total,
-    //                         'completados' => $completos,
-    //                         'pendientes' => $total - $completos
-    //                     ]
-    //                 ];
-    //             })->values();
-
-    //             // Calcular promedio general del proyecto
-    //             $avanceProyecto = $etapas->avg('avance') ?? 0;
-
-    //             return [
-    //                 'tipo' => 'documentos',
-    //                 'codigo_proyecto' => $proyecto,
-    //                 'avance_general' => $avanceProyecto,
-    //                 'atrazo_general' => 100 - $avanceProyecto,
-    //                 'etapas' => $etapas,
-    //                 'total_etapas' => $etapas->count()
-    //             ];
-    //         })->values();
-    //     };
-
-    //     // Función para organismos agrupados por proyecto, etapa y operador
-    //     $calcularPorcentajesOrganismos = function ($coleccion) {
-    //         return $coleccion->groupBy('codigo_proyecto')->map(function ($itemsProyecto, $proyecto) {
-    //             // Agrupar por etapas
-    //             $etapas = $itemsProyecto->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
-    //                 // Agrupar por operadores dentro de la etapa
-    //                 $operadores = $itemsEtapa->groupBy('operador')->map(function ($itemsOperador, $operador) {
-    //                     $total = $itemsOperador->count();
-    //                     $completos = $itemsOperador->where('estado', 2)->count();
-    //                     $avance = $total > 0 ? round(($completos / $total) * 100, 2) : 0;
-
-    //                     return [
-    //                         'operador' => $operador,
-    //                         'avance' => $avance,
-    //                         'atrazo' => 100 - $avance,
-    //                         'detalle' => [
-    //                             'total' => $total,
-    //                             'completados' => $completos,
-    //                             'pendientes' => $total - $completos
-    //                         ]
-    //                     ];
-    //                 })->values();
-
-    //                 // Calcular promedio de la etapa
-    //                 $avanceEtapa = $operadores->avg('avance') ?? 0;
-
-    //                 return [
-    //                     'etapa' => $etapa,
-    //                     'avance_etapa' => $avanceEtapa,
-    //                     'atrazo_etapa' => 100 - $avanceEtapa,
-    //                     'operadores' => $operadores,
-    //                     'total_operadores' => $operadores->count()
-    //                 ];
-    //             })->values();
-
-    //             // Calcular promedio general del proyecto
-    //             $avanceGeneral = $etapas->avg('avance_etapa') ?? 0;
-
-    //             return [
-    //                 'tipo' => 'organismos',
-    //                 'codigo_proyecto' => $proyecto,
-    //                 'avance_general' => $avanceGeneral,
-    //                 'atrazo_general' => 100 - $avanceGeneral,
-    //                 'etapas' => $etapas,
-    //                 'total_etapas' => $etapas->count()
-    //             ];
-    //         })->values();
-    //     };
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'resumen' => [
-    //             'total_proyectos_documentos' => $documentos->groupBy('codigo_proyecto')->count(),
-    //             'total_proyectos_organismos' => $organismos->groupBy('codigo_proyecto')->count(),
-    //             'total_documentos' => $documentos->count(),
-    //             'total_organismos' => $organismos->count()
-    //         ],
-    //         'detalle' => [
-    //             'documentos' => $calcularPorcentajesDocumentos($documentos),
-    //             'organismos' => $calcularPorcentajesOrganismos($organismos)
-    //         ]
-    //     ]);
-    // }
     public function estadoTramitesAdmin()
-{
-    $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador')->get();
-    $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador')->get();
+    {
+        $documentos = Documentos::select('codigo_proyecto', 'etapa', 'estado', 'operador', 'nombre_etapa')->get();
+        $organismos = DocumentosOrganismos::select('codigo_proyecto', 'estado', 'operador', 'nombre_etapa')->get();
 
-    // Función para documentos (agrupado por proyecto y etapa)
-    $calcularPorcentajesDocumentos = function ($coleccion) {
-        return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
-            // Agrupar por etapas para calcular porcentajes por etapa
-            $etapas = $items->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
-                $total = $itemsEtapa->count();
-                $completos = $itemsEtapa->where('estado', 2)->count();
-                
+        // Función para documentos (agrupado por proyecto y etapa)
+        $calcularPorcentajesDocumentos = function ($coleccion) {
+            return $coleccion->groupBy('codigo_proyecto')->map(function ($items, $proyecto) {
+                // Agrupar por etapas para calcular porcentajes por etapa
+                $etapas = $items->groupBy('etapa')->map(function ($itemsEtapa, $etapa) {
+                    $total = $itemsEtapa->count();
+                    $completos = $itemsEtapa->where('estado', 2)->count();
+
+                    // Obtener el nombre_etapa del primer registro (todos deberían tener el mismo)
+                    $primerItem = $itemsEtapa->first();
+                    $nombreEtapa = $primerItem ? $primerItem->nombre_etapa : "Etapa {$etapa}";
+
+                    return [
+                        'etapa' => $etapa,
+                        'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                        'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                        'total' => $total,
+                        'completados' => $completos,
+                        'pendientes' => $total - $completos,
+                        'info' => $nombreEtapa  // Agregado: nombre de la etapa
+                    ];
+                })->values();
+
+                // Calcular totales del proyecto
+                $total = $items->count();
+                $completos = $items->where('estado', 2)->count();
+
                 return [
-                    'etapa' => $etapa,
+                    'tipo' => 'documentos',
+                    'codigo_proyecto' => $proyecto,
                     'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
                     'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                    'etapas' => $etapas, // Agregado: detalle por etapas
                     'total' => $total,
                     'completados' => $completos,
                     'pendientes' => $total - $completos
                 ];
             })->values();
-            
-            // Calcular totales del proyecto
-            $total = $items->count();
-            $completos = $items->where('estado', 2)->count();
+        };
 
-            return [
-                'tipo' => 'documentos',
-                'codigo_proyecto' => $proyecto,
-                'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
-                'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
-                'etapas' => $etapas, // Agregado: detalle por etapas
-                'total' => $total,
-                'completados' => $completos,
-                'pendientes' => $total - $completos
-            ];
-        })->values();
-    };
+        // Función para organismos (estructura anidada: proyecto -> operadores)
+        $calcularPorcentajesOrganismos = function ($coleccion) {
+            $resultados = [];
 
-    // Función para organismos (estructura anidada: proyecto -> operadores)
-    $calcularPorcentajesOrganismos = function ($coleccion) {
-        $resultados = [];
+            // Agrupar por proyecto
+            $porProyecto = $coleccion->groupBy('codigo_proyecto');
 
-        // Agrupar por proyecto
-        $porProyecto = $coleccion->groupBy('codigo_proyecto');
-
-        foreach ($porProyecto as $proyecto => $itemsProyecto) {
-            $proyectoData = [
-                'codigo_proyecto' => $proyecto,
-                'tipo' => 'organismos',
-                'operadores' => []
-            ];
-
-            // Agrupar por operador dentro del proyecto
-            $porOperador = $itemsProyecto->groupBy('operador');
-
-            foreach ($porOperador as $operador => $items) {
-                $total = $items->count();
-                $completos = $items->where('estado', 2)->count();
-
-                $proyectoData['operadores'][] = [
-                    'operador' => $operador,
-                    'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
-                    'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
-                    'total' => $total,
-                    'completados' => $completos,
-                    'pendientes' => $total - $completos
+            foreach ($porProyecto as $proyecto => $itemsProyecto) {
+                $proyectoData = [
+                    'codigo_proyecto' => $proyecto,
+                    'tipo' => 'organismos',
+                    'operadores' => []
                 ];
+
+                // Agrupar por operador dentro del proyecto
+                $porOperador = $itemsProyecto->groupBy('operador');
+
+                foreach ($porOperador as $operador => $items) {
+                    $total = $items->count();
+                    $completos = $items->where('estado', 2)->count();
+
+                    // Obtener el nombre_etapa del primer registro
+                    $primerItem = $items->first();
+                    $nombreEtapa = $primerItem ? $primerItem->nombre_etapa : "Etapa General";
+
+                    $proyectoData['operadores'][] = [
+                        'operador' => $operador,
+                        'avance' => $total > 0 ? round(($completos / $total) * 100, 2) : 0,
+                        'atrazo' => $total > 0 ? round((($total - $completos) / $total) * 100, 2) : 0,
+                        'total' => $total,
+                        'completados' => $completos,
+                        'pendientes' => $total - $completos,
+                        'info' => $nombreEtapa  // Agregado: nombre de la etapa
+                    ];
+                }
+
+                $resultados[] = $proyectoData;
             }
 
-            $resultados[] = $proyectoData;
-        }
+            return collect($resultados);
+        };
 
-        return collect($resultados);
-    };
-
-    return response()->json([
-        'status' => 'success',
-        'porcentajes' => [
-            'documentos' => $calcularPorcentajesDocumentos($documentos),
-            'organismos' => $calcularPorcentajesOrganismos($organismos)
-        ]
-    ]);
-}
+        return response()->json([
+            'status' => 'success',
+            'porcentajes' => [
+                'documentos' => $calcularPorcentajesDocumentos($documentos),
+                'organismos' => $calcularPorcentajesOrganismos($organismos)
+            ]
+        ]);
+    }
 
 
     //consular docuemtos disponibles
@@ -1637,8 +2081,7 @@ class DocumentosController extends Controller
         }
     }
 
-
-    /* logica para confirmar documentos de celsia */
+    /* LOGICA CONFIRMAR DOCUMENTOS CELSIA */
 
     public function confirmarDocumentoCelsia(Request $request)
     {
