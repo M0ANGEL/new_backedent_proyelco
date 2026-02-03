@@ -51,6 +51,7 @@ use App\Http\Controllers\PoerBiController;
 use App\Models\LinkDescargaAPK;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -219,6 +220,30 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('bodega-responsable-activo', [ActivosController::class, 'bodegaResponsable']);
     Route::get('bodega-responsable-activo-delete/{id}', [ActivosController::class, 'bodegaResponsableDelete']);
 
+
+
+    // Rutas para exportación
+    Route::post('/activos/exportar-excel', [ActivosController::class, 'exportarExcel']);
+
+    // Rutas para obtener categorías y subcategorías
+    Route::get('/categorias-activos', function () {
+        return DB::table('categoria_activos')
+            ->where('estado', 1)
+            ->select('id', 'nombre', 'prefijo')
+            ->orderBy('prefijo')
+            ->get();
+    });
+
+    Route::get('/subcategorias-activos', function () {
+        return DB::table('subcategoria_activos as s')
+            ->join('categoria_activos as c', 's.categoria_id', '=', 'c.id')
+            ->where('s.estado', 1)
+            ->select('s.id', 's.nombre', 's.categoria_id', 'c.nombre as categoria_nombre', 'c.prefijo as categoria_prefijo')
+            ->orderBy('c.prefijo')
+            ->orderBy('s.nombre')
+            ->get();
+    });
+
     Route::get('mis-activos-pendientes', [MisActivosController::class, 'index']);
     Route::get('mis-activos', [MisActivosController::class, 'misActivos']);
 
@@ -323,7 +348,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     //proyectos nombre e id
     Route::get('proyectos-nombre-id', [ProyectosController::class, 'ProyectoNombreId']);
-    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']); 
+    Route::get('proyectos-proyeccio', [MaterialesSolicitudesController::class, 'index']);
     Route::get('proyeccionData/{codigo_proyecto}', [MaterialesSolicitudesController::class, 'proyeccionData']);
     Route::post('cargueProyeccion', [MaterialesSolicitudesController::class, 'cargueProyeccion']);
     Route::post('generarExcelAxuiliarMaterial', [MaterialesSolicitudesController::class, 'generarExcelAxuiliarMaterial']);
@@ -345,7 +370,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-documentos-confirmar-celsia', [DocumentosController::class, 'confirmarDocumentoCelsia']);
     Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
     //Buscar los proyectos que estan disponibles
-    Route::get('dodumentos-disponibles/{codigo}',[DocumentosController::class, 'DocumentosDisponibles']);
+    Route::get('dodumentos-disponibles/{codigo}', [DocumentosController::class, 'DocumentosDisponibles']);
 
 
     //CONTABILIDAD
@@ -381,9 +406,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
 
     //materiales parte logistica
-    Route::get('proyectos-proyeccio-logistica', [MaterialesSolicitudesController::class, 'indexLogisitca']); 
-    Route::post('TmDisponiblesOrganismos',[DocumentosController::class, 'TmDisponiblesOrganismos']);
-    Route::post('ConfirmarTM',[DocumentosController::class, 'ConfirmarTM']);
+    Route::get('proyectos-proyeccio-logistica', [MaterialesSolicitudesController::class, 'indexLogisitca']);
+    Route::post('TmDisponiblesOrganismos', [DocumentosController::class, 'TmDisponiblesOrganismos']);
+    Route::post('ConfirmarTM', [DocumentosController::class, 'ConfirmarTM']);
 });
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
@@ -393,6 +418,6 @@ Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado
 //api de rfid
 Route::post('rfid', [LectorRFIDController::class, 'registrarMarcacionRFID']);
 Route::post('rfid-create', [LectorRFIDController::class, 'storeRFID']);
-Route::get('rfid-disponibles',[FichaObraController::class,'rfid']);
-Route::post('rfid-update',[FichaObraController::class,'rfidUpdate']);
-Route::get('rfid-delete/{id}',[FichaObraController::class,'rfidDelete']);
+Route::get('rfid-disponibles', [FichaObraController::class, 'rfid']);
+Route::post('rfid-update', [FichaObraController::class, 'rfidUpdate']);
+Route::get('rfid-delete/{id}', [FichaObraController::class, 'rfidDelete']);

@@ -10,8 +10,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Exports\ReporteAsistenciasExport;
-use App\Exports\ReporteCompletoAsistenciasExport;
 use App\Exports\ReporteCompletoConCalculoHorasExport;
 use App\Models\User;
 use Maatwebsite\Excel\Facades\Excel;
