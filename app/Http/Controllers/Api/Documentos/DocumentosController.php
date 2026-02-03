@@ -1213,7 +1213,7 @@ class DocumentosController extends Controller
                 'codigo_documento' => 'required|string',
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
-                'observacion' => 'required|string',
+                'observacion' => 'string',
                 'archivos' => 'array',
                 'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
             ]);
@@ -1228,7 +1228,7 @@ class DocumentosController extends Controller
             // 3. Actualizar actividad a estado 2 (Completado)
             $actividadActual->update([
                 'estado' => 2,
-                'observacion' => $request->observacion,
+                'observacion' => $request->observacion != "." ? $request->observacion : "Sin observación",
                 'fecha_confirmacion' => now(),
                 'fecha_actual' => now(),
                 'usuario_id' => Auth::id(),
@@ -2093,7 +2093,7 @@ class DocumentosController extends Controller
                 'codigo_documento' => 'required|string',
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
-                'observacion' => 'required|string',
+                'observacion' => 'string',
 
                 // Array de archivos
                 'archivos' => 'array',
@@ -2148,7 +2148,7 @@ class DocumentosController extends Controller
             // 2. Actualizar actividad a estado 2 (Completado)
             $actividadActual->update([
                 'estado' => 2,
-                'observacion' => $request->observacion,
+                'observacion' => $request->observacion != "."? $request->observacion : "Sin observación",
                 'fecha_confirmacion' => now(),
                 'fecha_actual' => now(),
                 'usuario_id' => Auth::id(),
