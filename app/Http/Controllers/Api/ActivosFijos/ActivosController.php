@@ -274,11 +274,12 @@ class ActivosController extends Controller
     public function update(Request $request, $id)
     {
 
-        dd(
-            $request->hasFile('file'),
-            $request->files->all(),
-            $request->header('content-type')
-        );
+        return response()->json([
+            'hasFile' => $request->hasFile('file'),
+            'files' => $request->files->all(),
+            'content_type' => $request->header('content-type'),
+        ]);
+
         try {
             $validator = Validator::make($request->all(), [
                 'categoria_id' => ['required'],
