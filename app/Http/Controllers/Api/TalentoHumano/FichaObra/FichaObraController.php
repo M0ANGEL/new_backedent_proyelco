@@ -431,7 +431,7 @@ class FichaObraController extends Controller
                 );
 
                 // ✅ Guardar ruta en BD
-                $personal->foto = $ruta;
+                // $personal->foto = $ruta;
             }
 
             $personal->save();
