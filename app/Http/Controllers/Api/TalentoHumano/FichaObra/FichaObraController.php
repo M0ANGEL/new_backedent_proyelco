@@ -324,20 +324,81 @@ class FichaObraController extends Controller
         return null;
     }
 
+    // public function update(Request $request, $id)
+    // {
+    //     DB::beginTransaction();
+    //     try {
+    //         $validator = Validator::make($request->all(), [
+    //             // ... tus validaciones existentes ...
+    //             'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
+    //         ]);
+
+    //         if ($validator->fails()) {
+    //             return response()->json(['errors' => $validator->errors()], 400);
+    //         }
+
+    //         // Buscar el empleado existente
+    //         $personal = FichaObra::findOrFail($id);
+
+    //         // Actualizar datos
+    //         $personal->rh = $request->tipo_sangre;
+    //         $personal->hijos = $request->numero_hijos;
+    //         $personal->eps = $request->eps;
+    //         $personal->afp = $request->pension;
+    //         $personal->contratista_id = $request->contratista_id;
+
+    //         // Procesar la foto si existe
+    //         if ($request->hasFile('foto')) {
+    //             $foto = $request->file('foto');
+
+    //             // Eliminar foto anterior si existe
+    //             if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+    //                 Storage::disk('public')->delete($personal->foto);
+    //             }
+
+    //             // Generar nombre único para el archivo
+    //             $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+
+    //             // Guardar nueva foto
+    //             $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+
+    //             // 🔹 GUARDAR LA RUTA EN EL MODELO
+
+    //         }
+
+    //         $personal->save();
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Empleado actualizado exitosamente',
+    //             'data' => $personal
+    //         ], 200);
+    //     } catch (Exception $e) {
+    //         DB::rollBack();
+
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
     public function update(Request $request, $id)
     {
         DB::beginTransaction();
+
         try {
             $validator = Validator::make($request->all(), [
-                // ... tus validaciones existentes ...
-                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // Buscar el empleado existente
+            // Buscar empleado
             $personal = FichaObra::findOrFail($id);
 
             // Actualizar datos
@@ -347,27 +408,33 @@ class FichaObraController extends Controller
             $personal->afp = $request->pension;
             $personal->contratista_id = $request->contratista_id;
 
-            // Procesar la foto si existe
+            // 📸 Procesar foto
             if ($request->hasFile('foto')) {
-                $foto = $request->file('foto');
 
-                // Eliminar foto anterior si existe
-                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
-                    Storage::disk('public')->delete($personal->foto);
+                // 🔥 BORRAR CUALQUIER FOTO ANTERIOR DE ESTE EMPLEADO
+                $files = Storage::disk('public')->files('SST');
+
+                foreach ($files as $file) {
+                    if (pathinfo($file, PATHINFO_FILENAME) == 'empleado_' . $personal->id) {
+                        Storage::disk('public')->delete($file);
+                    }
                 }
 
-                // Generar nombre único para el archivo
-                $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+                // 💾 Guardar nueva foto
+                $extension = $request->file('foto')->getClientOriginalExtension();
+                $nombreArchivo = 'empleado_' . $personal->id . '.' . $extension;
 
-                // Guardar nueva foto
-                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
+                $ruta = $request->file('foto')->storeAs(
+                    'SST',
+                    $nombreArchivo,
+                    'public'
+                );
 
-                // 🔹 GUARDAR LA RUTA EN EL MODELO
-
+                // ✅ Guardar ruta en BD
+                $personal->foto = $ruta;
             }
 
             $personal->save();
-
             DB::commit();
 
             return response()->json([
