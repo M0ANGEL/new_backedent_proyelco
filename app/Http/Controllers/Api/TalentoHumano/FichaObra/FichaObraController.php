@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class FichaObraController extends Controller
 {
@@ -390,63 +391,68 @@ class FichaObraController extends Controller
         DB::beginTransaction();
 
         try {
+            // ✅ Validación
             $validator = Validator::make($request->all(), [
                 'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
+                return response()->json([
+                    'errors' => $validator->errors()
+                ], 400);
             }
 
-            // Buscar el empleado existente
+            // ✅ Buscar empleado
             $personal = FichaObra::findOrFail($id);
 
-            // Actualizar datos
+            // ✅ Actualizar campos
             $personal->rh = $request->tipo_sangre;
             $personal->hijos = $request->numero_hijos;
             $personal->eps = $request->eps;
             $personal->afp = $request->pension;
             $personal->contratista_id = $request->contratista_id;
 
-            // 📸 Procesar la foto si existe
+            // ✅ Manejo de la foto (SIN BD)
             if ($request->hasFile('foto')) {
-                $foto = $request->file('foto');
 
-                // 🗑️ Eliminar foto anterior si existe
-                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
-                    Storage::disk('public')->delete($personal->foto);
+                $foto = $request->file('foto');
+                $rutaSST = public_path('SST');
+
+                // 🔥 Borrar cualquier imagen previa del empleado
+                $pattern = $rutaSST . '/empleado_' . $personal->id . '.*';
+                foreach (glob($pattern) as $archivo) {
+                    File::delete($archivo);
                 }
 
-                // 💾 Nombre del archivo
-                $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+                // 🔥 Guardar nueva imagen
+                $extension = $foto->getClientOriginalExtension();
+                $nombreArchivo = 'empleado_' . $personal->id . '.' . $extension;
 
-                // 💾 Guardar nueva foto
-                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
-
-                // ✅ GUARDAR LA RUTA EN BD (ESTO FALTABA)
-                // $personal->foto = $rutaGuardada;
+                $foto->move($rutaSST, $nombreArchivo);
             }
 
             $personal->save();
             DB::commit();
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Empleado actualizado exitosamente',
-                'data' => $personal
+                'status'  => 'success',
+                'message' => 'Empleado actualizado correctamente',
+                'data'    => $personal
             ], 200);
-        } catch (Exception $e) {
+
+        } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
-                'status' => 'error',
-                'message' => 'Error al actualizar el empleado: ' . $e->getMessage(),
+                'status'  => 'error',
+                'message' => 'Error al actualizar: ' . $e->getMessage(),
             ], 500);
         }
     }
 
+    
 
-
+   
 
     public function destroy($id)
     {
