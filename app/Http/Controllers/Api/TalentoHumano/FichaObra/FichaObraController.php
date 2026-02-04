@@ -330,7 +330,7 @@ class FichaObraController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 // ... tus validaciones existentes ...
-                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
             ]);
 
             if ($validator->fails()) {
@@ -387,11 +387,42 @@ class FichaObraController extends Controller
 
     public function destroy($id)
     {
-        $Personal = FichaObra::find($id);
+        $personal = FichaObra::findOrFail($id);
 
-        $Personal->estado = !$Personal->estado;
-        $Personal->update();
+        // Personal Proyelco
+        $proyelco = PersonalProyelco::where('identificacion', $personal->identificacion)->first();
+        if ($proyelco && $proyelco->estado == 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No se puede activar el empleado porque está inactivo en Personal Proyelco',
+            ], 400);
+        }
+
+        // Personal No Proyelco
+        $noProyelco = Personal::where('identificacion', $personal->identificacion)->first();
+        if ($noProyelco && $noProyelco->estado == 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No se puede activar el empleado porque está inactivo en Personal No Proyelco',
+            ], 400);
+        }
+
+        // Cambio de estado
+        if ($personal->estado == 2 || $personal->estado == 0) {
+            $personal->estado = 1;
+        } else {
+            $personal->estado = 0;
+        }
+
+        $personal->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Estado actualizado correctamente',
+            'estado' => $personal->estado
+        ]);
     }
+
 
     public function rfid()
     {
@@ -469,9 +500,10 @@ class FichaObraController extends Controller
         }
     }
 
-    public function rfidDelete($id){
+    public function rfidDelete($id)
+    {
         //llega el id de la ficha
-        $usuario = FichaObra::where("id",$id)->first();
+        $usuario = FichaObra::where("id", $id)->first();
         $usuario->rfid = null;
         $usuario->save();
     }
