@@ -319,26 +319,52 @@ class ActivosController extends Controller
             $cliente->save();
 
             // Manejo de imagen
+            // if ($request->hasFile('file')) {
+            //     $request->validate([
+            //         'file' => 'mimes:jpg,jpeg,png|max:2048'
+            //     ]);
+
+            //     // Borrar imagen anterior
+            //     $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
+            //     foreach ($oldFiles as $oldFile) {
+            //         if (file_exists($oldFile)) {
+            //             unlink($oldFile);
+            //         }
+            //     }
+
+            //     // Guardar nueva imagen
+            //     $extension = strtolower($request->file('file')->getClientOriginalExtension());
+            //     $request->file('file')->storeAs(
+            //         'public/activos',
+            //         $cliente->id . '.' . $extension
+            //     );
+            // }
+
+            // Manejo de imagen
             if ($request->hasFile('file')) {
+
                 $request->validate([
                     'file' => 'mimes:jpg,jpeg,png|max:2048'
                 ]);
 
-                // Borrar imagen anterior
-                $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
-                foreach ($oldFiles as $oldFile) {
-                    if (file_exists($oldFile)) {
-                        unlink($oldFile);
+                // 🔥 BORRAR IMAGEN ANTERIOR (cualquier extensión)
+                $files = Storage::disk('public')->files('activos');
+
+                foreach ($files as $file) {
+                    if (pathinfo($file, PATHINFO_FILENAME) == $cliente->id) {
+                        Storage::disk('public')->delete($file);
                     }
                 }
 
-                // Guardar nueva imagen
-                $extension = strtolower($request->file('file')->getClientOriginalExtension());
+                // 💾 GUARDAR NUEVA IMAGEN
+                $extension = $request->file('file')->getClientOriginalExtension();
                 $request->file('file')->storeAs(
-                    'public/activos',
-                    $cliente->id . '.' . $extension
+                    'activos',
+                    $cliente->id . '.' . $extension,
+                    'public'
                 );
             }
+
 
             return response()->json([
                 'status' => 'success',
