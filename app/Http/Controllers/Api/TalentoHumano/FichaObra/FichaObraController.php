@@ -391,14 +391,14 @@ class FichaObraController extends Controller
 
         try {
             $validator = Validator::make($request->all(), [
-                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+                'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // Buscar empleado
+            // Buscar el empleado existente
             $personal = FichaObra::findOrFail($id);
 
             // Actualizar datos
@@ -408,30 +408,23 @@ class FichaObraController extends Controller
             $personal->afp = $request->pension;
             $personal->contratista_id = $request->contratista_id;
 
-            // 📸 Procesar foto
+            // 📸 Procesar la foto si existe
             if ($request->hasFile('foto')) {
+                $foto = $request->file('foto');
 
-                // 🔥 BORRAR CUALQUIER FOTO ANTERIOR DE ESTE EMPLEADO
-                $files = Storage::disk('public')->files('SST');
-
-                foreach ($files as $file) {
-                    if (pathinfo($file, PATHINFO_FILENAME) == 'empleado_' . $personal->id) {
-                        Storage::disk('public')->delete($file);
-                    }
+                // 🗑️ Eliminar foto anterior si existe
+                if ($personal->foto && Storage::disk('public')->exists($personal->foto)) {
+                    Storage::disk('public')->delete($personal->foto);
                 }
 
+                // 💾 Nombre del archivo
+                $nombreArchivo = 'empleado_' . $personal->id . '.' . $foto->getClientOriginalExtension();
+
                 // 💾 Guardar nueva foto
-                $extension = $request->file('foto')->getClientOriginalExtension();
-                $nombreArchivo = 'empleado_' . $personal->id . '.' . $extension;
+                $rutaGuardada = $foto->storeAs('SST', $nombreArchivo, 'public');
 
-                $ruta = $request->file('foto')->storeAs(
-                    'SST',
-                    $nombreArchivo,
-                    'public'
-                );
-
-                // ✅ Guardar ruta en BD
-                // $personal->foto = $ruta;
+                // ✅ GUARDAR LA RUTA EN BD (ESTO FALTABA)
+                // $personal->foto = $rutaGuardada;
             }
 
             $personal->save();
@@ -451,6 +444,9 @@ class FichaObraController extends Controller
             ], 500);
         }
     }
+
+
+
 
     public function destroy($id)
     {
