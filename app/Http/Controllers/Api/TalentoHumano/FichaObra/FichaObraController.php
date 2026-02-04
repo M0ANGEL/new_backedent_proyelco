@@ -391,60 +391,53 @@ class FichaObraController extends Controller
         DB::beginTransaction();
 
         try {
-            // ✅ Validación
             $validator = Validator::make($request->all(), [
                 'foto' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif'],
             ]);
 
             if ($validator->fails()) {
-                return response()->json([
-                    'errors' => $validator->errors()
-                ], 400);
+                return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // ✅ Buscar empleado
             $personal = FichaObra::findOrFail($id);
 
-            // ✅ Actualizar campos
             $personal->rh = $request->tipo_sangre;
             $personal->hijos = $request->numero_hijos;
             $personal->eps = $request->eps;
             $personal->afp = $request->pension;
             $personal->contratista_id = $request->contratista_id;
 
-            // ✅ Manejo de la foto (SIN BD)
             if ($request->hasFile('foto')) {
 
-                $foto = $request->file('foto');
-                $rutaSST = public_path('SST');
-
-                // 🔥 Borrar cualquier imagen previa del empleado
-                $pattern = $rutaSST . '/empleado_' . $personal->id . '.*';
-                foreach (glob($pattern) as $archivo) {
-                    File::delete($archivo);
+                // 🔥 borrar cualquier imagen previa
+                foreach (Storage::disk('public')->files('SST') as $file) {
+                    if (str_starts_with(basename($file), 'empleado_' . $personal->id . '.')) {
+                        Storage::disk('public')->delete($file);
+                    }
                 }
 
-                // 🔥 Guardar nueva imagen
+                // 🔥 guardar nueva
+                $foto = $request->file('foto');
                 $extension = $foto->getClientOriginalExtension();
-                $nombreArchivo = 'empleado_' . $personal->id . '.' . $extension;
+                $nombre = 'empleado_' . $personal->id . '.' . $extension;
 
-                $foto->move($rutaSST, $nombreArchivo);
+                $foto->storeAs('SST', $nombre, 'public');
             }
 
             $personal->save();
             DB::commit();
 
             return response()->json([
-                'status'  => 'success',
+                'status' => 'success',
                 'message' => 'Empleado actualizado correctamente',
-                'data'    => $personal
+                'data' => $personal
             ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Error al actualizar: ' . $e->getMessage(),
             ], 500);
         }
