@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Proyectos\TipoProyectosController;
 use App\Http\Controllers\Api\Proyectos\VaidarProcesoController;
 use App\Http\Controllers\Api\Proyectos\ValidarProcesoCasaController;
 use App\Http\Controllers\Api\Proyectos\ValiProcPTController;
+use App\Http\Controllers\Api\ReporteMateriaNcController;
 use App\Http\Controllers\Api\TalentoHumano\ApkController;
 use App\Http\Controllers\Api\TalentoHumano\Asistencia\ControlAsistenciasController;
 use App\Http\Controllers\Api\TalentoHumano\AsistenObras\AsistenciasObrasController;
@@ -226,7 +227,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('/activos/exportar-excel', [ActivosController::class, 'exportarExcel']);
 
     // Rutas para obtener categorías y subcategorías
-    Route::get('/categorias-activos', function () {
+    Route::get('/categorias-activos-export', function () {
         return DB::table('categoria_activos')
             ->where('estado', 1)
             ->select('id', 'nombre', 'prefijo')
@@ -234,7 +235,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             ->get();
     });
 
-    Route::get('/subcategorias-activos', function () {
+    Route::get('/subcategorias-activos-export', function () {
         return DB::table('subcategoria_activos as s')
             ->join('categoria_activos as c', 's.categoria_id', '=', 'c.id')
             ->where('s.estado', 1)
@@ -409,7 +410,41 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('proyectos-proyeccio-logistica', [MaterialesSolicitudesController::class, 'indexLogisitca']);
     Route::post('TmDisponiblesOrganismos', [DocumentosController::class, 'TmDisponiblesOrganismos']);
     Route::post('ConfirmarTM', [DocumentosController::class, 'ConfirmarTM']);
+
+
+
+    //MODULO DE CALIDAD
+    /* Gestion de reportes material */
+
+    Route::apiResource('reporte-material-nc', ReporteMateriaNcController::class);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Route::middleware('auth:sanctum')->get('/link-apk', [ApkController::class, 'linkDescargaAPK']);
 Route::get('/descargar-apk-firmado', [ApkController::class, 'descargarAPKFirmado'])
