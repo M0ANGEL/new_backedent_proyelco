@@ -23,6 +23,7 @@ class MantenimientoActivosController extends Controller
             ->select(
                 'mantenimiento_activos.*',
                 'activo.numero_activo',
+                'activo.descripcion',
             )
             ->get();
 
@@ -85,7 +86,15 @@ class MantenimientoActivosController extends Controller
 
     public function show($id)
     {
-        return response()->json(Activo::find($id), 200);
+         $data = DB::connection('mysql')
+            ->table('mantenimiento_activos')
+            ->select(
+                'mantenimiento_activos.*',
+            )
+            ->first();
+
+        return response()->json($data, 200);
+
     }
 
     public function update(Request $request, $id)

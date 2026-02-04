@@ -1657,6 +1657,20 @@ class MaterialesSolicitudesController extends Controller
                 'tamano' => $file->getSize(),
             ]);
 
+            //cambiar estado de que se subio pdf
+
+            //buscamos todo los registros con esa solicitud
+            $cambioEstadoSolicitud = SolicitudMaterialInge::where(
+                'numero_solicitud',
+                $solicitud->numero_solicitud
+            )->get();
+
+            foreach ($cambioEstadoSolicitud as $solicitud) {
+                $solicitud->documento_sinco = 1;
+                $solicitud->save();
+            }
+
+
             DB::commit();
 
             return response()->json([
@@ -2084,5 +2098,38 @@ class MaterialesSolicitudesController extends Controller
                 'message' => 'Error al descargar PDF: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+
+    //PARTE LOGISTICA, SE AGREGA EN ESTE COMPONENTE PARA QUE SEA TODO AQUI DEL MISMO TEMA
+    public function indexLogisitca()
+    {
+        $materialesAgrupados = DB::connection('mysql')
+            ->table('solicitud_material')
+            ->leftJoin('proyecto', 'solicitud_material.codigo_proyecto', '=', 'proyecto.codigo_proyecto')
+            ->leftJoin('proyectos_casas', 'solicitud_material.codigo_proyecto', '=', 'proyectos_casas.codigo_proyecto')
+            ->leftJoin('users', 'solicitud_material.user_id', '=', 'users.id')
+            ->leftJoin('users as userAsignado', 'solicitud_material.userAsignado_id', '=', 'userAsignado.id')
+            ->where('solicitud_material.documento_sinco',1)
+            ->select(
+                'solicitud_material.*',
+                 DB::raw('COALESCE(proyecto.descripcion_proyecto, proyectos_casas.descripcion_proyecto) as descripcion_proyecto'),
+                 DB::raw('CASE 
+                    WHEN proyecto.codigo_proyecto IS NOT NULL THEN "Apartamentos" 
+                    WHEN proyectos_casas.codigo_proyecto IS NOT NULL THEN "Casas" 
+                    ELSE "Sin Proyecto" 
+                END as tipo_proyecto'),
+                'users.nombre as usuario_solicitud',
+                'userAsignado.nombre as usuario_asignado',
+            )
+            ->orderBy('solicitud_material.fecha_solicitud', 'desc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $materialesAgrupados
+        ]);
     }
 }

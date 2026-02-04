@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('ficha_th', function (Blueprint $table) {
             $table->id();
-            $table->tinyInteger('estado')->default(1);
+            $table->tinyInteger('estado')->default(1); // 1: activo, 0: inactivo 2: suspendido
             $table->tinyInteger('tipo_empleado')->default(1);
             $table->string('identificacion');
             $table->string('empleado_id');

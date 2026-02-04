@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\ActivosFijos;
 
+use App\Exports\ActivosExport;
 use App\Http\Controllers\Controller;
 use App\Models\Activo;
 use App\Models\User;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Excel;
+use Maatwebsite\Excel\Facades\Excel;
+
 
 class ActivosController extends Controller
 {
@@ -83,9 +85,9 @@ class ActivosController extends Controller
                 }
             }
 
-            // Cache y paginación
+            // Cache y paginación 60 = 1 minuto 300 = 5 minutos
             $cacheKey = 'activos_page_' . $page . '_' . $perPage . '_' . md5($search . $responsable);
-            $activos = Cache::remember($cacheKey, 300, function () use ($query, $perPage, $page) {
+            $activos = Cache::remember($cacheKey, 6, function () use ($query, $perPage, $page) {
                 return $query->paginate($perPage, ['*'], 'page', $page);
             });
 
@@ -269,86 +271,103 @@ class ActivosController extends Controller
         return response()->json(Activo::find($id), 200);
     }
 
+    // public function update(Request $request, $id)
+    // {
+
+    //     try {
+    //         $validator = Validator::make($request->all(), [
+    //             'categoria_id' => ['required'],
+    //             'subcategoria_id' => ['required'],
+    //             'numero_activo' => ['required', 'string'],
+    //             'valor' => ['required', 'string'],
+    //             'condicion' => ['required'],
+    //         ]);
+
+    //         if ($validator->fails()) {
+    //             return response()->json(['errors' => $validator->errors()], 400);
+    //         }
+
+    //         // Validar que el numero de activo sea único
+    //         $proyectoUnico = Activo::where('numero_activo', $request->numero_activo)
+    //             ->where('id', '!=', $id)
+    //             ->first();
+    //         if ($proyectoUnico) {
+    //             return response()->json([
+    //                 'status' => 'error',
+    //                 'message' => 'Error: Este numero de activo ya está registrado',
+    //             ], 404);
+    //         }
+
+    //         // Obtener el registro existente
+    //         $cliente = Activo::findOrFail($id);
+
+    //         // Actualizar campos
+    //         $cliente->numero_activo = $request->numero_activo;
+    //         $cliente->categoria_id = $request->categoria_id;
+    //         $cliente->subcategoria_id = $request->subcategoria_id;
+    //         $cliente->descripcion = $request->descripcion ?: "..";
+    //         $cliente->valor = $request->valor;
+    //         $cliente->fecha_compra = $request->origen_activo == 1
+    //             ? Carbon::parse($request->fecha_compra)->format('Y-m-d')
+    //             : null;
+    //         $cliente->fecha_aquiler = $request->origen_activo == 1
+    //             ? null
+    //             : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
+    //         $cliente->condicion = $request->condicion;
+    //         $cliente->marca = $request->marca ?: null;
+    //         $cliente->serial = $request->serial ?: null;
+    //         $cliente->save();
+
+    //         // Manejo de imagen
+    //         if ($request->hasFile('file')) {
+    //             $request->validate([
+    //                 'file' => 'mimes:jpg,jpeg,png|max:2048'
+    //             ]);
+
+    //             // Borrar imagen anterior
+    //             $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
+    //             foreach ($oldFiles as $oldFile) {
+    //                 if (file_exists($oldFile)) {
+    //                     unlink($oldFile);
+    //                 }
+    //             }
+
+    //             // Guardar nueva imagen
+    //             $extension = strtolower($request->file('file')->getClientOriginalExtension());
+    //             $request->file('file')->storeAs(
+    //                 'public/activos',
+    //                 $cliente->id . '.' . $extension
+    //             );
+    //         }
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'data' => $cliente
+    //         ], 200);
+    //     } catch (Exception $e) {
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'Error: ' . $e->getMessage(),
+    //             'code' => $e->getCode()
+    //         ], 500);
+    //     }
+    // }
+
     public function update(Request $request, $id)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'categoria_id' => ['required'],
-                'subcategoria_id' => ['required'],
-                'numero_activo' => ['required', 'string'],
-                'valor' => ['required', 'string'],
-                'condicion' => ['required'],
+        if ($request->hasFile('file')) {
+            $path = $request->file('file')->store('activos', 'public');
+
+            return response()->json([
+                'ok' => true,
+                'path' => $path,
+                'url' => asset('storage/' . $path),
             ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
-
-            // Validar que el numero de activo sea único
-            $proyectoUnico = Activo::where('numero_activo', $request->numero_activo)
-                ->where('id', '!=', $id)
-                ->first();
-            if ($proyectoUnico) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Error: Este numero de activo ya está registrado',
-                ], 404);
-            }
-
-            // Obtener el registro existente
-            $cliente = Activo::findOrFail($id);
-
-            // Actualizar campos
-            $cliente->numero_activo = $request->numero_activo;
-            $cliente->categoria_id = $request->categoria_id;
-            $cliente->subcategoria_id = $request->subcategoria_id;
-            $cliente->descripcion = $request->descripcion ?: "..";
-            $cliente->valor = $request->valor;
-            $cliente->fecha_compra = $request->origen_activo == 1
-                ? Carbon::parse($request->fecha_compra)->format('Y-m-d')
-                : null;
-            $cliente->fecha_aquiler = $request->origen_activo == 1
-                ? null
-                : Carbon::parse($request->fecha_aquiler)->format('Y-m-d');
-            $cliente->condicion = $request->condicion;
-            $cliente->marca = $request->marca ?: null;
-            $cliente->serial = $request->serial ?: null;
-            $cliente->save();
-
-            // Manejo de imagen
-            if ($request->hasFile('file')) {
-                $request->validate([
-                    'file' => 'mimes:jpg,jpeg,png|max:2048'
-                ]);
-
-                // Borrar imagen anterior
-                $oldFiles = glob(storage_path("app/public/activos/{$cliente->id}.*"));
-                foreach ($oldFiles as $oldFile) {
-                    if (file_exists($oldFile)) {
-                        unlink($oldFile);
-                    }
-                }
-
-                // Guardar nueva imagen
-                $extension = strtolower($request->file('file')->getClientOriginalExtension());
-                $request->file('file')->storeAs(
-                    'public/activos',
-                    $cliente->id . '.' . $extension
-                );
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $cliente
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
-                'code' => $e->getCode()
-            ], 500);
         }
+
+        return response()->json(['error' => 'No file'], 400);
     }
+
 
     public function destroy($id)
     {
@@ -450,120 +469,6 @@ class ActivosController extends Controller
         }
     }
 
-
-
-    // public function reporteActivo(Request $request)
-    // {
-    //     $request->validate([
-    //         'fecha_inicio' => 'required|date',
-    //         'fecha_fin' => 'required|date|after_or_equal:fecha_inicio'
-    //     ]);
-
-    //     $fechaInicio = $request->fecha_inicio;
-    //     $fechaFin = $request->fecha_fin;
-
-    //     // Validar que no sea más de 4 meses
-    //     $start = Carbon::parse($fechaInicio);
-    //     $end = Carbon::parse($fechaFin);
-
-    //     if ($start->diffInMonths($end) > 4) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'El rango de fechas no puede ser mayor a 4 meses'
-    //         ], 400);
-    //     }
-
-    //     $totalPersonalProyelco = Activo::where('estado', 1)->count();
-
-    //     $asistencias = DB::connection('mysql')
-    //         ->table('asistencias_th')
-    //         //empleado
-    //         ->leftJoin('empleados_proyelco_th as ep', function ($join) {
-    //             $join->on('asistencias_th.empleado_id', '=', 'ep.id')
-    //                 ->where('asistencias_th.tipo_empleado', 1);
-    //         })
-    //         ->leftJoin('empleados_th as et', function ($join) {
-    //             $join->on('asistencias_th.empleado_id', '=', 'et.id')
-    //                 ->where('asistencias_th.tipo_empleado', 2);
-    //         })
-    //         //proyecto - AHORA SOLO CON bodegas_area
-    //         ->leftJoin('bodegas_area as ba', 'asistencias_th.obra_id', '=', 'ba.id')
-    //         //cargo
-    //         ->leftJoin('cargos_th as c', function ($join) {
-    //             $join->on('ep.cargo_id', '=', 'c.id')
-    //                 ->orOn('et.cargo_id', '=', 'c.id');
-    //         })
-    //         //contratista
-    //         ->leftJoin('ficha_th as f', 'asistencias_th.identificacion', '=', 'f.identificacion')
-    //         ->leftJoin('contratistas_th as cont', 'f.contratista_id', '=', 'cont.id')
-    //         ->select(
-    //             // Datos básicos de asistencias_th
-    //             'asistencias_th.id',
-    //             'asistencias_th.fecha_ingreso',
-    //             'asistencias_th.hora_ingreso',
-    //             'asistencias_th.fecha_salida',
-    //             'asistencias_th.hora_salida',
-    //             'asistencias_th.horas_laborales',
-    //             'asistencias_th.tipo_empleado',
-
-    //             // Datos del empleado
-    //             DB::raw("
-    //         CASE 
-    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.nombre_completo
-    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.nombre_completo
-    //         END as nombre_completo
-    //     "),
-    //             DB::raw("
-    //         CASE 
-    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.identificacion
-    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.identificacion
-    //         END as identificacion
-    //     "),
-    //             DB::raw("
-    //         CASE 
-    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.tipo_documento
-    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.tipo_documento
-    //         END as tipo_documento
-    //     "),
-    //             DB::raw("
-    //         CASE 
-    //             WHEN asistencias_th.tipo_empleado = 1 THEN ep.telefono_celular
-    //             WHEN asistencias_th.tipo_empleado = 2 THEN et.telefono_celular
-    //         END as telefono_celular
-    //     "),
-
-    //             // Información de la obra - AHORA SOLO DESDE bodegas_area
-    //             'ba.nombre as nombre_obra',
-
-    //             // Información del contratista
-    //             'cont.contratista as nombre_contratista',
-    //             'cont.nit as nit_contratista',
-
-    //             // Cargo del empleado
-    //             'c.cargo',
-
-    //             // Tipo de empleado como texto
-    //             DB::raw("
-    //         CASE 
-    //             WHEN asistencias_th.tipo_empleado = 1 THEN 'Empleado Proyelco'
-    //             WHEN asistencias_th.tipo_empleado = 2 THEN 'Empleado No Proyelco'
-    //             ELSE 'Desconocido'
-    //         END as tipo_empleado_texto
-    //     ")
-    //         )
-    //         ->whereBetween('asistencias_th.fecha_ingreso', [$fechaInicio, $fechaFin])
-    //         ->orderBy('asistencias_th.fecha_ingreso', 'desc')
-    //         ->orderBy('asistencias_th.hora_ingreso', 'desc')
-    //         ->get();
-
-    //     return response()->json([
-    //         'status' => 'success',
-    //         'data' => $asistencias,
-    //         'totalPersonalProyelco' => $totalPersonalProyelco
-    //     ]);
-    // }
-
-
     public function exportarActivosExcel(Request $request)
     {
         try {
@@ -586,20 +491,20 @@ class ActivosController extends Controller
 
             // Obtener la consulta base con relaciones
             $query = ActivoFijo::with([
-                'categoria' => function($q) {
+                'categoria' => function ($q) {
                     $q->select('id', 'nombre');
                 },
-                'subcategoria' => function($q) {
+                'subcategoria' => function ($q) {
                     $q->select('id', 'nombre');
                 },
-                'bodegaActual' => function($q) {
+                'bodegaActual' => function ($q) {
                     $q->select('id', 'nombre');
                 },
-                'bodegaResponsable' => function($q) {
+                'bodegaResponsable' => function ($q) {
                     $q->select('id', 'nombre');
                 },
-                'usuariosAsignados' => function($q) {
-                    $q->with(['usuario' => function($q2) {
+                'usuariosAsignados' => function ($q) {
+                    $q->with(['usuario' => function ($q2) {
                         $q2->select('id', 'nombre');
                     }]);
                 }
@@ -625,7 +530,6 @@ class ActivosController extends Controller
 
             // Exportar a Excel
             return Excel::download(new ActivosFijosExport($query), $nombreArchivo);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status' => 'error',
@@ -705,19 +609,19 @@ class ActivosController extends Controller
         // Búsqueda general en múltiples campos
         if (!empty($filtros['search'])) {
             $search = $filtros['search'];
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('numero_activo', 'like', "%{$search}%")
-                  ->orWhere('descripcion', 'like', "%{$search}%")
-                  ->orWhere('marca', 'like', "%{$search}%")
-                  ->orWhere('serial', 'like', "%{$search}%")
-                  ->orWhere('observacion', 'like', "%{$search}%");
+                    ->orWhere('descripcion', 'like', "%{$search}%")
+                    ->orWhere('marca', 'like', "%{$search}%")
+                    ->orWhere('serial', 'like', "%{$search}%")
+                    ->orWhere('observacion', 'like', "%{$search}%");
             });
         }
 
         // Búsqueda por responsable (a través de la relación usuariosAsignados)
         if (!empty($filtros['responsable'])) {
             $responsable = $filtros['responsable'];
-            $query->whereHas('usuariosAsignados.usuario', function($q) use ($responsable) {
+            $query->whereHas('usuariosAsignados.usuario', function ($q) use ($responsable) {
                 $q->where('nombre', 'like', "%{$responsable}%");
             });
         }
@@ -739,7 +643,7 @@ class ActivosController extends Controller
 
         // Filtro por categoría
         if (!empty($filtros['categoria'])) {
-            $query->whereHas('categoria', function($q) use ($filtros) {
+            $query->whereHas('categoria', function ($q) use ($filtros) {
                 $q->where('nombre', 'like', "%{$filtros['categoria']}%");
             });
         }
@@ -770,5 +674,257 @@ class ActivosController extends Controller
         $query->orderBy('created_at', 'desc');
 
         return $query;
+    }
+
+
+    /* exportar activos */
+
+    public function exportarExcel(Request $request)
+    {
+        try {
+            $filtros = $request->all();
+
+            // Construir la consulta base
+            $query = DB::table('activo as a')
+                ->leftJoin('categoria_activos as c', 'a.categoria_id', '=', 'c.id')
+                ->leftJoin('subcategoria_activos as s', 'a.subcategoria_id', '=', 's.id')
+                ->leftJoin('users as u', 'a.user_id', '=', 'u.id')
+                ->leftJoin('bodegas_area as b', 'a.ubicacion_actual_id', '=', DB::raw('CAST(b.id AS CHAR)'))
+                ->select(
+                    'a.numero_activo',
+                    'a.descripcion',
+                    'a.valor',
+                    'a.marca',
+                    'a.serial',
+                    'a.condicion',
+                    'a.estado',
+                    'a.aceptacion',
+                    'a.tipo_ubicacion',
+                    'a.tipo_activo',
+                    'a.origen_activo',
+                    'a.fecha_compra',
+                    'a.fecha_aquiler',
+                    'a.proveedor_activo',
+                    'c.nombre as categoria',
+                    'c.prefijo as prefijo_categoria',
+                    's.nombre as subcategoria',
+                    'u.nombre as creado_por',
+                    'a.created_at as fecha_creacion',
+                    'b.nombre as ubicacion_actual',
+                    'a.usuarios_asignados'
+                );
+
+            // Aplicar filtros solo si existen
+            $aplicarFiltros = false;
+
+            // Aplicar filtros de categoría
+            if (!empty($filtros['categoria_id'])) {
+                $aplicarFiltros = true;
+                if (is_array($filtros['categoria_id'])) {
+                    $query->whereIn('a.categoria_id', $filtros['categoria_id']);
+                } else {
+                    $query->where('a.categoria_id', $filtros['categoria_id']);
+                }
+            }
+
+            // Aplicar filtros de subcategoría
+            if (!empty($filtros['subcategoria_id'])) {
+                $aplicarFiltros = true;
+                if (is_array($filtros['subcategoria_id'])) {
+                    $query->whereIn('a.subcategoria_id', $filtros['subcategoria_id']);
+                } else {
+                    $query->where('a.subcategoria_id', $filtros['subcategoria_id']);
+                }
+            }
+
+            // Ordenar resultados
+            $query->orderBy('c.prefijo')
+                ->orderBy('a.numero_activo');
+
+            // Obtener los datos
+            $activos = $query->get();
+
+            // Verificar si hay datos
+            if ($activos->isEmpty()) {
+                throw new \Exception('No se encontraron activos con los filtros seleccionados');
+            }
+
+            // Obtener todos los IDs de usuarios únicos de los activos
+            $userIds = [];
+            foreach ($activos as $activo) {
+                if (!empty($activo->usuarios_asignados)) {
+                    $ids = json_decode($activo->usuarios_asignados, true);
+                    if (is_array($ids)) {
+                        foreach ($ids as $id) {
+                            if (is_numeric($id)) {
+                                $userIds[] = (int)$id;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Obtener los nombres de los usuarios
+            $usuarios = [];
+            if (!empty($userIds)) {
+                $usuarios = DB::table('users')
+                    ->whereIn('id', array_unique($userIds))
+                    ->select('id', 'nombre')
+                    ->get()
+                    ->keyBy('id');
+            }
+
+            // Transformar los datos para Excel
+            $data = [];
+            foreach ($activos as $index => $activo) {
+                // Mapear valores numéricos a texto legible
+                $condicion = $this->mapearCondicion($activo->condicion);
+                $estado = $this->mapearEstado($activo->estado);
+                $aceptacion = $this->mapearAceptacion($activo->aceptacion);
+                $tipoUbicacion = $this->mapearTipoUbicacion($activo->tipo_ubicacion);
+                $tipoActivo = $this->mapearTipoActivo($activo->tipo_activo);
+                $origenActivo = $this->mapearOrigenActivo($activo->origen_activo);
+
+                // Procesar usuarios asignados (IDs en JSON)
+                $usuariosAsignados = 'N/A';
+                if (!empty($activo->usuarios_asignados)) {
+                    $ids = json_decode($activo->usuarios_asignados, true);
+                    if (is_array($ids) && !empty($ids)) {
+                        $nombresUsuarios = [];
+                        foreach ($ids as $id) {
+                            if (isset($usuarios[$id])) {
+                                $nombresUsuarios[] = $usuarios[$id]->nombre;
+                            } else {
+                                $nombresUsuarios[] = "Usuario ID: $id";
+                            }
+                        }
+                        $usuariosAsignados = implode(', ', $nombresUsuarios);
+                    }
+                }
+
+                $data[] = [
+                    'N°' => $index + 1,
+                    'Número de Activo' => $activo->numero_activo,
+                    'Prefijo Categoría' => $activo->prefijo_categoria,
+                    'Categoría' => $activo->categoria,
+                    'Subcategoría' => $activo->subcategoria,
+                    'Descripción' => $activo->descripcion,
+                    'Valor' => number_format($activo->valor, 2, ',', '.'),
+                    'Marca' => $activo->marca ?? 'N/A',
+                    'Serial' => $activo->serial ?? 'N/A',
+                    'Condición' => $condicion,
+                    'Estado' => $estado,
+                    'Aceptación' => $aceptacion,
+                    'Tipo Ubicación' => $tipoUbicacion,
+                    'Tipo Activo' => $tipoActivo,
+                    'Origen Activo' => $origenActivo,
+                    'Fecha Compra' => $activo->fecha_compra ? Carbon::parse($activo->fecha_compra)->format('d/m/Y') : 'N/A',
+                    'Fecha Alquiler' => $activo->fecha_aquiler ? Carbon::parse($activo->fecha_aquiler)->format('d/m/Y') : 'N/A',
+                    'Proveedor' => $activo->proveedor_activo ?? 'N/A',
+                    'Ubicación Actual' => $activo->ubicacion_actual ?? 'N/A',
+                    'Usuarios Asignados' => $usuariosAsignados,
+                    'Creado por' => $activo->creado_por,
+                    'Fecha Creación' => Carbon::parse($activo->fecha_creacion)->format('d/m/Y H:i:s'),
+                ];
+            }
+
+            // Generar nombre del archivo
+            $filtrosInfo = '';
+            if ($aplicarFiltros) {
+                $filtrosInfo = '_filtrados';
+            }
+            $fileName = 'activos_exportados' . $filtrosInfo . '_' . Carbon::now()->format('Y_m_d_His') . '.xlsx';
+
+            // Retornar el archivo Excel
+            return Excel::download(new ActivosExport($data), $fileName);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    // Mantener los métodos auxiliares igual...
+
+    // Métodos auxiliares para mapear valores (mantener los mismos)
+    private function mapearCondicion($valor)
+    {
+        switch ($valor) {
+            case 1:
+                return 'Bueno';
+            case 2:
+                return 'Reparado';
+            case 3:
+                return 'En mal estado';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearEstado($valor)
+    {
+        switch ($valor) {
+            case 1:
+                return 'Activo';
+            case 0:
+                return 'Inactivo';
+            case 2:
+                return 'De baja';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearAceptacion($valor)
+    {
+        switch ($valor) {
+            case 0:
+                return 'Sin asignar';
+            case 1:
+                return 'Sin aceptar';
+            case 2:
+                return 'Asignado';
+            case 3:
+                return 'Rechazado';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearTipoUbicacion($valor)
+    {
+        switch ($valor) {
+            case 1:
+                return 'Administrativas';
+            case 2:
+                return 'Obras';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearTipoActivo($valor)
+    {
+        switch ($valor) {
+            case 1:
+                return 'Mayor';
+            case 2:
+                return 'Menor';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearOrigenActivo($valor)
+    {
+        switch ($valor) {
+            case 1:
+                return 'Comprado';
+            case 2:
+                return 'Alquilado';
+            default:
+                return 'Desconocido';
+        }
     }
 }
