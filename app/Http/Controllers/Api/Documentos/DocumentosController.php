@@ -779,6 +779,7 @@ class DocumentosController extends Controller
                 'observacion' => 'string',
                 'archivos' => 'array',
                 'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
+                
             ]);
 
             // 1. Guardar archivos si existen
