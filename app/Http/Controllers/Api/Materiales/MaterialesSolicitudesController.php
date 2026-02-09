@@ -400,7 +400,6 @@ class MaterialesSolicitudesController extends Controller
 
     public function generarExcelAxuiliarMaterial(Request $request)
     {
-        info($request->all());
         return;
         try {
             // Validar que la solicitud tenga updates

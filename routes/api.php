@@ -370,6 +370,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('gestion-documentos-confirmar', [DocumentosController::class, 'confirmarDocumento']);
     Route::post('gestion-documentos-confirmar-celsia', [DocumentosController::class, 'confirmarDocumentoCelsia']);
     Route::post('gestion-documentos-confirmar-organismos', [DocumentosController::class, 'confirmarDocumentoOrganismo']);
+    /* para anular docuemntos confirmados */
+    Route::get('gestion-documentos-anular/{id}', [DocumentosController::class, 'anularDocumento']);
+    Route::get('gestion-documentos-anular-celsia/{id}', [DocumentosController::class, 'anularDocumentoCelsia']);
+    
+    
+    
+    
     //Buscar los proyectos que estan disponibles
     Route::get('dodumentos-disponibles/{codigo}', [DocumentosController::class, 'DocumentosDisponibles']);
 
