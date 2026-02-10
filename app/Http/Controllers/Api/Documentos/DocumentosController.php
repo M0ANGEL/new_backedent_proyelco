@@ -765,7 +765,7 @@ class DocumentosController extends Controller
     }
 
 
-    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
+    /* //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
     public function confirmarDocumento(Request $request)
     {
         try {
@@ -1084,11 +1084,340 @@ class DocumentosController extends Controller
                 'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
             ]);
         }
+    } */
+
+
+    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
+    public function confirmarDocumento(Request $request)
+    {
+        try {
+            // Validación de campos y múltiples archivos
+            $request->validate([
+                'id' => 'required|exists:documentacion_operadores,id',
+                'codigo_proyecto' => 'required|string',
+                'codigo_documento' => 'required|string',
+                'etapa' => 'required|integer',
+                'actividad_id' => 'required|integer',
+                'observacion' => 'string',
+                'fecha_confirmacion' => 'required|date_format:Y-m-d', // Validar formato específico
+                'archivos' => 'array',
+                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
+            ]);
+
+            // Convertir fecha a Carbon para consistencia
+            $fechaConfirmacion = Carbon::parse($request->fecha_confirmacion)->format('Y-m-d');
+
+            // 1. Guardar archivos si existen
+            $archivosGuardados = $this->guardarArchivos($request);
+
+            // 2. Obtener la actividad actual y calcular diferencia de días
+            $actividadActual = Documentos::find($request->id);
+            $diasDiferencia = $this->calcularDiferenciaDias($actividadActual, $fechaConfirmacion);
+
+            // 3. Actualizar actividad a estado 2 (Completado)
+            $actividadActual->update([
+                'estado' => 2,
+                'observacion' => $request->observacion != "." ? $request->observacion : "Sin observación",
+                'fecha_confirmacion' => $fechaConfirmacion,
+                'fecha_actual' => $fechaConfirmacion, // Usar la misma fecha de confirmación
+                'usuario_id' => Auth::id(),
+            ]);
+
+            // 4. Actualizar fechas de actividades siguientes si hay diferencia
+            if ($diasDiferencia != 0) {
+                $this->actualizarFechasSiguientes(
+                    $request->codigo_proyecto,
+                    $request->codigo_documento,
+                    $request->etapa,
+                    $actividadActual->orden,
+                    $diasDiferencia,
+                    $fechaConfirmacion
+                );
+            }
+
+            // 5. Aplicar lógica de habilitación según etapa
+            if ($request->etapa == 1) {
+                $this->aplicarLogicaEtapa1(
+                    $request->codigo_proyecto,
+                    $request->codigo_documento,
+                    $request->etapa,
+                    $request->actividad_id,
+                    $fechaConfirmacion
+                );
+            } else {
+                $this->aplicarLogicaCascada(
+                    $request->codigo_proyecto,
+                    $request->codigo_documento,
+                    $request->etapa,
+                    $actividadActual,
+                    $fechaConfirmacion
+                );
+            }
+
+            // 6. Respuesta completa
+            return response()->json([
+                'status' => 'success',
+                'message' => $this->generarMensajeExito($diasDiferencia),
+                'data' => [
+                    'actual' => $actividadActual,
+                    'dias_diferencia' => $diasDiferencia,
+                    'archivos' => $archivosGuardados,
+                    'fecha_utilizada' => $fechaConfirmacion,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI FIN
-    //LOGICA DE DOCUMENTOS DE ORGANISMOS
+    // ==================== LÓGICA ETAPA 1 ====================
+    private function aplicarLogicaEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id, $fechaConfirmacion)
+    {
+        // Reglas de habilitación para etapa 1
+        $reglas = [
+            1 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5], $fechaConfirmacion);
+            },
+            3 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6], $fechaConfirmacion);
+            },
+            6 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7], $fechaConfirmacion);
+            },
+            2 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7], $fechaConfirmacion);
+            },
+            7 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7], $fechaConfirmacion);
+            },
+            8 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9], $fechaConfirmacion);
+            },
+            9 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [10], $fechaConfirmacion);
+            },
+            10 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [11, 12, 13, 14, 15, 16, 17, 18, 19, 20], $fechaConfirmacion);
+            },
+            11 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            12 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            13 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            14 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            15 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            16 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            17 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            18 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            19 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            20 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
+            },
+            21 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [22, 23, 24, 25], $fechaConfirmacion);
+            },
+            22 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
+            },
+            23 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
+            },
+            24 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
+            },
+            25 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
+            },
+            26 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [27], $fechaConfirmacion);
+            },
+            27 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [28], $fechaConfirmacion);
+            },
+            28 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [29], $fechaConfirmacion);
+            },
+            29 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [30], $fechaConfirmacion);
+            },
+            30 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [31], $fechaConfirmacion);
+            },
+            31 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [32], $fechaConfirmacion);
+            },
+            32 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [33], $fechaConfirmacion);
+            },
+        ];
 
+        // Ejecutar regla si existe
+        if (isset($reglas[$actividad_id])) {
+            $reglas[$actividad_id]();
+        }
+    }
+
+    // ==================== LÓGICA ETAPAS DIFERENTES A 1 ====================
+    private function aplicarLogicaCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadActual, $fechaConfirmacion)
+    {
+        // Para etapas diferentes a 1, habilitar la siguiente actividad por orden
+        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('orden', $actividadActual->orden + 1)
+            ->first();
+
+        if ($siguienteActividad && $siguienteActividad->estado == 0) {
+            $siguienteActividad->update([
+                'estado' => 1,
+                'fecha_actual' => $fechaConfirmacion,
+            ]);
+        }
+    }
+
+    // ==================== MÉTODOS AUXILIARES ====================
+    private function habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids, $fechaConfirmacion)
+    {
+        foreach ($actividades_ids as $actividad_id) {
+            Documentos::where('codigo_proyecto', $codigo_proyecto)
+                ->where('codigo_documento', $codigo_documento)
+                ->where('etapa', $etapa)
+                ->where('actividad_id', $actividad_id)
+                ->where('estado', 0)
+                ->update([
+                    'estado' => 1,
+                    'fecha_actual' => $fechaConfirmacion,
+                ]);
+        }
+    }
+
+    private function verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, $actividad_a_activar, $actividades_requeridas, $fechaConfirmacion)
+    {
+        // Contar cuántas actividades requeridas están completadas
+        $completadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereIn('actividad_id', $actividades_requeridas)
+            ->where('estado', 2)
+            ->count();
+
+        // Si todas las requeridas están completadas, activar la siguiente
+        if ($completadas == count($actividades_requeridas)) {
+            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [$actividad_a_activar], $fechaConfirmacion);
+        }
+    }
+
+    private function guardarArchivos(Request $request)
+    {
+        if (!$request->hasFile('archivos')) {
+            return [];
+        }
+
+        $archivosGuardados = [];
+
+        foreach ($request->file('archivos') as $archivo) {
+            // Generar nombre único para cada archivo
+            $nombreArchivo = $request->codigo_proyecto . '-' .
+                $request->codigo_documento . '-' .
+                $request->etapa . '-' .
+                $request->actividad_id . '-' .
+                time() . '-' .
+                Str::random(10) . '.' .
+                $archivo->getClientOriginalExtension();
+
+            // Guardar archivo en storage
+            $archivo->storeAs('public/documentacion/red', $nombreArchivo);
+
+            // Obtener ruta pública
+            $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
+
+            // Guardar en tabla documentos_adjuntos
+            DocumentosAdjuntos::create([
+                'documento_id' => $request->id,
+                'ruta_archivo' => $rutaPublica,
+                'nombre_original' => $archivo->getClientOriginalName(),
+                'extension' => $archivo->getClientOriginalExtension(),
+                'tamano' => $archivo->getSize(),
+            ]);
+
+            // Agregar a array de respuesta
+            $archivosGuardados[] = [
+                'nombre' => $archivo->getClientOriginalName(),
+                'ruta' => $rutaPublica,
+                'mime' => $archivo->getMimeType(),
+            ];
+        }
+
+        return $archivosGuardados;
+    }
+
+    private function calcularDiferenciaDias($actividad, $fechaConfirmacion)
+    {
+        $fechaProyeccion = Carbon::parse($actividad->fecha_proyeccion);
+        $fechaConfirmacionCarbon = Carbon::parse($fechaConfirmacion);
+        return $fechaProyeccion->diffInDays($fechaConfirmacionCarbon, false);
+    }
+
+    private function generarMensajeExito($diasDiferencia)
+    {
+        $mensaje = 'Actividad confirmada exitosamente';
+
+        if ($diasDiferencia > 0) {
+            $mensaje .= " con {$diasDiferencia} días de retraso aplicados";
+        } elseif ($diasDiferencia < 0) {
+            $mensaje .= " con " . abs($diasDiferencia) . " días de adelanto aplicados";
+        }
+
+        return $mensaje;
+    }
+
+    private function actualizarFechasSiguientes($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia, $fechaBase)
+    {
+        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('orden', '>', $ordenActual)
+            ->where('estado', '!=', 2)
+            ->orderBy('orden')
+            ->get();
+
+        foreach ($actividadesSiguientes as $actividad) {
+            $nuevaFechaActual = Carbon::parse($fechaBase);
+
+            if ($diasDiferencia > 0) {
+                $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
+            } else {
+                $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
+            }
+
+            $actividad->update([
+                'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
+            ]);
+        }
+    }
+    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI FIN
+
+
+    //LOGICA DE DOCUMENTOS DE ORGANISMOS
     private function documentosOrganismos($data)
     {
         $etapa = $data->etapaProyecto;

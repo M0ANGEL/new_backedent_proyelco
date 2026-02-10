@@ -495,7 +495,7 @@ class ActivosController extends Controller
         }
     }
 
-    public function exportarActivosExcel(Request $request)
+    /*  public function exportarActivosExcel(Request $request)
     {
         try {
             // Validar los filtros recibidos
@@ -569,11 +569,9 @@ class ActivosController extends Controller
                 'message' => 'Error interno del servidor al generar el reporte'
             ], 500);
         }
-    }
+    } */
 
-    /**
-     * Preparar los filtros para la consulta
-     */
+    /* 
     private function prepararFiltros(array $validated): array
     {
         $filtros = [];
@@ -627,9 +625,7 @@ class ActivosController extends Controller
         return $filtros;
     }
 
-    /**
-     * Aplicar filtros a la consulta
-     */
+    
     private function aplicarFiltros($query, array $filtros)
     {
         // Búsqueda general en múltiples campos
@@ -700,12 +696,12 @@ class ActivosController extends Controller
         $query->orderBy('created_at', 'desc');
 
         return $query;
-    }
+    } */
 
 
-    /* exportar activos */
+    /* EXPORTE DE ACTIVOS */
 
-    public function exportarExcel(Request $request)
+    /* public function exportarExcel(Request $request)
     {
         try {
             $filtros = $request->all();
@@ -871,9 +867,6 @@ class ActivosController extends Controller
         }
     }
 
-    // Mantener los métodos auxiliares igual...
-
-    // Métodos auxiliares para mapear valores (mantener los mismos)
     private function mapearCondicion($valor)
     {
         switch ($valor) {
@@ -952,5 +945,291 @@ class ActivosController extends Controller
             default:
                 return 'Desconocido';
         }
+    } */
+
+
+    public function exportarExcel(Request $request)
+    {
+        try {
+            $filtros = $request->all();
+
+            // Construir la consulta base
+            $query = DB::table('activo as a')
+                ->leftJoin('categoria_activos as c', 'a.categoria_id', '=', 'c.id')
+                ->leftJoin('subcategoria_activos as s', 'a.subcategoria_id', '=', 's.id')
+                ->leftJoin('users as u', 'a.user_id', '=', 'u.id')
+                ->leftJoin('bodegas_area as b', 'a.ubicacion_actual_id', '=', DB::raw('CAST(b.id AS CHAR)'))
+                ->select(
+                    'a.numero_activo',
+                    'a.descripcion',
+                    'a.valor',
+                    'a.marca',
+                    'a.serial',
+                    'a.condicion',
+                    'a.estado',
+                    'a.aceptacion',
+                    'a.tipo_ubicacion',
+                    'a.tipo_activo',
+                    'a.origen_activo',
+                    'a.fecha_compra',
+                    'a.fecha_aquiler',
+                    'a.proveedor_activo',
+                    'c.nombre as categoria',
+                    'c.prefijo as prefijo_categoria',
+                    's.nombre as subcategoria',
+                    'u.nombre as creado_por',
+                    'a.created_at as fecha_creacion',
+                    'b.nombre as ubicacion_actual',
+                    'a.usuarios_asignados'
+                );
+
+            // Aplicar filtros solo si existen
+            $aplicarFiltros = false;
+
+            // Aplicar filtros de categoría
+            if (!empty($filtros['categoria_id'])) {
+                $aplicarFiltros = true;
+                if (is_array($filtros['categoria_id'])) {
+                    $query->whereIn('a.categoria_id', $filtros['categoria_id']);
+                } else {
+                    $query->where('a.categoria_id', $filtros['categoria_id']);
+                }
+            }
+
+            // Aplicar filtros de subcategoría
+            if (!empty($filtros['subcategoria_id'])) {
+                $aplicarFiltros = true;
+                if (is_array($filtros['subcategoria_id'])) {
+                    $query->whereIn('a.subcategoria_id', $filtros['subcategoria_id']);
+                } else {
+                    $query->where('a.subcategoria_id', $filtros['subcategoria_id']);
+                }
+            }
+
+            // Ordenar resultados
+            $query->orderBy('c.prefijo')
+                ->orderBy('a.numero_activo');
+
+            // Obtener los datos
+            $activos = $query->get();
+
+            // DEBUG: Ver cuántos registros se obtuvieron
+            Log::info('Registros obtenidos para exportación: ' . $activos->count());
+
+            // Verificar si hay datos
+            if ($activos->isEmpty()) {
+                throw new \Exception('No se encontraron activos con los filtros seleccionados');
+            }
+
+            // Obtener todos los IDs de usuarios únicos de los activos
+            $userIds = [];
+            foreach ($activos as $activo) {
+                if (!empty($activo->usuarios_asignados)) {
+                    $ids = json_decode($activo->usuarios_asignados, true);
+                    if (is_array($ids)) {
+                        foreach ($ids as $id) {
+                            if (is_numeric($id)) {
+                                $userIds[] = (int)$id;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Obtener los nombres de los usuarios
+            $usuarios = [];
+            if (!empty($userIds)) {
+                $usuarios = DB::table('users')
+                    ->whereIn('id', array_unique($userIds))
+                    ->select('id', 'nombre')
+                    ->get()
+                    ->keyBy('id');
+            }
+
+            // Transformar los datos para Excel
+            $data = [];
+            foreach ($activos as $index => $activo) {
+                // Mapear valores numéricos a texto legible con manejo de valores nulos
+                $condicion = $this->mapearCondicion($activo->condicion ?? null);
+                $estado = $this->mapearEstado($activo->estado ?? null);
+                $aceptacion = $this->mapearAceptacion($activo->aceptacion ?? null);
+                $tipoUbicacion = $this->mapearTipoUbicacion($activo->tipo_ubicacion ?? null);
+                $tipoActivo = $this->mapearTipoActivo($activo->tipo_activo ?? null);
+                $origenActivo = $this->mapearOrigenActivo($activo->origen_activo ?? null);
+
+                // Procesar usuarios asignados (IDs en JSON)
+                $usuariosAsignados = 'N/A';
+                if (!empty($activo->usuarios_asignados)) {
+                    $ids = json_decode($activo->usuarios_asignados, true);
+                    if (is_array($ids) && !empty($ids)) {
+                        $nombresUsuarios = [];
+                        foreach ($ids as $id) {
+                            if (isset($usuarios[$id])) {
+                                $nombresUsuarios[] = $usuarios[$id]->nombre;
+                            } else {
+                                $nombresUsuarios[] = "Usuario ID: $id";
+                            }
+                        }
+                        $usuariosAsignados = implode(', ', $nombresUsuarios);
+                    }
+                }
+
+                // Formatear valor con manejo de nulos y strings
+                $valorFormateado = 'N/A';
+                if ($activo->valor !== null && $activo->valor !== '' && is_numeric($activo->valor)) {
+                    $valorFormateado = number_format((float)$activo->valor, 2, ',', '.');
+                }
+
+                $data[] = [
+                    'N°' => $index + 1,
+                    'Número de Activo' => $activo->numero_activo ?? 'N/A',
+                    'Prefijo Categoría' => $activo->prefijo_categoria ?? 'N/A',
+                    'Categoría' => $activo->categoria ?? 'N/A',
+                    'Subcategoría' => $activo->subcategoria ?? 'N/A',
+                    'Descripción' => $activo->descripcion ?? 'N/A',
+                    'Valor' => $valorFormateado,
+                    'Marca' => $activo->marca ?? 'N/A',
+                    'Serial' => $activo->serial ?? 'N/A',
+                    'Condición' => $condicion,
+                    'Estado' => $estado,
+                    'Aceptación' => $aceptacion,
+                    'Tipo Ubicación' => $tipoUbicacion,
+                    'Tipo Activo' => $tipoActivo,
+                    'Origen Activo' => $origenActivo,
+                    'Fecha Compra' => $activo->fecha_compra ? Carbon::parse($activo->fecha_compra)->format('d/m/Y') : 'N/A',
+                    'Fecha Alquiler' => $activo->fecha_aquiler ? Carbon::parse($activo->fecha_aquiler)->format('d/m/Y') : 'N/A',
+                    'Proveedor' => $activo->proveedor_activo ?? 'N/A',
+                    'Ubicación Actual' => $activo->ubicacion_actual ?? 'N/A',
+                    'Usuarios Asignados' => $usuariosAsignados,
+                    'Creado por' => $activo->creado_por ?? 'N/A',
+                    'Fecha Creación' => $activo->fecha_creacion ? Carbon::parse($activo->fecha_creacion)->format('d/m/Y H:i:s') : 'N/A',
+                ];
+            }
+
+            // DEBUG: Ver cuántos registros se van a exportar
+            Log::info('Registros preparados para exportar: ' . count($data));
+
+            // Generar nombre del archivo
+            $filtrosInfo = '';
+            if ($aplicarFiltros) {
+                $filtrosInfo = '_filtrados';
+            }
+            $fileName = 'activos_exportados' . $filtrosInfo . '_' . Carbon::now()->format('Y_m_d_His') . '.xlsx';
+
+            // Retornar el archivo Excel
+            return Excel::download(new ActivosExport($data), $fileName);
+        } catch (\Exception $e) {
+            Log::error('Error al exportar Excel: ' . $e->getMessage() . ' en ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al exportar: ' . $e->getMessage()
+            ], 400);
+        }
     }
+
+    private function mapearCondicion($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 1:
+                return 'Bueno';
+            case 2:
+                return 'Reparado';
+            case 3:
+                return 'En mal estado';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearEstado($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 1:
+                return 'Activo';
+            case 0:
+                return 'Inactivo';
+            case 2:
+                return 'De baja';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearAceptacion($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 0:
+                return 'Sin asignar';
+            case 1:
+                return 'Sin aceptar';
+            case 2:
+                return 'Asignado';
+            case 3:
+                return 'Rechazado';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearTipoUbicacion($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 1:
+                return 'Administrativas';
+            case 2:
+                return 'Obras';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearTipoActivo($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 1:
+                return 'Mayor';
+            case 2:
+                return 'Menor';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    private function mapearOrigenActivo($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return 'N/A';
+        }
+
+        switch ($valor) {
+            case 1:
+                return 'Comprado';
+            case 2:
+                return 'Alquilado';
+            default:
+                return 'Desconocido';
+        }
+    }
+
+    //FIN DE EXPORTACION DE EXCEL DE ACTIVOS
 }

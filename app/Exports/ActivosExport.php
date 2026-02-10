@@ -9,6 +9,7 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class ActivosExport implements FromArray, WithHeadings, WithStyles, ShouldAutoSize, WithColumnFormatting
 {
@@ -45,8 +46,8 @@ class ActivosExport implements FromArray, WithHeadings, WithStyles, ShouldAutoSi
             'Fecha Compra',
             'Fecha Alquiler',
             'Proveedor',
-            'Ubicación Actual', // Nuevo encabezado
-            'Usuarios Asignados', // Nuevo encabezado
+            'Ubicación Actual',
+            'Usuarios Asignados',
             'Creado por',
             'Fecha Creación'
         ];
@@ -54,40 +55,39 @@ class ActivosExport implements FromArray, WithHeadings, WithStyles, ShouldAutoSi
     
     public function styles(Worksheet $sheet)
     {
-        // Aplicar estilos
-        $sheet->getStyle('A1:V1')->getFont()->setBold(true); // Cambiado a V por las nuevas columnas
+        // Aplicar estilos al encabezado
+        $sheet->getStyle('A1:V1')->getFont()->setBold(true);
         $sheet->getStyle('A1:V1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setARGB('FFCCCCCC');
         
-        // Alinear verticalmente todas las celdas
-        $sheet->getStyle('A2:V' . (count($this->data) + 1))
+        // Centrar vertical y horizontalmente todo el contenido
+        $sheet->getStyle('A1:V' . (count($this->data) + 1))
             ->getAlignment()
-            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
         
         // Ajustar ancho para columnas con texto largo
         $sheet->getColumnDimension('F')->setWidth(30); // Descripción
-        $sheet->getColumnDimension('T')->setWidth(30); // Ubicación Actual
+        $sheet->getColumnDimension('G')->setWidth(15); // Valor
+        $sheet->getColumnDimension('T')->setWidth(25); // Ubicación Actual
         $sheet->getColumnDimension('U')->setWidth(30); // Usuarios Asignados
         
-        return [
-            // Estilo para el encabezado
-            1 => [
-                'font' => ['bold' => true, 'size' => 12],
-                'fill' => [
-                    'fillType' => 'solid',
-                    'startColor' => ['rgb' => 'CCCCCC']
-                ]
-            ],
-        ];
+        // Aplicar bordes a todas las celdas
+        $lastRow = count($this->data) + 1;
+        $sheet->getStyle("A1:V{$lastRow}")
+            ->getBorders()
+            ->getAllBorders()
+            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+        
+        return [];
     }
     
     public function columnFormats(): array
     {
         return [
-            // Formato para la columna de valor (columna G)
-            'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED2,
+            'G' => '#,##0.00', // Formato para la columna de valor
         ];
     }
 }
