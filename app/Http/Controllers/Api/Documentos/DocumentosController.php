@@ -17,18 +17,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use PhpParser\Node\Stmt\TryCatch;
 use Illuminate\Support\Str;
 
 class DocumentosController extends Controller
 {
-
-    //CREAR DOCUMENTACION (INICIO)
+    //=========== CREAR DOCUMENTACION (INICIO) ==========
     public function StoreDocumentacionRed(Request $request)
     {
-
-
         //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
         if ($request->requiereOrganismos == "1") {
             $this->documentosOrganismos($request);
@@ -62,57 +59,78 @@ class DocumentosController extends Controller
 
         //datos de operadores para plantilla
         $operador = $datos->operadorRed;
-        $organismo = $datos->organismoInspeccion;
         $fecha_entrega = $datos->fechaEntrega;
         $nombre_etapa = $datos->nombre_etapa;
 
         //tipo de proyecto en caso que casas sea distinto
         $tipoProyecto_id = $datosUnicos->tipoProyecto_id;
 
-        //se valdia si ya hay docuemnto con este proyecto tiene la misma etapa
-        $validarEtpa = Documentos::where('codigo_proyecto', $request->codigo_proyecto)->where('etapa', $etapaData)->first();
 
-        // Validar si se encontró algún dato
-        if ($validarEtpa) {
+        // Validar si ya existe un documento con este código_documento (debe ser único)
+        $validarDocumento = Documentos::where('codigo_documento', $codigo_proyecto_documentos)->first();
+
+        if ($validarDocumento) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Este proyecto ya tiene una etapa ' . $etapaData
+                'message' => 'El código de documento "' . $codigo_proyecto_documentos . '" ya existe. Debe ser único.'
+            ], 404);
+        }
+
+        // Validar si este proyecto ya tiene registrada esta etapa
+        $validarEtapa = Documentos::where('codigo_proyecto', $request->codigo_proyecto)
+            ->where('etapa', $etapaData)
+            ->first();
+
+        if ($validarEtapa) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Este proyecto ya tiene una etapa ' . $etapaData . ' registrada'
             ], 404);
         }
 
         $cronogramaGenerado = null;
 
-        // //ENVIAR DATOS PARA CREAR DOCUMENTOS DE ORGANISMO
-        // if ($request->requiereOrganismos == "1") {
-        //     $this->documentosOrganismos($request->organismoInspeccion);
-        // }
-
-
-        //OPERADORES DE RED
-        //APARTAMENTOS
-        // if ($tipoProyecto_id == 1) {
-        if ($etapa == '1') {
-            if ($operador == "1") { //emcali
-                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-            } else if ($operador == "2") { //celsia
-                // Para Celsia
-                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-            }
-        } else {
-            //aqui cual quier etapa >1
-            if ($operador == "1") { //emcali
-                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
-            } else if ($operador == "2") { //celsia
-                // Para Celsia
-                $cronogramaGenerado = $this->generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, 1, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData);
+        //logica para crear torres o manzanas para activacion retie, por el momento solo emcali
+        if ($operador == 1) {
+            // Verificar que torres existe y es un array
+            if ($request->has('torres') && is_array($request->torres)) {
+                foreach ($request->torres as $registro) {
+                    // $registro es un string directo, no un array
+                    DB::table('documentacion_torres')->insert([
+                        'codigo_proyecto' => $codigo_proyecto,
+                        'codigo_documento' => $codigo_proyecto_documentos,
+                        'nombre_torre' => $registro, // Directamente el valor del array
+                        'operador' => $operador,
+                        'actividad_id' => 27,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
             }
         }
-        // } else if ($tipoProyecto_id == 2) {
-        //     //CASAS - Implementar lógica para casas si es necesario
-        //     $cronogramaGenerado = [];
-        // }
 
-        // ✅ AGREGAR ESTE RETURN AL FINAL - Respuesta de éxito
+        //OPERADORES DE RED - Usar la función específica según el operador
+        if ($operador == 1) { //emcali
+            $cronogramaGenerado = $this->generarCronogramaEmcali(
+                $codigo_proyecto,
+                $codigo_proyecto_documentos,
+                $etapa,
+                $fecha_entrega,
+                $nombre_etapa,
+                $etapaData
+            );
+        } else if ($operador == 2) { //celsia
+            $cronogramaGenerado = $this->generarCronogramaCelsia(
+                $codigo_proyecto,
+                $codigo_proyecto_documentos,
+                1, // Para Celsia siempre etapa 1 según tu código original
+                $fecha_entrega,
+                $nombre_etapa,
+                $etapaData
+            );
+        }
+
+        // Respuesta de éxito
         return response()->json([
             'status' => 'success',
             'message' => 'Documentación creada exitosamente',
@@ -128,133 +146,721 @@ class DocumentosController extends Controller
         ], 201);
     }
 
-    private function generarCronogramaDesdeBD($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $operador, $tipoProyecto_id, $nombre_etapa, $etapaData)
+    // Generar cronograma para OPERADOR 1 (EMCALI) - Con lógica específica de 237 días para etapa 1 y 113 días para otras etapas
+    private function generarCronogramaEmcali($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $nombre_etapa, $etapaData)
     {
         // Consultar actividades desde la base de datos
         $actividades = DB::table('actividades_documentos')
             ->where('etapa', $etapa)
-            ->where('operador', $operador)
+            ->where('operador', 1)
             ->where('estado', 1)
             ->orderBy('id')
             ->get();
 
         if ($actividades->isEmpty()) {
-            return;
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No se encontraron actividades para etapa: ' .  $etapa . ' operador: ' . $operador
-            ], 404);
+            return null;
         }
 
-        // Convertir fecha_entrega a Carbon - VERSIÓN COMPLETAMENTE CORREGIDA
+        // Convertir fecha_entrega a Carbon
         try {
-
             if (is_object($fecha_entrega) && method_exists($fecha_entrega, 'format')) {
                 $fechaBase = $fecha_entrega;
             } else if (is_string($fecha_entrega)) {
-                // PRIMERO: Intentar formato Y-m-d (2026-11-05)
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_entrega)) {
                     $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_entrega);
-                }
-                // SEGUNDO: Formato ISO 8601: 2026-10-22T05:00:00.000Z
-                else if (strpos($fecha_entrega, 'T') !== false) {
+                } else if (strpos($fecha_entrega, 'T') !== false) {
                     $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i:s.v\Z', $fecha_entrega);
-                }
-                // TERCERO: Formato con guiones (1-Oct-25)
-                else if (preg_match('/\d{1,2}-[A-Za-z]{3}-\d{2}/', $fecha_entrega)) {
+                } else if (preg_match('/\d{1,2}-[A-Za-z]{3}-\d{2}/', $fecha_entrega)) {
                     $fechaBase = \Carbon\Carbon::createFromFormat('d-M-y', $fecha_entrega);
-                }
-                // CUARTO: Intentar parsear automáticamente
-                else {
+                } else {
                     $fechaBase = \Carbon\Carbon::parse($fecha_entrega);
                 }
             } else {
-                throw new Exception("Formato de fecha no reconocido: " . gettype($fecha_entrega));
+                $fechaBase = \Carbon\Carbon::now();
             }
         } catch (\Exception $e) {
-            // Usar fecha actual como fallback
             $fechaBase = \Carbon\Carbon::now();
         }
 
+        // Determinar días a restar según la etapa
+        $diasQuemados = ($etapa == 1) ? 237 : 113;
+
+        // Calcular fecha de la actividad inicial: fecha_entrega - díasQuemados
+        $fechaActual = $fechaBase->copy()->subDays($diasQuemados);
+
+        // Array para almacenar las fechas calculadas por ID de actividad
+        $fechasPorActividad = [];
+
+        // MAPA DE DEPENDENCIAS específico para EMCALI
+        $dependencias = [
+            2 => 1,
+            3 => 2,
+            4 => 2,
+            5 => 2,     // 2 depende de 1, 3-5 dependen de 2
+            6 => 3,                              // 6 depende de 3
+            7 => 6,                              // 7 depende de 6
+            8 => 7,                              // 8 depende de 7
+            9 => 8,                              // 9 depende de 8
+            10 => 9,                             // 10 depende de 9
+            11 => 10,                             // 11 depende de 10
+            12 => 11,                             // 12 depende de 11
+            13 => 12,                             // 13 depende de 12
+            14 => 12,                             // 14 depende de 12 (simultánea con 13)
+            15 => 14,                             // 15 depende de 14
+            16 => 15,                             // 16 depende de 15
+            17 => 16,                             // 17 depende de 16
+            18 => 10,                             // 18 depende de 10
+            19 => 18,                             // 19 depende de 18
+            20 => 19,                             // 20 depende de 19
+            21 => 17,                             // 21 depende de 17
+            22 => 21,                             // 22 depende de 21
+            23 => 22,                             // 23 depende de 22
+            24 => 23,                             // 24 depende de 23
+            25 => 24,                             // 25 depende de 24
+            26 => 25,                             // 26 depende de 25
+            27 => 26,                             // 27 depende de 26
+            28 => 27,                             // 28 depende de 27
+            29 => 28,                             // 29 depende de 28
+            30 => 29,                             // 30 depende de 29
+            31 => 30,                             // 31 depende de 30
+            32 => 31,                             // 32 depende de 31
+            33 => 32,                             // 33 depende de 32
+            34 => 33,                             // 34 depende de 33
+        ];
+
+        // Dependencias para actividades de etapas posteriores (a partir de ID 35)
+        // Estas son en cascada simple: 35 no depende de nadie, 36 depende de 35, etc.
+        // Se generarán dinámicamente para IDs >= 35
+
+        // Ordenar actividades por ID para procesar secuencialmente
+        $actividades = $actividades->sortBy('id');
+
+        //aqui vemos si es etapa 1 o diferente a 1
+        if ($etapa == 1) {
+            // [TODO EL CÓDIGO EXISTENTE PARA ETAPA 1 SE MANTIENE IGUAL]
+            // Procesar actividad 1
+            $actividad1 = $actividades->firstWhere('id', 1);
+            if ($actividad1) {
+                $fechasPorActividad[1] = [
+                    'inicio' => $fechaActual->copy(),
+                    'fin' => $fechaActual->copy() // tiempo 0 para actividad 1
+                ];
+            }
+
+            // Procesar actividad 2 (depende de 1)
+            $actividad2 = $actividades->firstWhere('id', 2);
+            if ($actividad2 && isset($fechasPorActividad[1])) {
+                $fechaInicio2 = $fechasPorActividad[1]['inicio']->copy()->addDays($actividad2->tiempo);
+                $fechasPorActividad[2] = [
+                    'inicio' => $fechaInicio2->copy(),
+                    'fin' => $fechaInicio2->copy()->addDays($actividad2->tiempo)
+                ];
+            }
+
+            // Procesar actividades 3,4,5 (dependen de 2 - MISMA FECHA QUE 2)
+            foreach ([3, 4, 5] as $id) {
+                $actividad = $actividades->firstWhere('id', $id);
+                if ($actividad && isset($fechasPorActividad[2])) {
+                    $fechasPorActividad[$id] = [
+                        'inicio' => $fechasPorActividad[2]['inicio']->copy(),
+                        'fin' => $fechasPorActividad[2]['inicio']->copy()->addDays($actividad->tiempo)
+                    ];
+                }
+            }
+
+            // Procesar actividad 6 (depende de 3)
+            $actividad6 = $actividades->firstWhere('id', 6);
+            if ($actividad6 && isset($fechasPorActividad[3])) {
+                $fechaInicio6 = $fechasPorActividad[3]['inicio']->copy()->addDays($actividad6->tiempo);
+                $fechasPorActividad[6] = [
+                    'inicio' => $fechaInicio6->copy(),
+                    'fin' => $fechaInicio6->copy()->addDays($actividad6->tiempo)
+                ];
+            }
+
+            // Procesar actividad 7 (depende de 6)
+            $actividad7 = $actividades->firstWhere('id', 7);
+            if ($actividad7 && isset($fechasPorActividad[6])) {
+                $fechaInicio7 = $fechasPorActividad[6]['inicio']->copy()->addDays($actividad7->tiempo);
+                $fechasPorActividad[7] = [
+                    'inicio' => $fechaInicio7->copy(),
+                    'fin' => $fechaInicio7->copy()->addDays($actividad7->tiempo)
+                ];
+            }
+
+            // Procesar actividad 8 (depende de 7)
+            $actividad8 = $actividades->firstWhere('id', 8);
+            if ($actividad8 && isset($fechasPorActividad[7])) {
+                $fechaInicio8 = $fechasPorActividad[7]['inicio']->copy()->addDays($actividad8->tiempo);
+                $fechasPorActividad[8] = [
+                    'inicio' => $fechaInicio8->copy(),
+                    'fin' => $fechaInicio8->copy()->addDays($actividad8->tiempo)
+                ];
+            }
+
+            // Procesar actividad 9 (depende de 8)
+            $actividad9 = $actividades->firstWhere('id', 9);
+            if ($actividad9 && isset($fechasPorActividad[8])) {
+                $fechaInicio9 = $fechasPorActividad[8]['inicio']->copy()->addDays($actividad9->tiempo);
+                $fechasPorActividad[9] = [
+                    'inicio' => $fechaInicio9->copy(),
+                    'fin' => $fechaInicio9->copy()->addDays($actividad9->tiempo)
+                ];
+            }
+
+            // Procesar actividad 10 (depende de 9)
+            $actividad10 = $actividades->firstWhere('id', 10);
+            if ($actividad10 && isset($fechasPorActividad[9])) {
+                $fechaInicio10 = $fechasPorActividad[9]['inicio']->copy()->addDays($actividad10->tiempo);
+                $fechasPorActividad[10] = [
+                    'inicio' => $fechaInicio10->copy(),
+                    'fin' => $fechaInicio10->copy()->addDays($actividad10->tiempo)
+                ];
+            }
+
+            // Procesar actividad 11 (depende de 10)
+            $actividad11 = $actividades->firstWhere('id', 11);
+            if ($actividad11 && isset($fechasPorActividad[10])) {
+                $fechaInicio11 = $fechasPorActividad[10]['inicio']->copy()->addDays($actividad11->tiempo);
+                $fechasPorActividad[11] = [
+                    'inicio' => $fechaInicio11->copy(),
+                    'fin' => $fechaInicio11->copy()->addDays($actividad11->tiempo)
+                ];
+            }
+
+            // Procesar actividad 12 (depende de 11)
+            $actividad12 = $actividades->firstWhere('id', 12);
+            if ($actividad12 && isset($fechasPorActividad[11])) {
+                $fechaInicio12 = $fechasPorActividad[11]['inicio']->copy()->addDays($actividad12->tiempo);
+                $fechasPorActividad[12] = [
+                    'inicio' => $fechaInicio12->copy(),
+                    'fin' => $fechaInicio12->copy()->addDays($actividad12->tiempo)
+                ];
+            }
+
+            // Procesar actividad 13 (depende de 12)
+            $actividad13 = $actividades->firstWhere('id', 13);
+            if ($actividad13 && isset($fechasPorActividad[12])) {
+                $fechaInicio13 = $fechasPorActividad[12]['inicio']->copy()->addDays($actividad13->tiempo);
+                $fechasPorActividad[13] = [
+                    'inicio' => $fechaInicio13->copy(),
+                    'fin' => $fechaInicio13->copy()->addDays($actividad13->tiempo)
+                ];
+            }
+
+            // Procesar actividad 14 (depende de 12 - SIMULTÁNEA CON 13)
+            $actividad14 = $actividades->firstWhere('id', 14);
+            if ($actividad14 && isset($fechasPorActividad[12])) {
+                $fechaInicio14 = $fechasPorActividad[12]['inicio']->copy()->addDays($actividad14->tiempo);
+                $fechasPorActividad[14] = [
+                    'inicio' => $fechaInicio14->copy(),
+                    'fin' => $fechaInicio14->copy()->addDays($actividad14->tiempo)
+                ];
+            }
+
+            // Procesar actividad 15 (depende de 14)
+            $actividad15 = $actividades->firstWhere('id', 15);
+            if ($actividad15 && isset($fechasPorActividad[14])) {
+                $fechaInicio15 = $fechasPorActividad[14]['inicio']->copy()->addDays($actividad15->tiempo);
+                $fechasPorActividad[15] = [
+                    'inicio' => $fechaInicio15->copy(),
+                    'fin' => $fechaInicio15->copy()->addDays($actividad15->tiempo)
+                ];
+            }
+
+            // Procesar actividad 16 (depende de 15)
+            $actividad16 = $actividades->firstWhere('id', 16);
+            if ($actividad16 && isset($fechasPorActividad[15])) {
+                $fechaInicio16 = $fechasPorActividad[15]['inicio']->copy()->addDays($actividad16->tiempo);
+                $fechasPorActividad[16] = [
+                    'inicio' => $fechaInicio16->copy(),
+                    'fin' => $fechaInicio16->copy()->addDays($actividad16->tiempo)
+                ];
+            }
+
+            // Procesar actividad 17 (depende de 16)
+            $actividad17 = $actividades->firstWhere('id', 17);
+            if ($actividad17 && isset($fechasPorActividad[16])) {
+                $fechaInicio17 = $fechasPorActividad[16]['inicio']->copy()->addDays($actividad17->tiempo);
+                $fechasPorActividad[17] = [
+                    'inicio' => $fechaInicio17->copy(),
+                    'fin' => $fechaInicio17->copy()->addDays($actividad17->tiempo)
+                ];
+            }
+
+            // Procesar actividad 18 (depende de 10)
+            $actividad18 = $actividades->firstWhere('id', 18);
+            if ($actividad18 && isset($fechasPorActividad[10])) {
+                $fechaInicio18 = $fechasPorActividad[10]['inicio']->copy()->addDays($actividad18->tiempo);
+                $fechasPorActividad[18] = [
+                    'inicio' => $fechaInicio18->copy(),
+                    'fin' => $fechaInicio18->copy()->addDays($actividad18->tiempo)
+                ];
+            }
+
+            // Procesar actividad 19 (depende de 18)
+            $actividad19 = $actividades->firstWhere('id', 19);
+            if ($actividad19 && isset($fechasPorActividad[18])) {
+                $fechaInicio19 = $fechasPorActividad[18]['inicio']->copy()->addDays($actividad19->tiempo);
+                $fechasPorActividad[19] = [
+                    'inicio' => $fechaInicio19->copy(),
+                    'fin' => $fechaInicio19->copy()->addDays($actividad19->tiempo)
+                ];
+            }
+
+            // Procesar actividad 20 (depende de 19)
+            $actividad20 = $actividades->firstWhere('id', 20);
+            if ($actividad20 && isset($fechasPorActividad[19])) {
+                $fechaInicio20 = $fechasPorActividad[19]['inicio']->copy()->addDays($actividad20->tiempo);
+                $fechasPorActividad[20] = [
+                    'inicio' => $fechaInicio20->copy(),
+                    'fin' => $fechaInicio20->copy()->addDays($actividad20->tiempo)
+                ];
+            }
+
+            // Procesar actividad 21 (depende de 17)
+            $actividad21 = $actividades->firstWhere('id', 21);
+            if ($actividad21 && isset($fechasPorActividad[17])) {
+                $fechaInicio21 = $fechasPorActividad[17]['inicio']->copy()->addDays($actividad21->tiempo);
+                $fechasPorActividad[21] = [
+                    'inicio' => $fechaInicio21->copy(),
+                    'fin' => $fechaInicio21->copy()->addDays($actividad21->tiempo)
+                ];
+            }
+
+            // Procesar actividad 22 (depende de 21)
+            $actividad22 = $actividades->firstWhere('id', 22);
+            if ($actividad22 && isset($fechasPorActividad[21])) {
+                $fechaInicio22 = $fechasPorActividad[21]['inicio']->copy()->addDays($actividad22->tiempo);
+                $fechasPorActividad[22] = [
+                    'inicio' => $fechaInicio22->copy(),
+                    'fin' => $fechaInicio22->copy()->addDays($actividad22->tiempo)
+                ];
+            }
+
+            // Procesar actividad 23 (depende de 22)
+            $actividad23 = $actividades->firstWhere('id', 23);
+            if ($actividad23 && isset($fechasPorActividad[22])) {
+                $fechaInicio23 = $fechasPorActividad[22]['inicio']->copy()->addDays($actividad23->tiempo);
+                $fechasPorActividad[23] = [
+                    'inicio' => $fechaInicio23->copy(),
+                    'fin' => $fechaInicio23->copy()->addDays($actividad23->tiempo)
+                ];
+            }
+
+            // Procesar actividad 24 (depende de 23)
+            $actividad24 = $actividades->firstWhere('id', 24);
+            if ($actividad24 && isset($fechasPorActividad[23])) {
+                $fechaInicio24 = $fechasPorActividad[23]['inicio']->copy()->addDays($actividad24->tiempo);
+                $fechasPorActividad[24] = [
+                    'inicio' => $fechaInicio24->copy(),
+                    'fin' => $fechaInicio24->copy()->addDays($actividad24->tiempo)
+                ];
+            }
+
+            // Procesar actividad 25 (depende de 24)
+            $actividad25 = $actividades->firstWhere('id', 25);
+            if ($actividad25 && isset($fechasPorActividad[24])) {
+                $fechaInicio25 = $fechasPorActividad[24]['inicio']->copy()->addDays($actividad25->tiempo);
+                $fechasPorActividad[25] = [
+                    'inicio' => $fechaInicio25->copy(),
+                    'fin' => $fechaInicio25->copy()->addDays($actividad25->tiempo)
+                ];
+            }
+
+            // Procesar actividad 26 (depende de 25)
+            $actividad26 = $actividades->firstWhere('id', 26);
+            if ($actividad26 && isset($fechasPorActividad[25])) {
+                $fechaInicio26 = $fechasPorActividad[25]['inicio']->copy()->addDays($actividad26->tiempo);
+                $fechasPorActividad[26] = [
+                    'inicio' => $fechaInicio26->copy(),
+                    'fin' => $fechaInicio26->copy()->addDays($actividad26->tiempo)
+                ];
+            }
+
+            // Procesar actividad 27 (depende de 26)
+            $actividad27 = $actividades->firstWhere('id', 27);
+            if ($actividad27 && isset($fechasPorActividad[26])) {
+                $fechaInicio27 = $fechasPorActividad[26]['inicio']->copy()->addDays($actividad27->tiempo);
+                $fechasPorActividad[27] = [
+                    'inicio' => $fechaInicio27->copy(),
+                    'fin' => $fechaInicio27->copy()->addDays($actividad27->tiempo)
+                ];
+            }
+
+            // Procesar actividad 28 (depende de 27)
+            $actividad28 = $actividades->firstWhere('id', 28);
+            if ($actividad28 && isset($fechasPorActividad[27])) {
+                $fechaInicio28 = $fechasPorActividad[27]['inicio']->copy()->addDays($actividad28->tiempo);
+                $fechasPorActividad[28] = [
+                    'inicio' => $fechaInicio28->copy(),
+                    'fin' => $fechaInicio28->copy()->addDays($actividad28->tiempo)
+                ];
+            }
+
+            // Procesar actividad 29 (depende de 28)
+            $actividad29 = $actividades->firstWhere('id', 29);
+            if ($actividad29 && isset($fechasPorActividad[28])) {
+                $fechaInicio29 = $fechasPorActividad[28]['inicio']->copy()->addDays($actividad29->tiempo);
+                $fechasPorActividad[29] = [
+                    'inicio' => $fechaInicio29->copy(),
+                    'fin' => $fechaInicio29->copy()->addDays($actividad29->tiempo)
+                ];
+            }
+
+            // Procesar actividad 30 (depende de 29)
+            $actividad30 = $actividades->firstWhere('id', 30);
+            if ($actividad30 && isset($fechasPorActividad[29])) {
+                $fechaInicio30 = $fechasPorActividad[29]['inicio']->copy()->addDays($actividad30->tiempo);
+                $fechasPorActividad[30] = [
+                    'inicio' => $fechaInicio30->copy(),
+                    'fin' => $fechaInicio30->copy()->addDays($actividad30->tiempo)
+                ];
+            }
+
+            // Procesar actividad 31 (depende de 30)
+            $actividad31 = $actividades->firstWhere('id', 31);
+            if ($actividad31 && isset($fechasPorActividad[30])) {
+                $fechaInicio31 = $fechasPorActividad[30]['inicio']->copy()->addDays($actividad31->tiempo);
+                $fechasPorActividad[31] = [
+                    'inicio' => $fechaInicio31->copy(),
+                    'fin' => $fechaInicio31->copy()->addDays($actividad31->tiempo)
+                ];
+            }
+
+            // Procesar actividad 32 (depende de 31)
+            $actividad32 = $actividades->firstWhere('id', 32);
+            if ($actividad32 && isset($fechasPorActividad[31])) {
+                $fechaInicio32 = $fechasPorActividad[31]['inicio']->copy()->addDays($actividad32->tiempo);
+                $fechasPorActividad[32] = [
+                    'inicio' => $fechaInicio32->copy(),
+                    'fin' => $fechaInicio32->copy()->addDays($actividad32->tiempo)
+                ];
+            }
+
+            // Procesar actividad 33 (depende de 32)
+            $actividad33 = $actividades->firstWhere('id', 33);
+            if ($actividad33 && isset($fechasPorActividad[32])) {
+                $fechaInicio33 = $fechasPorActividad[32]['inicio']->copy()->addDays($actividad33->tiempo);
+                $fechasPorActividad[33] = [
+                    'inicio' => $fechaInicio33->copy(),
+                    'fin' => $fechaInicio33->copy()->addDays($actividad33->tiempo)
+                ];
+            }
+
+            // Procesar actividad 34 (depende de 33)
+            $actividad34 = $actividades->firstWhere('id', 34);
+            if ($actividad34 && isset($fechasPorActividad[33])) {
+                $fechaInicio34 = $fechasPorActividad[33]['inicio']->copy()->addDays($actividad34->tiempo);
+                $fechasPorActividad[34] = [
+                    'inicio' => $fechaInicio34->copy(),
+                    'fin' => $fechaInicio34->copy()->addDays($actividad34->tiempo)
+                ];
+            }
+
+            // Generar el cronograma para insertar
+            $cronograma = [];
+            $orden = 1;
+
+            foreach ($actividades as $actividad) {
+                $id = $actividad->id;
+
+                // Verificar si la actividad tiene fecha calculada
+                if (!isset($fechasPorActividad[$id])) {
+                    // Si no tiene fecha, usar la lógica de dependencia
+                    $dependenciaId = $dependencias[$id] ?? ($id - 1);
+
+                    if (isset($fechasPorActividad[$dependenciaId])) {
+                        $fechaInicio = $fechasPorActividad[$dependenciaId]['inicio']->copy()->addDays($actividad->tiempo);
+                        $fechasPorActividad[$id] = [
+                            'inicio' => $fechaInicio->copy(),
+                            'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                        ];
+                    } else {
+                        // Fallback: usar la última fecha disponible
+                        $ultimaFecha = end($fechasPorActividad);
+                        $fechaInicio = $ultimaFecha['inicio']->copy()->addDays($actividad->tiempo);
+                        $fechasPorActividad[$id] = [
+                            'inicio' => $fechaInicio->copy(),
+                            'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                        ];
+                    }
+                }
+
+                // Obtener fecha calculada
+                $fechaActividad = $fechasPorActividad[$id]['inicio'];
+
+                // Determinar dependencia para el registro
+                $dependenciaId = $dependencias[$id] ?? null;
+                if (!$dependenciaId && $id > 1) {
+                    $dependenciaId = $id - 1;
+                }
+
+                // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
+                $estado = ($orden == 1) ? 1 : 0;
+
+                $registro = [
+                    'nombre_etapa' => $nombre_etapa,
+                    'codigo_proyecto' => $codigo_proyecto,
+                    'codigo_documento' => $codigo_proyecto_documentos,
+                    'etapa' => $etapaData,
+                    'actividad_id' => $actividad->id,
+                    'actividad_depende_id' => $dependenciaId,
+                    'tipo' => ($actividad->tipo == 1) ? 'principal' : 'simultanea',
+                    'orden' => $orden,
+                    'fecha_proyeccion' => $fechaActividad->format('Y-m-d'),
+                    'fecha_actual' => $fechaActividad->format('Y-m-d'),
+                    'estado' => $estado,
+                    'operador' => 1,
+                    'created_at' => now(),
+                ];
+
+                $cronograma[] = $registro;
+                $orden++;
+            }
+        } else {
+            // PARA ETAPAS DIFERENTES A 1 (etapa 2, 3, etc.)
+            // Iniciamos desde el ID 35 con dependencia en cascada
+
+            // Encontrar la primera actividad (debe ser ID 35 o el mínimo ID en la consulta)
+            $actividadesFiltradas = $actividades->filter(function ($actividad) {
+                return $actividad->id >= 35;
+            })->values();
+
+            if ($actividadesFiltradas->isEmpty()) {
+                return null;
+            }
+
+            // Ordenar por ID para procesar en cascada
+            $actividadesFiltradas = $actividadesFiltradas->sortBy('id');
+
+            // Variables para seguimiento
+            $ultimoId = null;
+            $cronograma = [];
+            $orden = 1;
+
+            foreach ($actividadesFiltradas as $actividad) {
+                $id = $actividad->id;
+
+                // Calcular fecha según dependencia
+                if ($ultimoId === null) {
+                    // Es la primera actividad (ID 35 o el mínimo) - No depende de nadie
+                    $fechaInicio = $fechaActual->copy();
+                    $dependenciaId = null;
+                } else {
+                    // Depende de la actividad anterior en cascada
+                    $fechaInicio = $fechasPorActividad[$ultimoId]['inicio']->copy()->addDays($actividad->tiempo);
+                    $dependenciaId = $ultimoId;
+                }
+
+                // Guardar fecha calculada
+                $fechasPorActividad[$id] = [
+                    'inicio' => $fechaInicio->copy(),
+                    'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                ];
+
+                // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
+                $estado = ($orden == 1) ? 1 : 0;
+
+                $registro = [
+                    'nombre_etapa' => $nombre_etapa,
+                    'codigo_proyecto' => $codigo_proyecto,
+                    'codigo_documento' => $codigo_proyecto_documentos,
+                    'etapa' => $etapaData,
+                    'actividad_id' => $actividad->id,
+                    'actividad_depende_id' => $dependenciaId,
+                    'tipo' => ($actividad->tipo == 1) ? 'principal' : 'simultanea',
+                    'orden' => $orden,
+                    'fecha_proyeccion' => $fechaInicio->format('Y-m-d'),
+                    'fecha_actual' => $fechaInicio->format('Y-m-d'),
+                    'estado' => $estado,
+                    'operador' => 1,
+                    'created_at' => now(),
+                ];
+
+                $cronograma[] = $registro;
+                $ultimoId = $id;
+                $orden++;
+            }
+        }
+
+        // Insertar en la base de datos
+        try {
+            foreach ($cronograma as $registro) {
+                DB::table('documentacion_operadores')->insert($registro);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error insertando cronograma EMCALI: ' . $e->getMessage());
+            throw $e;
+        }
+
+        return $cronograma;
+    }
+
+    // Generar cronograma para OPERADOR 2 (CELSIA) - Con nueva lógica de dependencias
+    private function generarCronogramaCelsia($codigo_proyecto, $codigo_proyecto_documentos, $etapa, $fecha_entrega, $nombre_etapa, $etapaData)
+    {
+        // Consultar actividades desde la base de datos
+        $actividades = DB::table('actividades_documentos')
+            ->where('etapa', $etapa)
+            ->where('operador', 2)
+            ->where('estado', 1)
+            ->orderBy('id')
+            ->get();
+
+        if ($actividades->isEmpty()) {
+            return null;
+        }
+
+        // Convertir fecha_entrega a Carbon
+        try {
+            if (is_object($fecha_entrega) && method_exists($fecha_entrega, 'format')) {
+                $fechaBase = $fecha_entrega;
+            } else if (is_string($fecha_entrega)) {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_entrega)) {
+                    $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_entrega);
+                } else if (strpos($fecha_entrega, 'T') !== false) {
+                    $fechaBase = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i:s.v\Z', $fecha_entrega);
+                } else if (preg_match('/\d{1,2}-[A-Za-z]{3}-\d{2}/', $fecha_entrega)) {
+                    $fechaBase = \Carbon\Carbon::createFromFormat('d-M-y', $fecha_entrega);
+                } else {
+                    $fechaBase = \Carbon\Carbon::parse($fecha_entrega);
+                }
+            } else {
+                $fechaBase = \Carbon\Carbon::now();
+            }
+        } catch (\Exception $e) {
+            $fechaBase = \Carbon\Carbon::now();
+        }
+
+        // DÍAS QUEMADOS para CELSIA (siempre 81 días)
+        $diasQuemados = 81;
+
+        // Calcular fecha de la actividad inicial: fecha_entrega - 81 días
+        $fechaActual = $fechaBase->copy()->subDays($diasQuemados);
+
+        // Array para almacenar las fechas calculadas por ID de actividad
+        $fechasPorActividad = [];
+
+        // MAPA DE DEPENDENCIAS específico para CELSIA según requerimiento
+        $dependencias = [
+            // 43 es la primera actividad, no depende de nadie
+            44 => 43,
+            45 => 44,
+            46 => 45,
+            47 => 46,
+            48 => 47,
+            49 => 48,
+            50 => 46,      // 50 depende de 46 
+            51 => 50,
+            52 => 51,
+            53 => 52,
+            54 => 53,
+            // Del 55 al 66 dependen de 52
+            55 => 52,
+            56 => 52,
+            57 => 52,
+            58 => 52,
+            59 => 52,
+            60 => 52,
+            61 => 52,
+            62 => 52,
+            63 => 52,
+            64 => 52,
+            65 => 52,
+            66 => 52,
+
+
+            67 => 66,
+            68 => 67,
+            69 => 68,
+            70 => 69,
+            71 => 70,
+            72 => 71,
+            73 => 72,
+        ];
+
+        // Ordenar actividades por ID para procesar secuencialmente
+        $actividades = $actividades->sortBy('id');
+
+        // Procesar actividad 43 (primera actividad, no depende de nadie)
+        $actividad43 = $actividades->firstWhere('id', 43);
+        if ($actividad43) {
+            $fechasPorActividad[43] = [
+                'inicio' => $fechaActual->copy(),
+                'fin' => $fechaActual->copy()->addDays($actividad43->tiempo)
+            ];
+        }
+
+        // Procesar las demás actividades según sus dependencias
+        $idsProcesados = [43];
+        $iteraciones = 0;
+        $maxIteraciones = 100; // Evitar bucle infinito
+
+        while (count($idsProcesados) < $actividades->count() && $iteraciones < $maxIteraciones) {
+            $iteraciones++;
+
+            foreach ($actividades as $actividad) {
+                $id = $actividad->id;
+
+                // Si ya fue procesado, continuar
+                if (in_array($id, $idsProcesados)) {
+                    continue;
+                }
+
+                // Verificar si tiene dependencia definida
+                if (!isset($dependencias[$id])) {
+                    continue;
+                }
+
+                $dependenciaId = $dependencias[$id];
+
+                // Si la dependencia ya fue procesada, calcular fecha
+                if (in_array($dependenciaId, $idsProcesados)) {
+                    $fechaInicio = $fechasPorActividad[$dependenciaId]['inicio']->copy()->addDays($actividad->tiempo);
+                    $fechasPorActividad[$id] = [
+                        'inicio' => $fechaInicio->copy(),
+                        'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                    ];
+                    $idsProcesados[] = $id;
+                }
+            }
+        }
+
+        // Generar el cronograma para insertar
         $cronograma = [];
         $orden = 1;
 
-        // Calcular todas las fechas
-        $fechasCalculadas = [];
-        $totalDias = 0;
-
-        // Sumar todos los días para calcular la fecha inicial
         foreach ($actividades as $actividad) {
-            $totalDias += $actividad->tiempo;
-        }
+            $id = $actividad->id;
 
-        // Fecha inicial (la más antigua) - CORREGIDO: restar el total de días
-        $fechaInicial = $fechaBase->copy()->subDays($totalDias);
-        $fechaActual = $fechaInicial->copy();
+            // Verificar si la actividad tiene fecha calculada
+            if (!isset($fechasPorActividad[$id])) {
+                // Si no tiene fecha, usar la lógica de dependencia
+                $dependenciaId = $dependencias[$id] ?? null;
 
-        // Identificar actividades simultáneas para operador 1
-        $actividadesSimultaneasIds = [2, 3, 4, 5];
-        $fechaSimultaneas = null;
-        $maxTiempoSimultaneas = 0;
-
-        // Primera pasada: calcular fechas normales y detectar simultáneas
-        foreach ($actividades as $actividad) {
-            // Si es operador 1 y está en las actividades simultáneas
-            if ($operador == 1 && in_array($actividad->id, $actividadesSimultaneasIds)) {
-                // Para la primera actividad simultánea, guardar la fecha de inicio
-                if ($fechaSimultaneas === null) {
-                    $fechaSimultaneas = $fechaActual->copy();
+                if ($dependenciaId && isset($fechasPorActividad[$dependenciaId])) {
+                    $fechaInicio = $fechasPorActividad[$dependenciaId]['inicio']->copy()->addDays($actividad->tiempo);
+                    $fechasPorActividad[$id] = [
+                        'inicio' => $fechaInicio->copy(),
+                        'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                    ];
+                } else {
+                    // Fallback: usar la última fecha disponible
+                    $ultimaFecha = end($fechasPorActividad);
+                    $fechaInicio = $ultimaFecha['inicio']->copy()->addDays($actividad->tiempo);
+                    $fechasPorActividad[$id] = [
+                        'inicio' => $fechaInicio->copy(),
+                        'fin' => $fechaInicio->copy()->addDays($actividad->tiempo)
+                    ];
                 }
-                // Encontrar el tiempo máximo entre las actividades simultáneas
-                if ($actividad->tiempo > $maxTiempoSimultaneas) {
-                    $maxTiempoSimultaneas = $actividad->tiempo;
-                }
-
-                // Todas las simultáneas comparten la misma fecha de inicio
-                $fechaFinActividad = $fechaSimultaneas->copy()->addDays($actividad->tiempo);
-                $fechasCalculadas[$actividad->id] = [
-                    'inicio' => $fechaSimultaneas->copy(),
-                    'fin' => $fechaFinActividad->copy()
-                ];
-            } else {
-                // Actividades normales
-                $fechaFinActividad = $fechaActual->copy()->addDays($actividad->tiempo);
-                $fechasCalculadas[$actividad->id] = [
-                    'inicio' => $fechaActual->copy(),
-                    'fin' => $fechaFinActividad->copy()
-                ];
-                $fechaActual = $fechaFinActividad->copy();
             }
-        }
 
-        // Segunda pasada: ajustar fechas después de las simultáneas
-        $fechaActual = $fechaInicial->copy();
-        foreach ($actividades as $actividad) {
-            if ($operador == 1 && in_array($actividad->id, $actividadesSimultaneasIds)) {
-                // Para actividades simultáneas, usar la fecha compartida
-                $fechaActual = $fechaSimultaneas->copy();
-            } else {
-                // Para actividades normales, calcular normalmente
-                $fechaFinActividad = $fechaActual->copy()->addDays($actividad->tiempo);
-                $fechasCalculadas[$actividad->id] = [
-                    'inicio' => $fechaActual->copy(),
-                    'fin' => $fechaFinActividad->copy()
-                ];
-                $fechaActual = $fechaFinActividad->copy();
-            }
-        }
+            // Obtener fecha calculada
+            $fechaActividad = $fechasPorActividad[$id]['inicio'];
 
-        // Ajustar: después de todas las simultáneas, avanzar con el tiempo máximo
-        if ($operador == 1 && $maxTiempoSimultaneas > 0) {
-            $fechaActual = $fechaSimultaneas->copy()->addDays($maxTiempoSimultaneas);
-        }
-
-        // Generar el cronograma
-        foreach ($actividades as $actividad) {
-            $fechas = $fechasCalculadas[$actividad->id];
-
-            // Determinar dependencia
-            $dependencia = $this->determinarDependencia($actividad->id, $actividades, $operador);
+            // Determinar dependencia para el registro
+            $dependenciaId = $dependencias[$id] ?? null;
 
             // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
             $estado = ($orden == 1) ? 1 : 0;
@@ -265,13 +871,13 @@ class DocumentosController extends Controller
                 'codigo_documento' => $codigo_proyecto_documentos,
                 'etapa' => $etapaData,
                 'actividad_id' => $actividad->id,
-                'actividad_depende_id' => $dependencia,
+                'actividad_depende_id' => $dependenciaId,
                 'tipo' => ($actividad->tipo == 1) ? 'principal' : 'simultanea',
                 'orden' => $orden,
-                'fecha_proyeccion' => $fechas['inicio']->format('Y-m-d'),
-                'fecha_actual' => $fechas['inicio']->format('Y-m-d'),
+                'fecha_proyeccion' => $fechaActividad->format('Y-m-d'),
+                'fecha_actual' => $fechaActividad->format('Y-m-d'),
                 'estado' => $estado,
-                'operador' => $operador,
+                'operador' => 2,
                 'created_at' => now(),
             ];
 
@@ -285,39 +891,14 @@ class DocumentosController extends Controller
                 DB::table('documentacion_operadores')->insert($registro);
             }
         } catch (\Exception $e) {
-            throw $e; // Relanzar la excepción para ver el error completo
+            Log::error('Error insertando cronograma CELSIA: ' . $e->getMessage());
+            throw $e;
         }
 
         return $cronograma;
     }
 
-    private function determinarDependencia($actividadId, $actividades, $operador = null)
-    {
-        // Para operador 1, actividades simultáneas (2,3,4,5) dependen de la actividad 1
-        if ($operador == 1 && in_array($actividadId, [2, 3, 4, 5])) {
-            return 1;
-        }
-
-        // Para actividades simultáneas (14-19) que dependen de 13
-        if ($actividadId >= 14 && $actividadId <= 19) {
-            return 13;
-        }
-
-        // Para actividad 20 que depende de 13 (las simultáneas se completan)
-        if ($actividadId == 20) {
-            return 13;
-        }
-
-        // Para las demás, dependen de la actividad anterior
-        if ($actividadId > 1) {
-            return $actividadId - 1;
-        }
-
-        // Primera actividad no tiene dependencia
-        return null;
-    }
-
-    private function CreartTm($data)
+    private function CreartTm($data) //sigue siendo el mismo
     {
         $codigoProyecto   = $data->codigo_proyecto;
         $codigoDocumento  = $data->codigoDocumentos;
@@ -325,9 +906,7 @@ class DocumentosController extends Controller
         $cantidadTm       = (int) $data->cantidad_tm;
         $organismos       = $data->organismoInspeccion;
 
-        /**
-         * Configuración fija por operador
-         */
+
         $configOperadores = [
             1 => [ // RETIE
                 'actividad_id' => 28,
@@ -354,9 +933,7 @@ class DocumentosController extends Controller
             $actividadId  = $configOperadores[$operador]['actividad_id'];
             $hijos        = $configOperadores[$operador]['hijos'];
 
-            /**
-             * Crear registros por cantidad de TM
-             */
+
             for ($tm = 1; $tm <= $cantidadTm; $tm++) {
 
                 foreach ($hijos as $actividadHijoId) {
@@ -375,9 +952,7 @@ class DocumentosController extends Controller
                 }
             }
         }
-        /**
-         * Inserción masiva
-         */
+
         DB::table('torres_documentacion_organismos')->insert($registrosCreados);
 
         return [
@@ -385,9 +960,22 @@ class DocumentosController extends Controller
             'total_registros' => count($registrosCreados),
         ];
     }
-    //CREAR DOCUMENTACION (FIN)
+    //=========== CREAR DOCUMENTACION (FIN) ==========
 
-    public function indexEmcali() //version para finish y llevar colores de estado de actividades
+
+
+
+
+
+
+
+
+
+
+    //============== GET DE DOCUMENTOS ==============
+
+    //version para finish y llevar colores de estado de actividades
+    public function indexEmcali()
     {
         $usuario = Auth::user();
         $rolesPermitidos = ['Directora Proyectos', 'Tramites', 'Administrador'];
@@ -449,17 +1037,20 @@ class DocumentosController extends Controller
             if ($proyecto->documentacion && count($proyecto->documentacion) > 0) {
                 // Procesar cada etapa/documento
                 $proyecto->documentacion = $proyecto->documentacion->map(function ($documento) {
-                    // Verificar si existe al menos una actividad con estado 1 para esta combinación
-                    $tieneActividadesPendientes = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
+                    // Verificar el estado de TODAS las actividades relacionadas
+                    $actividades = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
                         ->where('codigo_documento', $documento->codigo_documento)
                         ->where('etapa', $documento->etapa)
                         ->where('operador', $documento->operador)
-                        ->where('estado', 1) // Estado 1 = pendiente/activo
-                        ->exists();
+                        ->get();
 
-                    // Si tiene actividades pendientes (estado 1) entonces finish = false
-                    // Si no tiene actividades pendientes entonces finish = true
-                    $documento->finish = !$tieneActividadesPendientes;
+                    // Verificar si TODAS las actividades están en estado 2
+                    $todasEstado2 = $actividades->every(function ($actividad) {
+                        return $actividad->estado == 2;
+                    });
+
+                    // Si TODAS son estado 2, finish = true, de lo contrario false
+                    $documento->finish = $todasEstado2;
 
                     return $documento;
                 });
@@ -474,7 +1065,8 @@ class DocumentosController extends Controller
         ]);
     }
 
-    public function indexCelsia() //version para finish y llevar colores de estado de actividades
+    //version para finish y llevar colores de estado de actividades
+    public function indexCelsia()
     {
         $usuario = Auth::user();
         $rolesPermitidos = ['Directora Proyectos', 'Ingeniero Obra', 'Tramites', 'Administrador'];
@@ -537,17 +1129,20 @@ class DocumentosController extends Controller
             if ($proyecto->documentacion && count($proyecto->documentacion) > 0) {
                 // Procesar cada etapa/documento
                 $proyecto->documentacion = $proyecto->documentacion->map(function ($documento) {
-                    // Verificar si existe al menos una actividad con estado 1 para esta combinación
-                    $tieneActividadesPendientes = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
+                    // Verificar el estado de TODAS las actividades relacionadas
+                    $actividades = Documentos::where('codigo_proyecto', $documento->codigo_proyecto)
                         ->where('codigo_documento', $documento->codigo_documento)
                         ->where('etapa', $documento->etapa)
                         ->where('operador', $documento->operador)
-                        ->where('estado', 1) // Estado 1 = pendiente/activo
-                        ->exists();
+                        ->get();
 
-                    // Si tiene actividades pendientes (estado 1) entonces finish = false
-                    // Si no tiene actividades pendientes entonces finish = true
-                    $documento->finish = !$tieneActividadesPendientes;
+                    // Verificar si TODAS las actividades están en estado 2
+                    $todasEstado2 = $actividades->every(function ($actividad) {
+                        return $actividad->estado == 2;
+                    });
+
+                    // Si TODAS son estado 2, finish = true, de lo contrario false
+                    $documento->finish = $todasEstado2;
 
                     return $documento;
                 });
@@ -627,7 +1222,6 @@ class DocumentosController extends Controller
     }
 
     //se envia codigo de proyecto pero se cambia por codigo del documento
-    //para traer datos unicos
     public function detalleDocumentos($codigo_documento)
     {
 
@@ -763,9 +1357,19 @@ class DocumentosController extends Controller
             ], 500);
         }
     }
+    //==================== GET DE DOCUMENTOS (FIN) =====================
 
 
-    /* //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
+
+
+
+
+
+
+
+
+
+    //=========== LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO =========
     public function confirmarDocumento(Request $request)
     {
         try {
@@ -777,39 +1381,54 @@ class DocumentosController extends Controller
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
                 'observacion' => 'string',
+                'fecha_confirmacion' => 'required|date_format:Y-m-d',
                 'archivos' => 'array',
-                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
-                
+                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576',
             ]);
 
             // 1. Guardar archivos si existen
             $archivosGuardados = $this->guardarArchivos($request);
 
-            // 2. Obtener la actividad actual y calcular diferencia de días
+            // 2. Obtener la actividad actual
             $actividadActual = Documentos::find($request->id);
-            $diasDiferencia = $this->calcularDiferenciaDias($actividadActual);
 
-            // 3. Actualizar actividad a estado 2 (Completado)
+            // 3. Calcular diferencia de días y generar texto descriptivo
+            $fechaProyeccion = Carbon::parse($actividadActual->fecha_proyeccion)->startOfDay();
+            $fechaConfirmacion = Carbon::parse($request->fecha_confirmacion)->startOfDay();
+
+            // Calcular diferencia absoluta en días
+            $diasDiferencia = abs($fechaConfirmacion->diffInDays($fechaProyeccion));
+
+            // Generar texto descriptivo según el caso
+            if ($fechaConfirmacion->lt($fechaProyeccion)) {
+                // Confirmación ANTES de lo planificado
+                $textoDiferencia = $diasDiferencia . " días antes";
+            } elseif ($fechaConfirmacion->gt($fechaProyeccion)) {
+                // Confirmación DESPUÉS de lo planificado (retraso)
+                $textoDiferencia = $diasDiferencia . " días de retraso";
+            } else {
+                // Mismo día
+                $textoDiferencia = "Justo a tiempo";
+            }
+
+            // 4. Actualizar SOLO estado y fecha_confirmacion (NO TOCAR fecha_actual)
             $actividadActual->update([
-                'estado' => 2,
+                'estado' => 2, // Completado
                 'observacion' => $request->observacion != "." ? $request->observacion : "Sin observación",
-                'fecha_confirmacion' => now(),
-                'fecha_actual' => now(),
+                'fecha_confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                'diferenciaDias' => $textoDiferencia, // Guardar texto descriptivo
                 'usuario_id' => Auth::id(),
             ]);
 
-            // 4. Actualizar fechas de actividades siguientes si hay diferencia
-            if ($diasDiferencia != 0) {
-                $this->actualizarFechasSiguientes(
-                    $request->codigo_proyecto,
-                    $request->codigo_documento,
-                    $request->etapa,
-                    $actividadActual->orden,
-                    $diasDiferencia
-                );
-            }
+            // Log para verificar
+            Log::info('Diferencia calculada:', [
+                'proyeccion' => $fechaProyeccion->format('Y-m-d'),
+                'confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                'dias' => $diasDiferencia,
+                'texto' => $textoDiferencia
+            ]);
 
-            // 5. Aplicar lógica de habilitación según etapa
+            // 5. Aplicar lógica de habilitación según etapa (SOLO CAMBIA ESTADOS)
             if ($request->etapa == 1) {
                 $this->aplicarLogicaEtapa1(
                     $request->codigo_proyecto,
@@ -826,13 +1445,19 @@ class DocumentosController extends Controller
                 );
             }
 
-            // 6. Respuesta completa
+            // 6. Respuesta con el texto descriptivo
             return response()->json([
                 'status' => 'success',
-                'message' => $this->generarMensajeExito($diasDiferencia),
+                'message' => 'Actividad confirmada exitosamente',
                 'data' => [
-                    'actual' => $actividadActual,
-                    'dias_diferencia' => $diasDiferencia,
+                    'actual' => [
+                        'id' => $actividadActual->id,
+                        'actividad_id' => $actividadActual->actividad_id,
+                        'estado' => 2,
+                        'fecha_proyeccion' => $actividadActual->fecha_proyeccion,
+                        'fecha_confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                        'diferenciaDias' => $textoDiferencia, // Texto descriptivo
+                    ],
                     'archivos' => $archivosGuardados,
                 ]
             ]);
@@ -844,100 +1469,175 @@ class DocumentosController extends Controller
         }
     }
 
-    // ==================== LÓGICA ETAPA 1 ====================
+    // LOGICA ETAPA 1 - SOLO CAMBIA ESTADOS, NO FECHAS
     private function aplicarLogicaEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id)
     {
         // Reglas de habilitación para etapa 1
         $reglas = [
+            // Actividad 1 completada -> habilita 2,3,4,5
             1 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5]);
             },
-            3 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6]);
-            },
-            6 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7]);
-            },
+
+            // Actividad 2 completada -> verifica para actividad 8 (con 7)
             2 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7]);
             },
+
+            // Actividad 3 completada -> habilita 6
+            3 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6]);
+            },
+
+            // Actividad 4 completada -> verifica para actividad 14 (con 12)
+            4 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 14, [4, 12]);
+            },
+
+            // Actividad 6 completada -> habilita 7
+            6 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7]);
+            },
+
+            // Actividad 7 completada -> verifica para actividad 8 (con 2)
             7 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7]);
             },
+
+            // Actividad 8 completada -> habilita 9
             8 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9]);
             },
+
+            // Actividad 9 completada -> habilita 10
             9 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [10]);
             },
+
+            // Actividad 10 completada -> habilita 11 y 18
             10 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [11, 18]);
             },
+
+            // Actividad 11 completada -> habilita 12
             11 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [12]);
             },
+
+            // Actividad 12 completada -> habilita 13 y verifica para 14 (con 4)
             12 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [13]);
+                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 14, [4, 12]);
             },
+
+            // Actividad 13 completada -> (no activa nada directamente según especificación)
             13 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                // No activa nada directamente, pero puede ser necesaria para otras validaciones
             },
+
+            // Actividad 14 completada -> habilita 15
             14 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [15]);
             },
+
+            // Actividad 15 completada -> habilita 16
             15 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [16]);
             },
+
+            // Actividad 16 completada -> habilita 17
             16 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [17]);
             },
+
+            // Actividad 17 completada -> habilita 21
             17 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [21]);
             },
+
+            // Actividad 18 completada -> habilita 19
             18 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [19]);
             },
+
+            // Actividad 19 completada -> habilita 20
             19 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [20]);
             },
+
+            // Actividad 20 completada -> (no activa nada según especificación)
             20 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20));
+                // No activa nada directamente
             },
+
+            // Actividad 21 completada -> habilita 22
             21 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [22, 23, 24, 25]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [22]);
             },
+
+            // Actividad 22 completada -> habilita 23
             22 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [23]);
             },
+
+            // Actividad 23 completada -> habilita 24
             23 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [24]);
             },
+
+            // Actividad 24 completada -> habilita 25
             24 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [25]);
             },
+
+            // Actividad 25 completada -> habilita 26
             25 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25]);
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [26]);
             },
+
+            // Actividad 26 completada -> (no activa nada según especificación)
             26 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [27]);
+                // No activa nada directamente
             },
+
+            // Actividad 27 completada -> habilita 28
             27 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [28]);
             },
+
+            // Actividad 28 completada -> habilita 29
             28 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [29]);
             },
+
+            // Actividad 29 completada -> habilita 30
             29 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [30]);
             },
+
+            // Actividad 30 completada -> habilita 31
             30 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [31]);
             },
+
+            // Actividad 31 completada -> habilita 32
             31 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [32]);
             },
+
+            // Actividad 32 completada -> habilita 33
             32 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
                 $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [33]);
+            },
+
+            // Actividad 33 completada -> habilita 34
+            33 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [34]);
+            },
+
+            // Actividad 34 completada -> (última actividad, no activa nada)
+            34 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                // Actividad final, no activa nada más
             },
         ];
 
@@ -947,25 +1647,72 @@ class DocumentosController extends Controller
         }
     }
 
-    // ==================== LÓGICA ETAPAS DIFERENTES A 1 ====================
+    // LOGICA ETAPA 2 (CASCADA SIMPLE)
     private function aplicarLogicaCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadActual)
     {
-        // Para etapas diferentes a 1, habilitar la siguiente actividad por orden
-        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', $actividadActual->orden + 1)
-            ->first();
+        // Reglas de habilitación para etapa 2 (cascada simple)
+        $reglasCascada = [
+            // 35 no depende de nadie (ya debería estar habilitada al crear)
+            35 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [36]);
+            },
 
-        if ($siguienteActividad && $siguienteActividad->estado == 0) {
-            $siguienteActividad->update([
-                'estado' => 1,
-                'fecha_actual' => now(),
-            ]);
+            // 36 depende de 35
+            36 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [37]);
+            },
+
+            // 37 depende de 36
+            37 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [38]);
+            },
+
+            // 38 depende de 37
+            38 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [39]);
+            },
+
+            // 39 depende de 38
+            39 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [40]);
+            },
+
+            // 40 depende de 39
+            40 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [41]);
+            },
+
+            // 41 depende de 40
+            41 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [42]);
+            },
+
+            // 42 depende de 41 (última actividad)
+            42 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                // Actividad final, no activa nada más
+            },
+        ];
+
+        // Verificar si es etapa 2 y si existe regla para la actividad actual
+        if ($etapa == 2 && isset($reglasCascada[$actividadActual->actividad_id])) {
+            $reglasCascada[$actividadActual->actividad_id]();
+        } else {
+            // Para otras etapas o actividades sin regla específica, usar lógica por orden
+            $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+                ->where('codigo_documento', $codigo_documento)
+                ->where('etapa', $etapa)
+                ->where('orden', $actividadActual->orden + 1)
+                ->first();
+
+            if ($siguienteActividad && $siguienteActividad->estado == 0) {
+                $siguienteActividad->update([
+                    'estado' => 1, // Habilitada
+                ]);
+            }
         }
     }
 
-    // ==================== MÉTODOS AUXILIARES ====================
+    // HABILITAR ACTIVIDADES - SOLO CAMBIA ESTADO (sin modificar)
     private function habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
     {
         foreach ($actividades_ids as $actividad_id) {
@@ -975,15 +1722,16 @@ class DocumentosController extends Controller
                 ->where('actividad_id', $actividad_id)
                 ->where('estado', 0)
                 ->update([
-                    'estado' => 1,
-                    'fecha_actual' => now(),
+                    'estado' => 1, // Habilitada
+                    // NO SE ACTUALIZA NINGUNA FECHA
                 ]);
         }
     }
 
+    // VERIFICAR ACTIVACIÓN MÚLTIPLE - SOLO VERIFICA ESTADOS (sin modificar)
     private function verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, $actividad_a_activar, $actividades_requeridas)
     {
-        // Contar cuántas actividades requeridas están completadas
+        // Contar cuántas actividades requeridas están completadas (estado 2)
         $completadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
             ->where('codigo_documento', $codigo_documento)
             ->where('etapa', $etapa)
@@ -997,6 +1745,7 @@ class DocumentosController extends Controller
         }
     }
 
+    // GUARDAR ARCHIVOS - IGUAL
     private function guardarArchivos(Request $request)
     {
         if (!$request->hasFile('archivos')) {
@@ -1006,7 +1755,6 @@ class DocumentosController extends Controller
         $archivosGuardados = [];
 
         foreach ($request->file('archivos') as $archivo) {
-            // Generar nombre único para cada archivo
             $nombreArchivo = $request->codigo_proyecto . '-' .
                 $request->codigo_documento . '-' .
                 $request->etapa . '-' .
@@ -1015,13 +1763,9 @@ class DocumentosController extends Controller
                 Str::random(10) . '.' .
                 $archivo->getClientOriginalExtension();
 
-            // Guardar archivo en storage
             $archivo->storeAs('public/documentacion/red', $nombreArchivo);
-
-            // Obtener ruta pública
             $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
 
-            // Guardar en tabla documentos_adjuntos
             DocumentosAdjuntos::create([
                 'documento_id' => $request->id,
                 'ruta_archivo' => $rutaPublica,
@@ -1030,394 +1774,27 @@ class DocumentosController extends Controller
                 'tamano' => $archivo->getSize(),
             ]);
 
-            // Agregar a array de respuesta
             $archivosGuardados[] = [
                 'nombre' => $archivo->getClientOriginalName(),
                 'ruta' => $rutaPublica,
-                'mime' => $archivo->getMimeType(),
             ];
         }
 
         return $archivosGuardados;
     }
-
-    private function calcularDiferenciaDias($actividad)
-    {
-        $fechaProyeccion = Carbon::parse($actividad->fecha_proyeccion);
-        $fechaHoy = Carbon::now();
-        return $fechaProyeccion->diffInDays($fechaHoy, false);
-    }
-
-    private function generarMensajeExito($diasDiferencia)
-    {
-        $mensaje = 'Actividad confirmada exitosamente';
-
-        if ($diasDiferencia > 0) {
-            $mensaje .= " con {$diasDiferencia} días de retraso aplicados";
-        } elseif ($diasDiferencia < 0) {
-            $mensaje .= " con " . abs($diasDiferencia) . " días de adelanto aplicados";
-        }
-
-        return $mensaje;
-    }
-
-    private function actualizarFechasSiguientes($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia)
-    {
-        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', '>', $ordenActual)
-            ->where('estado', '!=', 2)
-            ->orderBy('orden')
-            ->get();
-
-        foreach ($actividadesSiguientes as $actividad) {
-            $nuevaFechaActual = Carbon::parse($actividad->fecha_actual);
-
-            if ($diasDiferencia > 0) {
-                $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
-            } else {
-                $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
-            }
-
-            $actividad->update([
-                'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
-            ]);
-        }
-    } */
+    //================== LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI FIN =================
 
 
-    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI INICIO
-    public function confirmarDocumento(Request $request)
-    {
-        try {
-            // Validación de campos y múltiples archivos
-            $request->validate([
-                'id' => 'required|exists:documentacion_operadores,id',
-                'codigo_proyecto' => 'required|string',
-                'codigo_documento' => 'required|string',
-                'etapa' => 'required|integer',
-                'actividad_id' => 'required|integer',
-                'observacion' => 'string',
-                'fecha_confirmacion' => 'required|date_format:Y-m-d', // Validar formato específico
-                'archivos' => 'array',
-                'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
-            ]);
-
-            // Convertir fecha a Carbon para consistencia
-            $fechaConfirmacion = Carbon::parse($request->fecha_confirmacion)->format('Y-m-d');
-
-            // 1. Guardar archivos si existen
-            $archivosGuardados = $this->guardarArchivos($request);
-
-            // 2. Obtener la actividad actual y calcular diferencia de días
-            $actividadActual = Documentos::find($request->id);
-            $diasDiferencia = $this->calcularDiferenciaDias($actividadActual, $fechaConfirmacion);
-
-            // 3. Actualizar actividad a estado 2 (Completado)
-            $actividadActual->update([
-                'estado' => 2,
-                'observacion' => $request->observacion != "." ? $request->observacion : "Sin observación",
-                'fecha_confirmacion' => $fechaConfirmacion,
-                'fecha_actual' => $fechaConfirmacion, // Usar la misma fecha de confirmación
-                'usuario_id' => Auth::id(),
-            ]);
-
-            // 4. Actualizar fechas de actividades siguientes si hay diferencia
-            if ($diasDiferencia != 0) {
-                $this->actualizarFechasSiguientes(
-                    $request->codigo_proyecto,
-                    $request->codigo_documento,
-                    $request->etapa,
-                    $actividadActual->orden,
-                    $diasDiferencia,
-                    $fechaConfirmacion
-                );
-            }
-
-            // 5. Aplicar lógica de habilitación según etapa
-            if ($request->etapa == 1) {
-                $this->aplicarLogicaEtapa1(
-                    $request->codigo_proyecto,
-                    $request->codigo_documento,
-                    $request->etapa,
-                    $request->actividad_id,
-                    $fechaConfirmacion
-                );
-            } else {
-                $this->aplicarLogicaCascada(
-                    $request->codigo_proyecto,
-                    $request->codigo_documento,
-                    $request->etapa,
-                    $actividadActual,
-                    $fechaConfirmacion
-                );
-            }
-
-            // 6. Respuesta completa
-            return response()->json([
-                'status' => 'success',
-                'message' => $this->generarMensajeExito($diasDiferencia),
-                'data' => [
-                    'actual' => $actividadActual,
-                    'dias_diferencia' => $diasDiferencia,
-                    'archivos' => $archivosGuardados,
-                    'fecha_utilizada' => $fechaConfirmacion,
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    // ==================== LÓGICA ETAPA 1 ====================
-    private function aplicarLogicaEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id, $fechaConfirmacion)
-    {
-        // Reglas de habilitación para etapa 1
-        $reglas = [
-            1 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [2, 3, 4, 5], $fechaConfirmacion);
-            },
-            3 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [6], $fechaConfirmacion);
-            },
-            6 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [7], $fechaConfirmacion);
-            },
-            2 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7], $fechaConfirmacion);
-            },
-            7 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 8, [2, 7], $fechaConfirmacion);
-            },
-            8 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [9], $fechaConfirmacion);
-            },
-            9 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [10], $fechaConfirmacion);
-            },
-            10 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [11, 12, 13, 14, 15, 16, 17, 18, 19, 20], $fechaConfirmacion);
-            },
-            11 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            12 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            13 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            14 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            15 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            16 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            17 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            18 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            19 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            20 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 21, range(11, 20), $fechaConfirmacion);
-            },
-            21 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [22, 23, 24, 25], $fechaConfirmacion);
-            },
-            22 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
-            },
-            23 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
-            },
-            24 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
-            },
-            25 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, 26, [22, 23, 24, 25], $fechaConfirmacion);
-            },
-            26 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [27], $fechaConfirmacion);
-            },
-            27 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [28], $fechaConfirmacion);
-            },
-            28 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [29], $fechaConfirmacion);
-            },
-            29 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [30], $fechaConfirmacion);
-            },
-            30 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [31], $fechaConfirmacion);
-            },
-            31 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [32], $fechaConfirmacion);
-            },
-            32 => function () use ($codigo_proyecto, $codigo_documento, $etapa, $fechaConfirmacion) {
-                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [33], $fechaConfirmacion);
-            },
-        ];
-
-        // Ejecutar regla si existe
-        if (isset($reglas[$actividad_id])) {
-            $reglas[$actividad_id]();
-        }
-    }
-
-    // ==================== LÓGICA ETAPAS DIFERENTES A 1 ====================
-    private function aplicarLogicaCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadActual, $fechaConfirmacion)
-    {
-        // Para etapas diferentes a 1, habilitar la siguiente actividad por orden
-        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', $actividadActual->orden + 1)
-            ->first();
-
-        if ($siguienteActividad && $siguienteActividad->estado == 0) {
-            $siguienteActividad->update([
-                'estado' => 1,
-                'fecha_actual' => $fechaConfirmacion,
-            ]);
-        }
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private function habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids, $fechaConfirmacion)
-    {
-        foreach ($actividades_ids as $actividad_id) {
-            Documentos::where('codigo_proyecto', $codigo_proyecto)
-                ->where('codigo_documento', $codigo_documento)
-                ->where('etapa', $etapa)
-                ->where('actividad_id', $actividad_id)
-                ->where('estado', 0)
-                ->update([
-                    'estado' => 1,
-                    'fecha_actual' => $fechaConfirmacion,
-                ]);
-        }
-    }
-
-    private function verificarActivacionMultiple($codigo_proyecto, $codigo_documento, $etapa, $actividad_a_activar, $actividades_requeridas, $fechaConfirmacion)
-    {
-        // Contar cuántas actividades requeridas están completadas
-        $completadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->whereIn('actividad_id', $actividades_requeridas)
-            ->where('estado', 2)
-            ->count();
-
-        // Si todas las requeridas están completadas, activar la siguiente
-        if ($completadas == count($actividades_requeridas)) {
-            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [$actividad_a_activar], $fechaConfirmacion);
-        }
-    }
-
-    private function guardarArchivos(Request $request)
-    {
-        if (!$request->hasFile('archivos')) {
-            return [];
-        }
-
-        $archivosGuardados = [];
-
-        foreach ($request->file('archivos') as $archivo) {
-            // Generar nombre único para cada archivo
-            $nombreArchivo = $request->codigo_proyecto . '-' .
-                $request->codigo_documento . '-' .
-                $request->etapa . '-' .
-                $request->actividad_id . '-' .
-                time() . '-' .
-                Str::random(10) . '.' .
-                $archivo->getClientOriginalExtension();
-
-            // Guardar archivo en storage
-            $archivo->storeAs('public/documentacion/red', $nombreArchivo);
-
-            // Obtener ruta pública
-            $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
-
-            // Guardar en tabla documentos_adjuntos
-            DocumentosAdjuntos::create([
-                'documento_id' => $request->id,
-                'ruta_archivo' => $rutaPublica,
-                'nombre_original' => $archivo->getClientOriginalName(),
-                'extension' => $archivo->getClientOriginalExtension(),
-                'tamano' => $archivo->getSize(),
-            ]);
-
-            // Agregar a array de respuesta
-            $archivosGuardados[] = [
-                'nombre' => $archivo->getClientOriginalName(),
-                'ruta' => $rutaPublica,
-                'mime' => $archivo->getMimeType(),
-            ];
-        }
-
-        return $archivosGuardados;
-    }
-
-    private function calcularDiferenciaDias($actividad, $fechaConfirmacion)
-    {
-        $fechaProyeccion = Carbon::parse($actividad->fecha_proyeccion);
-        $fechaConfirmacionCarbon = Carbon::parse($fechaConfirmacion);
-        return $fechaProyeccion->diffInDays($fechaConfirmacionCarbon, false);
-    }
-
-    private function generarMensajeExito($diasDiferencia)
-    {
-        $mensaje = 'Actividad confirmada exitosamente';
-
-        if ($diasDiferencia > 0) {
-            $mensaje .= " con {$diasDiferencia} días de retraso aplicados";
-        } elseif ($diasDiferencia < 0) {
-            $mensaje .= " con " . abs($diasDiferencia) . " días de adelanto aplicados";
-        }
-
-        return $mensaje;
-    }
-
-    private function actualizarFechasSiguientes($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia, $fechaBase)
-    {
-        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', '>', $ordenActual)
-            ->where('estado', '!=', 2)
-            ->orderBy('orden')
-            ->get();
-
-        foreach ($actividadesSiguientes as $actividad) {
-            $nuevaFechaActual = Carbon::parse($fechaBase);
-
-            if ($diasDiferencia > 0) {
-                $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
-            } else {
-                $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
-            }
-
-            $actividad->update([
-                'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
-            ]);
-        }
-    }
-    //LOGICA DE FLUJO PARA CONFIRMAR ACTIVIDADES EMCALI FIN
 
 
-    //LOGICA DE DOCUMENTOS DE ORGANISMOS
+
+
+
+
+
+
+
+    //================== LOGICA DE DOCUMENTOS DE ORGANISMOS ====================
     private function documentosOrganismos($data)
     {
         $etapa = $data->etapaProyecto;
@@ -1876,9 +2253,19 @@ class DocumentosController extends Controller
             ], 500);
         }
     }
+    //================== LOGICA DE DOCUMENTOS DE ORGANISMOS FIN ====================
 
-    /* LOGICA CONFIRMAR DOCUMENTOS CELSIA */
 
+
+
+
+
+
+
+
+
+
+    // ==================== CONFRIMAR DOCUMENTOS CELSIA INICIO ====================
     public function confirmarDocumentoCelsia(Request $request)
     {
         try {
@@ -1890,103 +2277,79 @@ class DocumentosController extends Controller
                 'etapa' => 'required|integer',
                 'actividad_id' => 'required|integer',
                 'observacion' => 'string',
-
-                // Array de archivos
+                'fecha_confirmacion' => 'required|date_format:Y-m-d', // Agregar validación de fecha
                 'archivos' => 'array',
                 'archivos.*' => 'file|mimes:jpg,jpeg,png,pdf|max:1048576', // 1GB
             ]);
 
-            $archivosGuardados = [];
+            // 1. Guardar archivos si existen
+            $archivosGuardados = $this->guardarArchivos($request);
 
-            // Guardar archivos si existen
-            if ($request->hasFile('archivos')) {
-                foreach ($request->file('archivos') as $archivo) {
+            // 2. Obtener la actividad actual
+            $actividadActual = Documentos::find($request->id);
 
-                    // Generar nombre único para cada archivo
-                    $nombreArchivo = $request->codigo_proyecto . '-' .
-                        $request->codigo_documento . '-' .
-                        $request->etapa . '-' .
-                        $request->actividad_id . '-' .
-                        time() . '-' .
-                        uniqid() . '.' .
-                        $archivo->getClientOriginalExtension();
+            // 3. Calcular diferencia de días y generar texto descriptivo
+            $fechaProyeccion = Carbon::parse($actividadActual->fecha_proyeccion)->startOfDay();
+            $fechaConfirmacion = Carbon::parse($request->fecha_confirmacion)->startOfDay();
 
-                    // Guardar archivo en storage
-                    $archivo->storeAs('public/documentacion/red', $nombreArchivo);
+            // Calcular diferencia absoluta en días
+            $diasDiferencia = abs($fechaConfirmacion->diffInDays($fechaProyeccion));
 
-                    // Obtener ruta pública
-                    $rutaPublica = Storage::url('documentacion/red/' . $nombreArchivo);
-
-                    // Guardar en tabla documentos_adjuntos
-                    DocumentosAdjuntos::create([
-                        'documento_id' => $request->id,
-                        'ruta_archivo' => $rutaPublica,
-                        'nombre_original' => $archivo->getClientOriginalName(),
-                        'extension' => $archivo->getClientOriginalExtension(),
-                        'tamano' => $archivo->getSize(),
-                    ]);
-
-                    // Agregar a array de respuesta
-                    $archivosGuardados[] = [
-                        'nombre' => $archivo->getClientOriginalName(),
-                        'ruta' => $rutaPublica,
-                        'mime' => $archivo->getMimeType(),
-                    ];
-                }
+            // Generar texto descriptivo según el caso
+            if ($fechaConfirmacion->lt($fechaProyeccion)) {
+                // Confirmación ANTES de lo planificado
+                $textoDiferencia = $diasDiferencia . " días antes";
+            } elseif ($fechaConfirmacion->gt($fechaProyeccion)) {
+                // Confirmación DESPUÉS de lo planificado (retraso)
+                $textoDiferencia = $diasDiferencia . " días de retraso";
+            } else {
+                // Mismo día
+                $textoDiferencia = "Justo a tiempo";
             }
 
-            // 1. Obtener la actividad actual y calcular diferencia de días
-            $actividadActual = Documentos::find($request->id);
-            $fechaProyeccion = \Carbon\Carbon::parse($actividadActual->fecha_proyeccion);
-            $fechaHoy = now();
-            $diasDiferencia = $fechaProyeccion->diffInDays($fechaHoy, false);
-
-            // 2. Actualizar actividad a estado 2 (Completado)
+            // 4. Actualizar SOLO estado y fecha_confirmacion (NO TOCAR fecha_actual)
             $actividadActual->update([
-                'estado' => 2,
+                'estado' => 2, // Completado
                 'observacion' => $request->observacion != "." ? $request->observacion : "Sin observación",
-                'fecha_confirmacion' => now(),
-                'fecha_actual' => now(),
+                'fecha_confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                'diferenciaDias' => $textoDiferencia, // Guardar texto descriptivo
                 'usuario_id' => Auth::id(),
             ]);
 
-            // 3. Actualizar fechas de actividades siguientes
-            if ($diasDiferencia != 0) {
-                $this->actualizarFechasSiguientesCelsia(
-                    $request->codigo_proyecto,
-                    $request->codigo_documento,
-                    $request->etapa,
-                    $actividadActual->orden,
-                    $diasDiferencia
-                );
-            }
+            // Log para verificar
+            Log::info('Diferencia calculada CELSIA:', [
+                'proyeccion' => $fechaProyeccion->format('Y-m-d'),
+                'confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                'dias' => $diasDiferencia,
+                'texto' => $textoDiferencia
+            ]);
 
-            // 4. Aplicar lógica de escalera basada en el orden
-            $this->aplicarLogicaEscaleraCelsia(
+            // 5. Aplicar lógica de habilitación para CELSIA (SOLO CAMBIA ESTADOS)
+            $this->aplicarLogicaCelsia(
                 $request->codigo_proyecto,
                 $request->codigo_documento,
                 $request->etapa,
-                $actividadActual->orden,
-                $actividadActual->actividad_id
+                $request->actividad_id
             );
 
-            // 5. Respuesta completa incluyendo archivos subidos
+            // 6. Respuesta con el texto descriptivo
             return response()->json([
                 'status' => 'success',
-                'message' => 'Actividad confirmada exitosamente' .
-                    ($diasDiferencia != 0 ?
-                        ($diasDiferencia > 0 ?
-                            " con {$diasDiferencia} días de retraso aplicados" :
-                            " con " . abs($diasDiferencia) . " días de adelanto aplicados")
-                        : ""
-                    ),
+                'message' => 'Actividad confirmada exitosamente',
                 'data' => [
-                    'actual' => $actividadActual,
-                    'dias_diferencia' => $diasDiferencia,
+                    'actual' => [
+                        'id' => $actividadActual->id,
+                        'actividad_id' => $actividadActual->actividad_id,
+                        'estado' => 2,
+                        'fecha_proyeccion' => $actividadActual->fecha_proyeccion,
+                        'fecha_confirmacion' => $fechaConfirmacion->format('Y-m-d'),
+                        'diferenciaDias' => $textoDiferencia,
+                    ],
                     'archivos' => $archivosGuardados,
                 ]
             ]);
         } catch (\Exception $e) {
+            Log::error('Error confirmando actividad CELSIA: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
@@ -1994,129 +2357,401 @@ class DocumentosController extends Controller
         }
     }
 
-    // Función principal para aplicar lógica de escalera
-    private function aplicarLogicaEscaleraCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $actividad_id)
+    // LOGICA CELSIA - NUEVAS DEPENDENCIAS
+    private function aplicarLogicaCelsia($codigo_proyecto, $codigo_documento, $etapa, $actividad_id)
     {
-        // Caso 1: Ordenes del 1 al 9 (escalera simple)
-        if ($ordenActual >= 1 && $ordenActual <= 9) {
-            // Habilitar solo la siguiente actividad en orden
-            $siguienteOrden = $ordenActual + 1;
+        // Reglas de habilitación para CELSIA según nuevas dependencias
+        $reglas = [
+            // 43 activa 44
+            43 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [44]);
+            },
 
-            // Para orden 10 hay lógica especial
-            if ($ordenActual == 10) {
-                $siguienteOrden = 11;
-            }
+            // 44 activa 45
+            44 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [45]);
+            },
 
-            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
+            // 45 activa 46
+            45 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [46]);
+            },
+
+            // 46 activa 47 y 50
+            46 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [47, 50]);
+            },
+
+            // 47 activa 48
+            47 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [48]);
+            },
+
+            // 48 activa 49
+            48 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [49]);
+            },
+
+            // 50 activa 51
+            50 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [51]);
+            },
+
+            // 51 activa 52
+            51 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [52]);
+            },
+
+            // 52 activa 53 y todas las del 55 al 66
+            52 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [53]);
+                $this->habilitarActividadesRango($codigo_proyecto, $codigo_documento, $etapa, 55, 66);
+            },
+
+            // 53 activa 54
+            53 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [54]);
+            },
+
+            // 66 activa 67
+            66 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [67]);
+            },
+
+            // 67 activa 68
+            67 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [68]);
+            },
+
+            // 68 activa 69
+            68 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [69]);
+            },
+
+            // 69 activa 70
+            69 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [70]);
+            },
+
+            // 70 y bloque 55-65 activan 71 (verificación múltiple)
+            70 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->verificarActivacion71($codigo_proyecto, $codigo_documento, $etapa);
+            },
+
+            // 71 activa 72
+            71 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [72]);
+            },
+
+            // 72 activa 73
+            72 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [73]);
+            },
+
+            // 73 es última actividad, no activa nada
+            73 => function () use ($codigo_proyecto, $codigo_documento, $etapa) {
+                // Actividad final
+            },
+        ];
+
+        // Ejecutar regla si existe
+        if (isset($reglas[$actividad_id])) {
+            $reglas[$actividad_id]();
         }
 
-        // Caso 2: Confirmación de orden 10 - habilitar todas las actividades del 11 al 23
-        elseif ($ordenActual == 10) {
-            $this->habilitarActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, 11, 23);
-        }
-
-        // Caso 3: Actividades del 11 al 23 - verificar si todas están completas para habilitar orden 24
-        elseif ($ordenActual >= 11 && $ordenActual <= 23) {
-            $this->verificarCompletitudGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa);
-        }
-
-        // Caso 4: Orden 24 en adelante - escalera normal
-        elseif ($ordenActual >= 24) {
-            $siguienteOrden = $ordenActual + 1;
-            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
+        // Verificar actividades que dependen de múltiples fuentes (55-65)
+        if (in_array($actividad_id, range(55, 65))) {
+            $this->verificarActivacion71($codigo_proyecto, $codigo_documento, $etapa);
         }
     }
 
-    // Función para habilitar solo la siguiente actividad por orden
-    private function habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden)
+    // Función para habilitar un rango de actividades
+    private function habilitarActividadesRango($codigo_proyecto, $codigo_documento, $etapa, $inicio, $fin)
     {
-        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', $siguienteOrden)
-            ->first();
-
-        if ($siguienteActividad && $siguienteActividad->estado == 0) {
-            $siguienteActividad->update([
-                'estado' => 1,
-                'fecha_actual' => now(),
-            ]);
-        }
+        $actividadesIds = range($inicio, $fin);
+        $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, $actividadesIds);
     }
 
-    // Función para habilitar un rango completo de actividades
-    private function habilitarActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenInicio, $ordenFin)
+    // Función específica para verificar activación de actividad 71
+    private function verificarActivacion71($codigo_proyecto, $codigo_documento, $etapa)
     {
-        $actividades = Documentos::where('codigo_proyecto', $codigo_proyecto)
+        // Verificar si 70 está completada
+        $actividad70Completa = Documentos::where('codigo_proyecto', $codigo_proyecto)
             ->where('codigo_documento', $codigo_documento)
             ->where('etapa', $etapa)
-            ->whereBetween('orden', [$ordenInicio, $ordenFin])
-            ->where('estado', 0)
+            ->where('actividad_id', 70)
+            ->where('estado', 2)
+            ->exists();
+
+        if (!$actividad70Completa) {
+            return;
+        }
+
+        // Verificar si todas las actividades del 55 al 65 están completadas
+        $actividadesBloque = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereBetween('actividad_id', [55, 65])
             ->get();
 
-        foreach ($actividades as $actividad) {
-            $actividad->update([
-                'estado' => 1,
-                'fecha_actual' => now(),
-            ]);
-        }
-    }
-
-    // Función para verificar si todas las actividades del 11 al 23 están completas
-    private function verificarCompletitudGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa)
-    {
-        $actividadesGrupo = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->whereBetween('orden', [11, 23])
-            ->get();
-
-        // Verificar si TODAS las actividades están en estado 2 (Completado)
-        $todasCompletas = $actividadesGrupo->every(function ($actividad) {
+        $todasCompletas = $actividadesBloque->every(function ($actividad) {
             return $actividad->estado == 2;
         });
 
+        // Si ambas condiciones se cumplen, activar 71
         if ($todasCompletas) {
-            // Habilitar orden 24
-            $this->habilitarSiguienteActividadCelsia($codigo_proyecto, $codigo_documento, $etapa, 24);
+            $this->habilitarActividades($codigo_proyecto, $codigo_documento, $etapa, [71]);
+        }
+    }
+    // ==================== CONFRIMAR DOCUMENTOS CELSIA FIN ====================
+
+
+
+
+
+
+
+
+
+
+
+    // ==================== LÓGICA ANULACIÓN EMCALI ====================
+    private function eliminarArchivosAdjuntos($documento_id)
+    {
+        $archivos = DocumentosAdjuntos::where('documento_id', $documento_id)->get();
+
+        foreach ($archivos as $archivo) {
+            // Extraer nombre del archivo de la ruta
+            $rutaArchivo = str_replace('/storage/', 'public/', $archivo->ruta_archivo);
+
+            // Eliminar del storage
+            if (Storage::exists($rutaArchivo)) {
+                Storage::delete($rutaArchivo);
+            }
+
+            // Eliminar registro de la base de datos
+            $archivo->delete();
         }
     }
 
-    // Función para actualizar fechas de actividades siguientes (sin cambios)
-    private function actualizarFechasSiguientesCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $diasDiferencia)
+    // metodos auxiliares para anulacion de documentos Celsia
+    private function anularActividadesDependientes($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
     {
+        foreach ($actividades_ids as $actividad_id) {
+            $actividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
+                ->where('codigo_documento', $codigo_documento)
+                ->where('etapa', $etapa)
+                ->where('actividad_id', $actividad_id)
+                ->where('estado', '!=', 0)
+                ->first();
+
+            if ($actividad) {
+                $actividad->update([
+                    'estado' => 0, // Solo las dependencias quedan en estado 0
+                    'fecha_confirmacion' => null,
+                    'fecha_actual' => $actividad->fecha_proyeccion,
+                ]);
+
+                // Eliminar archivos adjuntos
+                $this->eliminarArchivosAdjuntos($actividad->id);
+            }
+        }
+    }
+
+    // LOGICA ANULACION ETAPA 1 - ACTUALIZADA CON NUEVAS DEPENDENCIAS
+    private function aplicarLogicaAnulacionEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id)
+    {
+        // Mapeo de dependencias según la nueva lógica
+        $dependencias = [
+            1 => [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            2 => [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            3 => [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            4 => [14, 15, 16, 17, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34], // 4 afecta a 14 en adelante
+            5 => [], // Sin dependientes
+            6 => [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            7 => [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            8 => [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            9 => [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            10 => [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            11 => [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            12 => [13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34], // 12 afecta a 13 y 14 en adelante
+            13 => [], // No tiene dependientes directos según nueva lógica
+            14 => [15, 16, 17, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            15 => [16, 17, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            16 => [17, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            17 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            18 => [19, 20], // 18 solo afecta a 19 y 20
+            19 => [20], // 19 solo afecta a 20
+            20 => [], // 20 no tiene dependientes
+            21 => [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            22 => [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            23 => [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            24 => [25, 26, 27, 28, 29, 30, 31, 32, 33, 34],
+            25 => [26, 27, 28, 29, 30, 31, 32, 33, 34],
+            26 => [27, 28, 29, 30, 31, 32, 33, 34], // 26 afecta desde 27
+            27 => [28, 29, 30, 31, 32, 33, 34],
+            28 => [29, 30, 31, 32, 33, 34],
+            29 => [30, 31, 32, 33, 34],
+            30 => [31, 32, 33, 34],
+            31 => [32, 33, 34],
+            32 => [33, 34],
+            33 => [34],
+            34 => [], // Última actividad
+        ];
+
+        // Si la actividad tiene dependientes, anularlas
+        if (isset($dependencias[$actividad_id]) && !empty($dependencias[$actividad_id])) {
+            $this->anularActividadesDependientes(
+                $codigo_proyecto,
+                $codigo_documento,
+                $etapa,
+                $dependencias[$actividad_id]
+            );
+        }
+
+        // Verificar actividades que dependen de múltiples fuentes
+        $this->verificarDependenciasMultiplesAnulacion(
+            $codigo_proyecto,
+            $codigo_documento,
+            $etapa,
+            $actividad_id
+        );
+    }
+
+    // LOGICA ANULACION ETAPA 2 (CASCADA)
+    private function aplicarLogicaAnulacionCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadAnular)
+    {
+        // Para etapa 2, anular todas las actividades siguientes en orden
         $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
             ->where('codigo_documento', $codigo_documento)
             ->where('etapa', $etapa)
-            ->where('orden', '>', $ordenActual)
-            ->where('estado', '!=', 2)
+            ->where('orden', '>', $actividadAnular->orden)
+            ->where('estado', '!=', 0)
             ->orderBy('orden')
             ->get();
 
         foreach ($actividadesSiguientes as $actividad) {
-            $nuevaFechaActual = \Carbon\Carbon::parse($actividad->fecha_actual);
-
-            if ($diasDiferencia > 0) {
-                $nuevaFechaActual = $nuevaFechaActual->addDays($diasDiferencia);
-            } else {
-                $nuevaFechaActual = $nuevaFechaActual->subDays(abs($diasDiferencia));
-            }
-
             $actividad->update([
-                'fecha_actual' => $nuevaFechaActual->format('Y-m-d'),
+                'estado' => 0,
+                'fecha_confirmacion' => null,
+                'diferenciaDias' => null,
+                'observacion' => null,
+                'usuario_id' => null,
+                'fecha_actual' => $actividad->fecha_proyeccion,
             ]);
 
-            $tipoAjuste = $diasDiferencia > 0 ? "sumar" : "restar";
+            // Eliminar archivos adjuntos de cada actividad anulada
+            $this->eliminarArchivosAdjuntos($actividad->id);
         }
     }
 
-    //FIN CONFRIMAR DOCUMENTOS CELSIA
+    // VERIFICAR DEPENDENCIAS MÚLTIPLES EN ANULACIÓN - ACTUALIZADA
+    private function verificarDependenciasMultiplesAnulacion($codigo_proyecto, $codigo_documento, $etapa, $actividad_anulada_id)
+    {
+        // Definir actividades que requieren múltiples dependencias según nueva lógica
+        $dependenciasMultiples = [
+            8 => [2, 7],      // Requiere 2 y 7
+            14 => [4, 12],    // Requiere 4 y 12
+        ];
 
+        foreach ($dependenciasMultiples as $actividad_id => $dependenciasRequeridas) {
+            // Si la actividad anulada está en las dependencias de alguna actividad múltiple
+            if (in_array($actividad_anulada_id, $dependenciasRequeridas)) {
+                // Verificar cuántas de las dependencias requeridas están completadas
+                $completadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
+                    ->where('codigo_documento', $codigo_documento)
+                    ->where('etapa', $etapa)
+                    ->whereIn('actividad_id', $dependenciasRequeridas)
+                    ->where('estado', 2)
+                    ->count();
+
+                // Si no están todas completadas, anular la actividad dependiente
+                if ($completadas < count($dependenciasRequeridas)) {
+                    // Verificar si la actividad dependiente existe y está completada
+                    $actividadDependiente = Documentos::where('codigo_proyecto', $codigo_proyecto)
+                        ->where('codigo_documento', $codigo_documento)
+                        ->where('etapa', $etapa)
+                        ->where('actividad_id', $actividad_id)
+                        ->where('estado', 2)
+                        ->first();
+
+                    if ($actividadDependiente) {
+                        $this->anularActividadesDependientes(
+                            $codigo_proyecto,
+                            $codigo_documento,
+                            $etapa,
+                            [$actividad_id]
+                        );
+                    }
+                }
+            }
+        }
+
+        // Verificar dependencias en cascada larga (ejemplo: si se anula 21, anular todo desde 22)
+        $cascadas = [
+            21 => range(22, 34),  // Si se anula 21, anular 22-34
+            22 => range(23, 34),  // Si se anula 22, anular 23-34
+            23 => range(24, 34),  // etc.
+            24 => range(25, 34),
+            25 => range(26, 34),
+            26 => range(27, 34),
+            27 => range(28, 34),
+            28 => range(29, 34),
+            29 => range(30, 34),
+            30 => range(31, 34),
+            31 => range(32, 34),
+            32 => range(33, 34),
+            33 => [34],
+        ];
+
+        if (isset($cascadas[$actividad_anulada_id])) {
+            $this->anularActividadesDependientes(
+                $codigo_proyecto,
+                $codigo_documento,
+                $etapa,
+                $cascadas[$actividad_anulada_id]
+            );
+        }
+    }
+
+    // OBTENER DEPENDENCIAS ANULADAS - ACTUALIZADA
+    private function getDependenciasAnuladas($codigo_proyecto, $codigo_documento, $etapa, $excluir_actividad_id = null)
+    {
+        $query = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('estado', 0);
+
+        // Excluir la actividad principal si se especifica
+        if ($excluir_actividad_id) {
+            $query->where('actividad_id', '!=', $excluir_actividad_id);
+        }
+
+        return $query->get()->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'actividad_id' => $item->actividad_id,
+                'actividad_nombre' => $item->actividad->actividad ?? 'Sin nombre',
+                'orden' => $item->orden,
+            ];
+        })->toArray();
+    }
+
+    // MÉTODO PRINCIPAL DE ANULACIÓN ACTUALIZADO
     public function anularDocumento($id)
     {
         try {
-            // 1. Obtener la actividad a anular
-            $actividadAnular = Documentos::find($id);
+            DB::beginTransaction();
+
+            // 1. Obtener la actividad a anular con su relación de actividad
+            $actividadAnular = Documentos::with('actividad')->find($id);
+
+            if (!$actividadAnular) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Actividad no encontrada'
+                ], 404);
+            }
 
             // Guardar datos antes de modificar para las dependencias
             $codigo_proyecto = $actividadAnular->codigo_proyecto;
@@ -2148,6 +2783,9 @@ class DocumentosController extends Controller
             $actividadAnular->update([
                 'estado' => 1, // Estado 1 = Habilitado/Activo
                 'fecha_confirmacion' => null,
+                'observacion' => null,
+                'diferenciaDias' => null,
+                'usuario_id' => null,
                 'fecha_actual' => $actividadAnular->fecha_proyeccion,
             ]);
 
@@ -2159,6 +2797,8 @@ class DocumentosController extends Controller
                 $actividad_id // Excluir la actividad principal
             );
 
+            DB::commit();
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Actividad anulada exitosamente. Dependencias anuladas: ' . count($dependenciasAnuladas),
@@ -2166,82 +2806,117 @@ class DocumentosController extends Controller
                     'actividad_principal' => [
                         'id' => $actividadAnular->id,
                         'actividad_id' => $actividadAnular->actividad_id,
-                        'estado' => 1, // Confirmar que quedó en estado 1
+                        'actividad_nombre' => $actividadAnular->actividad->actividad ?? 'Sin nombre',
+                        'estado' => 1,
                     ],
                     'total_dependencias_anuladas' => count($dependenciasAnuladas),
                     'dependencias_anuladas' => $dependenciasAnuladas
                 ]
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error anulando actividad: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
             ], 500);
         }
     }
+    // ==================== LÓGICA ANULACIÓN EMCALI FIN ====================
 
-    //anulacion de codumentos y elimar archivos adjuntos emcali
-    private function eliminarArchivosAdjuntos($documento_id)
+
+
+
+
+
+
+
+
+
+
+    // ==================== LÓGICA ANULACIÓN CELSIA ====================
+    // LOGICA ANULACION CELSIA - CON NUEVAS DEPENDENCIAS
+    private function aplicarLogicaAnulacionCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $actividad_id)
     {
-        $archivos = DocumentosAdjuntos::where('documento_id', $documento_id)->get();
-
-        foreach ($archivos as $archivo) {
-            // Extraer nombre del archivo de la ruta
-            $rutaArchivo = str_replace('/storage/', 'public/', $archivo->ruta_archivo);
-
-            // Eliminar del storage
-            if (Storage::exists($rutaArchivo)) {
-                Storage::delete($rutaArchivo);
-            }
-
-            // Eliminar registro de la base de datos
-            $archivo->delete();
-        }
-    }
-
-    // ==================== LÓGICA ANULACIÓN ETAPA 1 ====================
-    private function aplicarLogicaAnulacionEtapa1($codigo_proyecto, $codigo_documento, $etapa, $actividad_id)
-    {
-        // Mapeo de dependencias: actividad_id => [actividades_dependientes]
+        // MAPA DE DEPENDENCIAS DE CELSIA (qué actividades dependen de cuáles)
         $dependencias = [
-            1 => [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            2 => [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            3 => [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            4 => [], // Sin dependientes
-            5 => [], // Sin dependientes
-            6 => [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            7 => [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            8 => [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            9 => [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            10 => [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            11 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            12 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            13 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            14 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            15 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            16 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            17 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            18 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            19 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            20 => [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            21 => [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-            22 => [26, 27, 28, 29, 30, 31, 32, 33],
-            23 => [26, 27, 28, 29, 30, 31, 32, 33],
-            24 => [26, 27, 28, 29, 30, 31, 32, 33],
-            25 => [26, 27, 28, 29, 30, 31, 32, 33],
-            26 => [27, 28, 29, 30, 31, 32, 33],
-            27 => [28, 29, 30, 31, 32, 33],
-            28 => [29, 30, 31, 32, 33],
-            29 => [30, 31, 32, 33],
-            30 => [31, 32, 33],
-            31 => [32, 33],
-            32 => [33],
-            33 => [], // Última actividad
+            // 43 activa 44
+            43 => [44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 44 activa 45
+            44 => [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 45 activa 46
+            45 => [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 46 activa 47 y 50
+            46 => [47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 47 activa 48
+            47 => [48, 49],
+
+            // 48 activa 49
+            48 => [49],
+
+            // 49 no tiene dependientes
+            49 => [],
+
+            // 50 activa 51
+            50 => [51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 51 activa 52
+            51 => [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 52 activa 53 y 55-66
+            52 => [53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73],
+
+            // 53 activa 54
+            53 => [54],
+
+            // 54 no tiene dependientes
+            54 => [],
+
+            // 55-65 activan en conjunto con 70 a 71
+            55 => [71, 72, 73],
+            56 => [71, 72, 73],
+            57 => [71, 72, 73],
+            58 => [71, 72, 73],
+            59 => [71, 72, 73],
+            60 => [71, 72, 73],
+            61 => [71, 72, 73],
+            62 => [71, 72, 73],
+            63 => [71, 72, 73],
+            64 => [71, 72, 73],
+            65 => [71, 72, 73],
+
+            // 66 activa 67
+            66 => [67, 68, 69, 70, 71, 72, 73],
+
+            // 67 activa 68
+            67 => [68, 69, 70, 71, 72, 73],
+
+            // 68 activa 69
+            68 => [69, 70, 71, 72, 73],
+
+            // 69 activa 70
+            69 => [70, 71, 72, 73],
+
+            // 70 activa 71 (junto con 55-65)
+            70 => [71, 72, 73],
+
+            // 71 activa 72
+            71 => [72, 73],
+
+            // 72 activa 73
+            72 => [73],
+
+            // 73 no tiene dependientes
+            73 => [],
         ];
 
-        // Si la actividad tiene dependientes, anularlas
+        // ANULAR POR ACTIVIDAD ID (basado en dependencias)
         if (isset($dependencias[$actividad_id]) && !empty($dependencias[$actividad_id])) {
-            $this->anularActividadesDependientes(
+            $this->anularActividadesDependientesCelsia(
                 $codigo_proyecto,
                 $codigo_documento,
                 $etapa,
@@ -2249,41 +2924,31 @@ class DocumentosController extends Controller
             );
         }
 
-        // Verificar actividades que dependen de múltiples fuentes
-        $this->verificarDependenciasMultiples(
-            $codigo_proyecto,
-            $codigo_documento,
-            $etapa,
-            $actividad_id
-        );
-    }
+        // VERIFICACIONES ESPECIALES PARA ACTIVACIÓN MÚLTIPLE
 
-    // ==================== LÓGICA ANULACIÓN CASCADA ====================
-    private function aplicarLogicaAnulacionCascada($codigo_proyecto, $codigo_documento, $etapa, $actividadAnular)
-    {
-        // Para etapas diferentes a 1, anular todas las actividades siguientes en orden
-        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', '>', $actividadAnular->orden)
-            ->where('estado', '!=', 0)
-            ->orderBy('orden')
-            ->get();
+        // Caso especial: Si se anula 70, verificar 71
+        if ($actividad_id == 70) {
+            $this->verificarAnulacion71PorBloque55a65($codigo_proyecto, $codigo_documento, $etapa);
+        }
 
-        foreach ($actividadesSiguientes as $actividad) {
-            $actividad->update([
-                'estado' => 0,
-                'fecha_confirmacion' => null,
-                'fecha_actual' => $actividad->fecha_proyeccion,
-            ]);
+        // Caso especial: Si se anula alguna del 55-65, verificar 71
+        if (in_array($actividad_id, range(55, 65))) {
+            $this->verificarAnulacion71PorBloque55a65($codigo_proyecto, $codigo_documento, $etapa);
+        }
 
-            // Eliminar archivos adjuntos de cada actividad anulada
-            $this->eliminarArchivosAdjuntos($actividad->id);
+        // Caso especial: Si se anula 52, anular todo lo que depende de 52
+        if ($actividad_id == 52) {
+            $this->anularActividadesDependientesCelsia(
+                $codigo_proyecto,
+                $codigo_documento,
+                $etapa,
+                [53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+            );
         }
     }
 
-    // ==================== MÉTODOS AUXILIARES ANULACIÓN ====================
-    private function anularActividadesDependientes($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
+    // Función para anular actividades dependientes
+    private function anularActividadesDependientesCelsia($codigo_proyecto, $codigo_documento, $etapa, $actividades_ids)
     {
         foreach ($actividades_ids as $actividad_id) {
             $actividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
@@ -2294,52 +2959,86 @@ class DocumentosController extends Controller
                 ->first();
 
             if ($actividad) {
+                // Guardar el ID para posible recursión
+                $idActual = $actividad->id;
+                $actividadIdActual = $actividad->actividad_id;
+
+                // Anular la actividad
                 $actividad->update([
-                    'estado' => 0, // Solo las dependencias quedan en estado 0
+                    'estado' => 0,
                     'fecha_confirmacion' => null,
+                    'observacion' => null,
+                    'usuario_id' => null,
+                    'diferenciaDias' => null,
                     'fecha_actual' => $actividad->fecha_proyeccion,
                 ]);
 
                 // Eliminar archivos adjuntos
                 $this->eliminarArchivosAdjuntos($actividad->id);
+
+                // Llamada recursiva para anular dependencias de esta actividad
+                $this->aplicarLogicaAnulacionCelsia(
+                    $codigo_proyecto,
+                    $codigo_documento,
+                    $etapa,
+                    $actividad->orden,
+                    $actividadIdActual
+                );
             }
         }
     }
 
-    private function verificarDependenciasMultiples($codigo_proyecto, $codigo_documento, $etapa, $actividad_anulada_id)
+    // Función para verificar si se debe anular la actividad 71
+    private function verificarAnulacion71PorBloque55a65($codigo_proyecto, $codigo_documento, $etapa)
     {
-        // Definir actividades que requieren múltiples dependencias
-        $dependenciasMultiples = [
-            8 => [2, 7],  // Requiere 2 y 7
-            21 => range(11, 20), // Requiere 11 al 20
-            26 => [22, 23, 24, 25], // Requiere 22, 23, 24, 25
-        ];
+        // Verificar si 70 está completada
+        $actividad70Completa = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->where('actividad_id', 70)
+            ->where('estado', 2)
+            ->exists();
 
-        foreach ($dependenciasMultiples as $actividad_id => $dependencias) {
-            // Si la actividad anulada está en las dependencias de alguna actividad múltiple
-            if (in_array($actividad_anulada_id, $dependencias)) {
-                // Verificar si todas las dependencias siguen activas
-                $actividadesCompletadas = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                    ->where('codigo_documento', $codigo_documento)
-                    ->where('etapa', $etapa)
-                    ->whereIn('actividad_id', $dependencias)
-                    ->where('estado', 2)
-                    ->count();
+        // Si 70 no está completada, no hay necesidad de verificar 71
+        if (!$actividad70Completa) {
+            return;
+        }
 
-                // Si no todas están completadas, anular la actividad dependiente
-                if ($actividadesCompletadas < count($dependencias)) {
-                    $this->anularActividadesDependientes(
-                        $codigo_proyecto,
-                        $codigo_documento,
-                        $etapa,
-                        [$actividad_id]
-                    );
-                }
+        // Verificar cuántas actividades del 55 al 65 están completadas
+        $actividadesBloque = Documentos::where('codigo_proyecto', $codigo_proyecto)
+            ->where('codigo_documento', $codigo_documento)
+            ->where('etapa', $etapa)
+            ->whereBetween('actividad_id', [55, 65])
+            ->get();
+
+        $completadas = $actividadesBloque->filter(function ($actividad) {
+            return $actividad->estado == 2;
+        })->count();
+
+        $totalBloque = $actividadesBloque->count();
+
+        // Si no todas están completadas, anular 71
+        if ($completadas < $totalBloque) {
+            $actividad71 = Documentos::where('codigo_proyecto', $codigo_proyecto)
+                ->where('codigo_documento', $codigo_documento)
+                ->where('etapa', $etapa)
+                ->where('actividad_id', 71)
+                ->where('estado', '!=', 0)
+                ->first();
+
+            if ($actividad71) {
+                $this->anularActividadesDependientesCelsia(
+                    $codigo_proyecto,
+                    $codigo_documento,
+                    $etapa,
+                    [71, 72, 73]
+                );
             }
         }
     }
 
-    private function getDependenciasAnuladas($codigo_proyecto, $codigo_documento, $etapa, $excluir_actividad_id = null)
+    // Función para obtener dependencias anuladas (mejorada)
+    private function getDependenciasAnuladasCelsia($codigo_proyecto, $codigo_documento, $etapa, $excluir_actividad_id = null)
     {
         $query = Documentos::where('codigo_proyecto', $codigo_proyecto)
             ->where('codigo_documento', $codigo_documento)
@@ -2351,17 +3050,23 @@ class DocumentosController extends Controller
             $query->where('actividad_id', '!=', $excluir_actividad_id);
         }
 
-        return $query->pluck('actividad_id')
-            ->toArray();
+        return $query->get()->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'actividad_id' => $item->actividad_id,
+                'orden' => $item->orden,
+            ];
+        })->toArray();
     }
 
-    //ANULACION CELSIA - LÓGICA ESPECIAL PARA CELSIA CON REGLAS DE ESCALERA Y DEPENDENCIAS
-
+    // Método principal de anulación para CELSIA (mejorado)
     public function anularDocumentoCelsia($id)
     {
         try {
-            // 1. Obtener la actividad a anular
-            $actividadAnular = Documentos::find($id);
+            DB::beginTransaction();
+
+            // 1. Obtener la actividad a anular con su relación de actividad
+            $actividadAnular = Documentos::with('actividad')->find($id);
 
             if (!$actividadAnular) {
                 return response()->json([
@@ -2376,6 +3081,7 @@ class DocumentosController extends Controller
             $etapa = $actividadAnular->etapa;
             $actividad_id = $actividadAnular->actividad_id;
             $orden = $actividadAnular->orden;
+
 
             // 2. Aplicar lógica de anulación con dependencias PRIMERO
             $this->aplicarLogicaAnulacionCelsia(
@@ -2393,6 +3099,9 @@ class DocumentosController extends Controller
             $actividadAnular->update([
                 'estado' => 1, // Estado 1 = Habilitado/Activo
                 'fecha_confirmacion' => null,
+                'observacion' => null,
+                'diferenciaDias' => null,
+                'usuario_id' => null,
                 'fecha_actual' => $actividadAnular->fecha_proyeccion,
             ]);
 
@@ -2404,6 +3113,8 @@ class DocumentosController extends Controller
                 $actividad_id // Excluir la actividad principal
             );
 
+            DB::commit();
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Actividad Celsia anulada exitosamente. Dependencias anuladas: ' . count($dependenciasAnuladas),
@@ -2411,11 +3122,251 @@ class DocumentosController extends Controller
                     'actividad_principal' => [
                         'id' => $actividadAnular->id,
                         'actividad_id' => $actividadAnular->actividad_id,
+                        'actividad_nombre' => $actividadAnular->actividad->actividad ?? 'Sin nombre',
                         'orden' => $actividadAnular->orden,
-                        'estado' => 1, // Confirmar que quedó en estado 1
+                        'estado' => 1,
                     ],
                     'total_dependencias_anuladas' => count($dependenciasAnuladas),
                     'dependencias_anuladas' => $dependenciasAnuladas
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error anulando actividad CELSIA: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+    // ==================== LÓGICA ANULACIÓN CELSIA FIN ====================
+
+
+
+
+
+
+
+
+
+
+
+    //================ LOGICA PARA MENEJO DE TORRES PARA HABILITAR===============
+    public function GetTorresDisponibleXPoryecto($codigoProyecto)
+    {
+        $tabla = null;
+        $campoNombre = null;
+        $campoRelacion = null;
+
+        // Buscar en apartamentos
+        $proyecto = Proyectos::where('codigo_proyecto', $codigoProyecto)->first();
+
+        if ($proyecto) {
+            $tabla = 'nombre_xtore';
+            $campoNombre = 'nombre_torre';
+            $campoRelacion = 'proyecto_id';
+        } else {
+            // Buscar en casas
+            $proyecto = ProyectoCasa::where('codigo_proyecto', $codigoProyecto)->first();
+
+            if ($proyecto) {
+                $tabla = 'nombrexmanzana';
+                $campoNombre = 'nombre_manzana';
+                $campoRelacion = 'proyectos_casas_id'; // ✅ CORRECTO
+            } else {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proyecto no encontrado'
+                ], 404);
+            }
+        }
+
+        // Nombres ya utilizados
+        $torresOcupadas = DB::table('documentacion_torres')
+            ->where('codigo_proyecto', $codigoProyecto)
+            ->pluck('nombre_torre');
+
+        // Disponibles
+        $disponibles = DB::table($tabla)
+            ->where($campoRelacion, $proyecto->id)
+            ->whereNotIn($campoNombre, $torresOcupadas)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $disponibles
+        ]);
+    }
+    //================ LOGICA PARA MENEJO DE TORRES PARA HABILITAR FIN ==============
+
+
+    //================ GET DE FECHA DE ENTREGA CALCULANDO LA FECHA ACTUAL ===============
+    /*  public function CalculoFechaReal($codigoDocumento)
+    {
+        try {
+            // 1. Buscar todos los documentos ordenados por ID ascendente (del 1 al 20)
+            $documentos = Documentos::where('codigo_documento', $codigoDocumento)
+                ->orderBy('id', 'asc') // Cambiado a ascendente para procesar de abajo arriba naturalmente
+                ->get();
+
+            if ($documentos->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se encontraron documentos'
+                ], 404);
+            }
+
+            // 2. Buscar la última fecha_confirmación (de arriba hacia abajo, que sería el último registro)
+            $fechaBase = null;
+            $actividadesDesde = [];
+            $indiceBase = -1;
+
+            // Recorrer de atrás hacia adelante para encontrar la última fecha_confirmación
+            for ($i = count($documentos) - 1; $i >= 0; $i--) {
+                $doc = $documentos[$i];
+                if ($doc->fecha_confirmacion) {
+                    // Encontramos la última fecha_confirmación (la más reciente)
+                    $fechaBase = Carbon::parse($doc->fecha_confirmacion);
+                    $indiceBase = $i;
+                    break;
+                }
+            }
+
+            // 3. Si encontramos fecha base, guardamos las actividades desde ese punto hasta el final
+            if ($indiceBase >= 0) {
+                for ($i = $indiceBase + 1; $i < count($documentos); $i++) {
+                    $actividadesDesde[] = $documentos[$i]->actividad_id;
+                }
+            }
+
+            // 4. Calcular fechaPropietario (última fecha_proyeccion + 30 días)
+            $ultimoRegistro = $documentos->last(); // El último registro (ID más alto)
+            $fechaPropietario = Carbon::parse($ultimoRegistro->fecha_proyeccion)->addDays(30);
+
+            // 5. Si no se encontró ninguna fecha_confirmación, usar la misma fechaPropietario para fechaReal
+            if (!$fechaBase) {
+                return response()->json([
+                    'status' => 'success',
+                    'fechaPropietario' => $fechaPropietario->format('d/m/Y'),
+                    'fechaReal' => $fechaPropietario->format('d/m/Y'),
+                    'desfase' => 0,
+                    'actividades_sumadas' => []
+                ]);
+            }
+
+            // 6. Obtener datos del primer documento para operador y etapa
+            $primerDoc = $documentos->first(); // El primer registro (ID más bajo)
+            $operador = $primerDoc->operador;
+            $etapa = $primerDoc->etapa;
+
+            // 7. Buscar en actividades_documentos los registros con esos IDs
+            $actividades = DB::table('actividades_documentos')
+                ->where('operador', $operador)
+                ->where('etapa', $etapa)
+                ->whereIn('id', $actividadesDesde)
+                ->get();
+
+            // 8. Sumar los tiempos solo de los que tienen calculo = 1 (días calendario)
+            $desfase = 0;
+            $actividadesSumadas = [];
+            foreach ($actividades as $actividad) {
+                if ($actividad->calculo == 1) {
+                    $desfase += $actividad->tiempo;
+                    $actividadesSumadas[] = $actividad->id;
+                }
+            }
+
+            // 9. Calcular fechaReal = fechaBase + desfase
+            $fechaReal = $fechaBase->copy()->addDays($desfase);
+
+            return response()->json([
+                'status' => 'success',
+                'fechaPropietario' => $fechaPropietario->format('d/m/Y'),
+                'fechaReal' => $fechaReal->format('d/m/Y'),
+                'desfase' => $desfase,
+                'actividades_sumadas' => $actividadesSumadas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    } */
+
+    public function CalculoFechaReal($codigoDocumento)
+    {
+        try {
+            // 1. Buscar todos los documentos
+            $documentos = Documentos::where('codigo_documento', $codigoDocumento)
+                ->orderBy('id', 'asc')
+                ->get();
+
+            if ($documentos->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se encontraron documentos'
+                ], 404);
+            }
+
+            // 2. Calcular fechaPropietario (última fecha_proyeccion + 30 días)
+            $ultimoRegistro = $documentos->last();
+            $fechaPropietario = Carbon::parse($ultimoRegistro->fecha_proyeccion)->addDays(30);
+
+            // 3. Buscar la PRIMER fecha_confirmación de abajo hacia arriba
+            $fechaConfirmacion = null;
+            $fechaProyeccionRegistro = null;
+
+            for ($i = count($documentos) - 1; $i >= 0; $i--) {
+                $doc = $documentos[$i];
+                if ($doc->fecha_confirmacion) {
+                    $fechaConfirmacion = Carbon::parse($doc->fecha_confirmacion);
+                    $fechaProyeccionRegistro = Carbon::parse($doc->fecha_proyeccion);
+                    break;
+                }
+            }
+
+            // 4. Si no hay fecha_confirmación, fechaReal = fechaPropietario
+            if (!$fechaConfirmacion) {
+                return response()->json([
+                    'status' => 'success',
+                    'fechaPropietario' => $fechaPropietario->format('d/m/Y'),
+                    'fechaReal' => $fechaPropietario->format('d/m/Y'),
+                    'desfase' => 0,
+                    'mensaje' => 'Sin fecha confirmación'
+                ]);
+            }
+
+            // 5. Calcular el desfase: fecha_proyeccion - fecha_confirmacion
+            // Usamos diffInDays con parámetro false para mantener el signo
+            $desfase = $fechaProyeccionRegistro->diffInDays($fechaConfirmacion, false);
+
+            // 6. APLICAR LÓGICA CORRECTA:
+            $fechaReal = $fechaPropietario->copy()->addDays($desfase);
+
+            // 7. Mensaje descriptivo
+            if ($desfase < 0) {
+                $dias = abs($desfase);
+                $mensaje = "Se confirmó $dias día(s) ANTES → se RESTAN $dias día(s) a fechaPropietario";
+            } elseif ($desfase > 0) {
+                $dias = $desfase;
+                $mensaje = "Se confirmó $dias día(s) DESPUÉS → se SUMAN $dias día(s) a fechaPropietario";
+            } else {
+                $mensaje = "Se confirmó el MISMO DÍA → fechaReal = fechaPropietario";
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'fechaPropietario' => $fechaPropietario->format('d/m/Y'),
+                'fechaReal' => $fechaReal->format('d/m/Y'),
+                'desfase' => $desfase,
+                'dias' => abs($desfase),
+                'tipo' => $desfase < 0 ? 'antes' : ($desfase > 0 ? 'despues' : 'exacto'),
+                'mensaje' => $mensaje,
+                'detalle' => [
+                    'fecha_confirmacion' => $fechaConfirmacion->format('d/m/Y'),
+                    'fecha_proyeccion_del_registro' => $fechaProyeccionRegistro->format('d/m/Y'),
+                    'ultima_fecha_proyeccion' => $ultimoRegistro->fecha_proyeccion
                 ]
             ]);
         } catch (\Exception $e) {
@@ -2424,188 +3375,5 @@ class DocumentosController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
-    }
-
-    // ==================== LÓGICA ANULACIÓN CELSIA ====================
-    private function aplicarLogicaAnulacionCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenActual, $actividad_id)
-    {
-        // Caso 1: Ordenes del 1 al 9 (escalera simple) - ANULA EL SIGUIENTE ORDEN
-        if ($ordenActual >= 1 && $ordenActual <= 9) {
-            // Anular solo la siguiente actividad en orden
-            $siguienteOrden = $ordenActual + 1;
-            $this->anularSiguienteActividadYCascadaCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
-        }
-
-        // Caso 2: Orden 10 - ANULA TODAS LAS ACTIVIDADES DEL 11 AL 23
-        elseif ($ordenActual == 10) {
-            // Anular todas las actividades del 11 al 23
-            $this->anularActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, 11, 23);
-        }
-
-        // Caso 3: Actividades del 11 al 23 - VERIFICAR SI TODAS ESTÁN COMPLETAS PARA ANULAR ORDEN 24
-        elseif ($ordenActual >= 11 && $ordenActual <= 23) {
-            $this->verificarAnulacionGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa);
-        }
-
-        // Caso 4: Orden 24 en adelante - ANULA EL SIGUIENTE ORDEN EN CASCADA
-        elseif ($ordenActual >= 24) {
-            $siguienteOrden = $ordenActual + 1;
-            $this->anularSiguienteActividadYCascadaCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden);
-        }
-    }
-
-    // Función para anular la siguiente actividad y sus dependencias en cascada
-    private function anularSiguienteActividadYCascadaCelsia($codigo_proyecto, $codigo_documento, $etapa, $siguienteOrden)
-    {
-        $siguienteActividad = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', $siguienteOrden)
-            ->where('estado', '!=', 0) // Solo si no está ya en estado 0
-            ->first();
-
-        if ($siguienteActividad) {
-            // Anular esta actividad
-            $siguienteActividad->update([
-                'estado' => 0,
-                'fecha_confirmacion' => null,
-                'fecha_actual' => $siguienteActividad->fecha_proyeccion,
-            ]);
-
-            // Eliminar archivos adjuntos
-            $this->eliminarArchivosAdjuntos($siguienteActividad->id);
-
-            // IMPORTANTE: Si esta actividad tenía dependencias, anularlas también
-            // Ejemplo: Si anulamos orden 2, y orden 2 activaba orden 3, también anular orden 3
-            $this->aplicarLogicaAnulacionCelsia(
-                $codigo_proyecto,
-                $codigo_documento,
-                $etapa,
-                $siguienteOrden,
-                $siguienteActividad->actividad_id
-            );
-        }
-    }
-
-    // Función para anular un rango completo de actividades
-    private function anularActividadesRangoCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenInicio, $ordenFin)
-    {
-        $actividades = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->whereBetween('orden', [$ordenInicio, $ordenFin])
-            ->where('estado', '!=', 0)
-            ->get();
-
-        foreach ($actividades as $actividad) {
-            // Anular esta actividad
-            $actividad->update([
-                'estado' => 0,
-                'fecha_confirmacion' => null,
-                'fecha_actual' => $actividad->fecha_proyeccion,
-            ]);
-
-            // Eliminar archivos adjuntos
-            $this->eliminarArchivosAdjuntos($actividad->id);
-
-            // IMPORTANTE: Si estas actividades (11-23) tienen dependencias (como orden 24), anularlas
-            $this->aplicarLogicaAnulacionCelsia(
-                $codigo_proyecto,
-                $codigo_documento,
-                $etapa,
-                $actividad->orden,
-                $actividad->actividad_id
-            );
-        }
-
-        // Después de anular 11-23, verificar si debemos anular orden 24
-        $this->verificarAnulacionOrden24($codigo_proyecto, $codigo_documento, $etapa);
-    }
-
-    // Función para verificar si todas las actividades del 11 al 23 están completas para anular orden 24
-    private function verificarAnulacionGrupo11a23Celsia($codigo_proyecto, $codigo_documento, $etapa)
-    {
-        $this->verificarAnulacionOrden24($codigo_proyecto, $codigo_documento, $etapa);
-    }
-
-    // Función para verificar y anular orden 24 si es necesario
-    private function verificarAnulacionOrden24($codigo_proyecto, $codigo_documento, $etapa)
-    {
-        // Verificar si el orden 24 está activo
-        $orden24 = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', 24)
-            ->where('estado', '!=', 0)
-            ->first();
-
-        if ($orden24) {
-            // Contar actividades completadas en el grupo 11-23
-            $actividadesGrupo = Documentos::where('codigo_proyecto', $codigo_proyecto)
-                ->where('codigo_documento', $codigo_documento)
-                ->where('etapa', $etapa)
-                ->whereBetween('orden', [11, 23])
-                ->get();
-
-            // Verificar si TODAS las actividades están en estado 2 (Completado)
-            $todasCompletas = $actividadesGrupo->every(function ($actividad) {
-                return $actividad->estado == 2;
-            });
-
-            // Si NO todas están completas, anular orden 24
-            if (!$todasCompletas) {
-                $orden24->update([
-                    'estado' => 0,
-                    'fecha_confirmacion' => null,
-                    'fecha_actual' => $orden24->fecha_proyeccion,
-                ]);
-
-                // Eliminar archivos adjuntos
-                $this->eliminarArchivosAdjuntos($orden24->id);
-
-                // Anular todas las actividades después del orden 24 (cascada)
-                $this->anularActividadesSiguientesCascadaCelsia($codigo_proyecto, $codigo_documento, $etapa, 24);
-            }
-        }
-    }
-
-    // Anular todas las actividades siguientes en cascada
-    private function anularActividadesSiguientesCascadaCelsia($codigo_proyecto, $codigo_documento, $etapa, $ordenAnulado)
-    {
-        $actividadesSiguientes = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('orden', '>', $ordenAnulado)
-            ->where('estado', '!=', 0)
-            ->orderBy('orden')
-            ->get();
-
-        foreach ($actividadesSiguientes as $actividad) {
-            $actividad->update([
-                'estado' => 0,
-                'fecha_confirmacion' => null,
-                'fecha_actual' => $actividad->fecha_proyeccion,
-            ]);
-
-            // Eliminar archivos adjuntos de cada actividad anulada
-            $this->eliminarArchivosAdjuntos($actividad->id);
-        }
-    }
-
-    // Obtener dependencias anuladas para Celsia
-    private function getDependenciasAnuladasCelsia($codigo_proyecto, $codigo_documento, $etapa, $excluir_actividad_id = null)
-    {
-        $query = Documentos::where('codigo_proyecto', $codigo_proyecto)
-            ->where('codigo_documento', $codigo_documento)
-            ->where('etapa', $etapa)
-            ->where('estado', 0);
-
-        // Excluir la actividad principal si se especifica
-        if ($excluir_actividad_id) {
-            $query->where('actividad_id', '!=', $excluir_actividad_id);
-        }
-
-        return $query->pluck('orden')
-            ->toArray();
     }
 }

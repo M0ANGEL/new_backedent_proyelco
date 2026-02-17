@@ -6,6 +6,9 @@ use App\Exports\InformeProyectoExport;
 use App\Http\Controllers\Controller;
 use App\Models\AnulacionApt;
 use App\Models\CambioProcesoProyectos;
+use App\Models\Documentos;
+use App\Models\DocumentosTorres;
+use App\Models\NombreTorres;
 use App\Models\ProcesosProyectos;
 use App\Models\Proyectos;
 use App\Models\ProyectosDetalle;
@@ -478,7 +481,7 @@ class GestionProyectosController extends Controller
         ]);
     }
 
-        //Calcula porcentajes de avance y atraso para procesos y torres
+    //Calcula porcentajes de avance y atraso para procesos y torres
     private function calcularPorcentajes(&$resultado, &$torreResumen)
     {
         // --- Porcentajes por proceso ---
@@ -946,7 +949,7 @@ class GestionProyectosController extends Controller
 
     //----------------------------------------------------------------------- nuevo toque minimos piso
 
-    public function confirmarAptNuevaLogica($id)
+    public function confirmarAptNuevaLogica($id) //aqui se debe validar si esta todo los retie para tratar de activar en documentacion campo con id 27
     {
         DB::beginTransaction();
 
@@ -1033,6 +1036,8 @@ class GestionProyectosController extends Controller
                 case 'retie':
                 case 'ritel':
                     $this->intentarHabilitarEntrega($info); // esta función no habilita entrega directamente, solo revisa
+                     //aqui enviamos para calcular si se debe activar el documento id 27, si retie esta completo
+                    $this->validarInertconexionDocumentos($info); // esta función no habilita entrega directamente, solo revisa
                     break;
 
                 case 'entrega':
@@ -1592,5 +1597,104 @@ class GestionProyectosController extends Controller
                 ->where('estado', 0)
                 ->update(['estado' => 1, 'fecha_habilitado' => now()]);
         }
+    }
+
+
+    //intentear Dictamen RETIE (UF, MT, TRAFO, Interconexión, BCI, ZC) de documentos
+    private function validarInertconexionDocumentos($info)
+    {
+        // CORRECCIÓN 1: "exits()" debe ser "exists()"
+        $completa = ProyectosDetalle::where('estado', 1)
+            ->where('proyecto_id', $info->proyecto_id)
+            ->where('torre', $info->torre)
+            ->where('orden_proceso', $info->orden_proceso)
+            // CORRECCIÓN 2: Quitar duplicado de proyecto_id
+            ->exists();
+
+        //validamos, si existe alguno no seguir
+        if ($completa) {
+            return;
+        }
+
+        //si no existe seguimos con la logica
+
+        // Buscar la torre
+        $nombreTorre = NombreTorres::select('nombre_torre')
+            ->where('proyecto_id', $info->proyecto_id)
+            ->where('torre', $info->torre)
+            ->first();
+
+        // Buscar el código del proyecto
+        $codigoProyecto = Proyectos::select('codigo_proyecto')
+            ->where('id', $info->proyecto_id)
+            ->first();
+
+        // CORRECCIÓN 3: Verificar que existan antes de continuar
+        if (!$nombreTorre || !$codigoProyecto) {
+            return;
+        }
+
+        // Acceder a las propiedades correctamente
+        $documenTorre = DocumentosTorres::where('codigo_proyecto', $codigoProyecto->codigo_proyecto)
+            ->where('nombre_torre', $nombreTorre->nombre_torre)
+            ->first();
+
+        // CORRECCIÓN 4: Verificar que existe el documento antes de actualizar
+        if (!$documenTorre) {
+            return;
+        }
+
+        $documenTorre->update([
+            'estado' => 2 //ya esta esa torre
+        ]);
+
+        //ahora buscamos si todas las torres de ese documento son estado 2
+        $documentosTorreAll = DocumentosTorres::where('codigo_proyecto', $codigoProyecto->codigo_proyecto)
+            ->where('codigo_documento', $documenTorre->codigo_documento) // CORRECCIÓN 5: Filtrar por el mismo documento
+            ->get();
+
+        // CORRECCIÓN 6: Verificar si TODAS son estado 2
+        $todasEstado2 = true;
+        foreach ($documentosTorreAll as $value) {
+            if ($value->estado != 2) {
+                $todasEstado2 = false;
+                break;
+            }
+        }
+
+        // Si no todas son estado 2, salir
+        if (!$todasEstado2) {
+            return;
+        }
+
+        //buscamos la etapa
+        $etapa = Documentos::select('etapa') // CORRECCIÓN 7: "estapa" -> "etapa"
+            ->where('codigo_documento', $documenTorre->codigo_documento)
+            ->first();
+
+        // CORRECCIÓN 8: Verificar que existe la etapa
+        if (!$etapa) {
+            return;
+        }
+
+        if ($etapa->etapa == 1) {
+            //si todas son estado 2, activar el documento Dictamen RETIE (actividad 27)
+            Documentos::where('codigo_documento', $documenTorre->codigo_documento)
+                ->where('codigo_proyecto', $codigoProyecto->codigo_proyecto)
+                ->where('actividad_id', 27)
+                ->update([
+                    'estado' => 1  // CORRECCIÓN 9: Sintaxis correcta update(['campo' => valor])
+                ]);
+        } else {
+            //si todas son estado 2, activar el documento Dictamen RETIE (actividad 35)
+            Documentos::where('codigo_documento', $documenTorre->codigo_documento)
+                ->where('codigo_proyecto', $codigoProyecto->codigo_proyecto)
+                ->where('actividad_id', 35)
+                ->update([
+                    'estado' => 1  // CORRECCIÓN 10: Sintaxis correcta
+                ]);
+        }
+
+        return;
     }
 }

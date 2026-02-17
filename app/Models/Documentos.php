@@ -26,6 +26,7 @@ class Documentos extends Model
         'estado',
         'operador',
         'observacion',
+        'diferenciaDias',
     ];
 
     // En el modelo Documentos
