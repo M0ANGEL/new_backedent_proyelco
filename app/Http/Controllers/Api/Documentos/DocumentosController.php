@@ -660,7 +660,7 @@ class DocumentosController extends Controller
                 ];
 
                 // SOLO el primer registro (orden 1) tiene estado 1, los demás estado 0
-                $estado = ($orden == 1) ? 1 : 0;
+                /* $estado = ($orden == 1) ? 1 : 0; */ //por ahora se cancela 
 
                 $registro = [
                     'nombre_etapa' => $nombre_etapa,
@@ -673,7 +673,7 @@ class DocumentosController extends Controller
                     'orden' => $orden,
                     'fecha_proyeccion' => $fechaInicio->format('Y-m-d'),
                     'fecha_actual' => $fechaInicio->format('Y-m-d'),
-                    'estado' => $estado,
+                    'estado' => 0,
                     'operador' => 1,
                     'created_at' => now(),
                 ];
@@ -1320,12 +1320,12 @@ class DocumentosController extends Controller
     public function proyectosCodigo()
     {
         try {
-            $dataApt = Proyectos::where('estado', 1)
+            $dataApt = Proyectos::whereIn('estado', [1,2])
                 ->select('descripcion_proyecto', 'codigo_proyecto')
                 ->orderBy('descripcion_proyecto')
                 ->get();
 
-            $dataCasas = ProyectoCasa::where('estado', 1)
+            $dataCasas = ProyectoCasa::whereIn('estado', [1,2])
                 ->select('descripcion_proyecto', 'codigo_proyecto')
                 ->orderBy('descripcion_proyecto')
                 ->get();
