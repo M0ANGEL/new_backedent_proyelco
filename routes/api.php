@@ -373,6 +373,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     /* para anular docuemntos confirmados */
     Route::get('gestion-documentos-anular/{id}', [DocumentosController::class, 'anularDocumento']);
     Route::get('gestion-documentos-anular-celsia/{id}', [DocumentosController::class, 'anularDocumentoCelsia']);
+
+
+    /* nuevas rutas llevar la activacion de retie x torres documentacion */
+    Route::get('torres-disponibles-dc-tr/{codigoProyecto}',[DocumentosController::class, 'GetTorresDisponibleXPoryecto']);
+    Route::get('fechasDocumentos/{codigoDocumento}',[DocumentosController::class, 'CalculoFechaReal']);
     
     
     
